@@ -2,20 +2,11 @@
  * Dashboard statistics component
  */
 
-import React from 'react'
 import { Package, AlertTriangle, TrendingDown, CheckCircle } from 'lucide-react'
 import { formatNumber, formatCurrency, formatPercentage } from '@/utils'
 
-interface StatCard {
-  title: string
-  value: string | number
-  change?: string
-  changeType?: 'increase' | 'decrease' | 'neutral'
-  icon: React.ComponentType<{ className?: string }>
-  color: 'blue' | 'green' | 'yellow' | 'red'
-}
 
-const mockStats: StatCard[] = [
+const mockStats = [
   {
     title: 'Total Products',
     value: formatNumber(1247),
@@ -83,11 +74,9 @@ export default function DashboardStats() {
   )
 }
 
-interface StatCardProps {
-  stat: StatCard
-}
 
-function StatCard({ stat }: StatCardProps) {
+
+function StatCard({ stat }) {
   const colors = colorClasses[stat.color]
 
   return (

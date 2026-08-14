@@ -8,7 +8,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { RouteGuard, RoleGuard, PermissionGuard } from '@/components/common/RouteGuard'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { NotificationProvider } from '@/hooks/useNotifications'
-import * as authApi from '@/api/auth'
+import { authApi } from '@/api/auth'
 
 // Mock the auth API
 vi.mock('@/api/auth', () => ({
@@ -21,15 +21,15 @@ vi.mock('@/api/auth', () => ({
 }))
 
 function renderWithAuth(
-  component: React.ReactElement,
-  user: any = null,
-  token: string | null = null
+  component,
+  user = null,
+  token = null
 ) {
-  vi.mocked(authApi.authApi.getStoredToken).mockReturnValue(token)
-  vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(user)
+  vi.mocked(authApi.getStoredToken).mockReturnValue(token)
+  vi.mocked(authApi.getStoredUser).mockReturnValue(user)
   
   if (user && token) {
-    vi.mocked(authApi.authApi.me).mockResolvedValue(user)
+    vi.mocked(authApi.me).mockResolvedValue(user)
   }
 
   return render(
@@ -223,7 +223,7 @@ describe('RouteGuard', () => {
 
   it('uses custom check function', async () => {
     const ProtectedComponent = () => <div>Custom Check Content</div>
-    const customCheck = (user: any) => user?.name === 'Manager User'
+    const customCheck = (user) => user?.name === 'Manager User'
 
     renderWithAuth(
       <RouteGuard customCheck={customCheck}>
@@ -240,7 +240,7 @@ describe('RouteGuard', () => {
 
   it('denies access when custom check fails', async () => {
     const ProtectedComponent = () => <div>Custom Check Content</div>
-    const customCheck = (user: any) => user?.name === 'Admin User'
+    const customCheck = (user) => user?.name === 'Admin User'
 
     renderWithAuth(
       <RouteGuard customCheck={customCheck}>

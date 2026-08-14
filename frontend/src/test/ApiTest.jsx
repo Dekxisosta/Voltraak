@@ -3,12 +3,12 @@
  * Temporary component to test API integration
  */
 
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { apiClient } from '@/api/client'
 import { authApi } from '@/api/auth'
 
 // Test result structure: { name, status, message, data }
-const createTestResult = (name, status = 'pending', message = '', data = null) => ({
+const _createTestResult = (name, status = 'pending', message = '', data = null) => ({
   name,
   status, // 'pending' | 'success' | 'error'
   message,
@@ -16,10 +16,10 @@ const createTestResult = (name, status = 'pending', message = '', data = null) =
 })
 
 export default function ApiTest() {
-  const [results, setResults] = useState<ApiTestResult[]>([])
+  const [results, setResults] = useState([])
   const [isRunning, setIsRunning] = useState(false)
 
-  const updateResult = (name: string, status: ApiTestResult['status'], message: string, data?: any) => {
+  const updateResult = (name, status, message, data) => {
     setResults(prev => prev.map(r => 
       r.name === name ? { ...r, status, message, data } : r
     ))

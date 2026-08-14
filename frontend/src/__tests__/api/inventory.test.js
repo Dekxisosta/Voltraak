@@ -347,7 +347,7 @@ describe('Inventory API', () => {
       const newTransaction = {
         product_id: 1,
         batch_id: 1,
-        type: 'stock_out' as const,
+        type: 'stock_out',
         quantity: 10,
         reference_number: 'SO-2024-001',
         notes: 'Sale to customer',

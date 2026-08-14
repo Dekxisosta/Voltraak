@@ -2,8 +2,7 @@
  * Main dashboard page with role-based content
  */
 
-import React from 'react'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/contexts/AuthContext'
 import { ConditionalRender } from '@/components/common/ProtectedRoute'
 import DashboardStats from './components/DashboardStats'
 import RecentActivity from './components/RecentActivity'

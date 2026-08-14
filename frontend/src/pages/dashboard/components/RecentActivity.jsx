@@ -2,22 +2,11 @@
  * Recent activity component showing latest transactions and events
  */
 
-import React from 'react'
 import { Package, ArrowUp, ArrowDown, AlertCircle, User } from 'lucide-react'
 import { formatDateTime } from '@/utils'
 
-interface ActivityItem {
-  id: string
-  type: 'stock_in' | 'stock_out' | 'count' | 'alert'
-  title: string
-  description: string
-  user?: string
-  timestamp: string
-  icon: React.ComponentType<{ className?: string }>
-  color: 'blue' | 'green' | 'yellow' | 'red' | 'gray'
-}
 
-const mockActivity: ActivityItem[] = [
+const mockActivity = [
   {
     id: '1',
     type: 'stock_in',
@@ -120,12 +109,9 @@ export default function RecentActivity() {
   )
 }
 
-interface ActivityItemProps {
-  item: ActivityItem
-  isLast: boolean
-}
 
-function ActivityItem({ item, isLast }: ActivityItemProps) {
+
+function ActivityItem({ item, isLast }) {
   const colors = colorClasses[item.color]
 
   return (

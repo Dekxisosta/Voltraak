@@ -48,7 +48,7 @@ export const colors = {
     900: '#111827',
     950: '#030712',
   }
-} as const
+}
 
 export const spacing = {
   // Base spacing scale (4px base unit)
@@ -69,7 +69,7 @@ export const spacing = {
   // Semantic spacing
   containerPadding: '1.5rem', // 24px - Standard content padding
   sidebarWidth: '13.75rem',   // 220px - Sidebar width
-} as const
+}
 
 export const typography = {
   fontFamily: {
@@ -92,7 +92,7 @@ export const typography = {
     semibold: '600',
     bold: '700',
   }
-} as const
+}
 
 export const borderRadius = {
   none: '0',
@@ -102,7 +102,7 @@ export const borderRadius = {
   lg: '0.5rem',     // 8px
   xl: '0.75rem',    // 12px
   full: '9999px',   // Fully rounded
-} as const
+}
 
 export const shadows = {
   sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
@@ -110,7 +110,7 @@ export const shadows = {
   md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
   lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
   xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
-} as const
+}
 
 export const animation = {
   duration: {
@@ -124,7 +124,7 @@ export const animation = {
     easeOut: 'cubic-bezier(0, 0, 0.2, 1)', 
     easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
   }
-} as const
+}
 
 export const zIndex = {
   dropdown: 50,
@@ -133,7 +133,7 @@ export const zIndex = {
   modal: 80,
   popover: 90,
   tooltip: 100,
-} as const
+}
 
 // Component-specific tokens
 export const components = {
@@ -177,7 +177,7 @@ export const components = {
       borderRadius: borderRadius.md,
     }
   }
-} as const
+}
 
 // Breakpoints for responsive design
 export const breakpoints = {
@@ -186,14 +186,14 @@ export const breakpoints = {
   lg: '1024px',
   xl: '1280px',
   '2xl': '1536px',
-} as const
+}
 
 // Export utility function for consistent color usage
-export const getStatusColor = (status: 'ok' | 'warning' | 'critical' | 'neutral') => {
+export const getStatusColor = (status) => {
   return colors.status[status]
 }
 
 // Export utility for consistent spacing
-export const getSpacing = (key: keyof typeof spacing) => {
+export const getSpacing = (key) => {
   return spacing[key]
 }

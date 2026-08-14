@@ -7,44 +7,40 @@ import { execSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 
-interface TestSuite {
-  name: string
-  pattern: string
-  description: string
-}
-
 class FrontendTestRunner {
-  private testSuites: TestSuite[] = [
-    {
-      name: 'Component Tests',
-      pattern: 'src/__tests__/components/**/*.test.{ts,tsx}',
-      description: 'Testing UI components and their interactions'
-    },
-    {
-      name: 'Context Tests',
-      pattern: 'src/__tests__/contexts/**/*.test.{ts,tsx}',
-      description: 'Testing React contexts and providers'
-    },
-    {
-      name: 'API Tests',
-      pattern: 'src/__tests__/api/**/*.test.{ts,tsx}',
-      description: 'Testing API client integrations'
-    },
-    {
-      name: 'Hook Tests',
-      pattern: 'src/__tests__/hooks/**/*.test.{ts,tsx}',
-      description: 'Testing custom React hooks'
-    },
-    {
-      name: 'Utility Tests',
-      pattern: 'src/__tests__/utils/**/*.test.{ts,tsx}',
-      description: 'Testing utility functions and helpers'
-    }
-  ]
+  constructor() {
+    this.testSuites = [
+      {
+        name: 'Component Tests',
+        pattern: 'src/__tests__/components/**/*.test.jsx',
+        description: 'Testing UI components and their interactions'
+      },
+      {
+        name: 'Context Tests', 
+        pattern: 'src/__tests__/contexts/**/*.test.jsx',
+        description: 'Testing React contexts and providers'
+      },
+      {
+        name: 'API Tests',
+        pattern: 'src/__tests__/api/**/*.test.js',
+        description: 'Testing API client integrations'
+      },
+      {
+        name: 'Hook Tests',
+        pattern: 'src/__tests__/hooks/**/*.test.jsx',
+        description: 'Testing custom React hooks'
+      },
+      {
+        name: 'Utility Tests',
+        pattern: 'src/__tests__/utils/**/*.test.js',
+        description: 'Testing utility functions and helpers'
+      }
+    ]
 
-  private results: Map<string, boolean> = new Map()
+    this.results = new Map()
+  }
 
-  run(): void {
+  run() {
     this.printHeader()
     
     // Run individual test suites
@@ -61,13 +57,13 @@ class FrontendTestRunner {
     this.printSummary()
   }
 
-  private printHeader(): void {
+  printHeader() {
     console.log('\n🚀 Voltraak IMS - Frontend Test Suite')
     console.log('='.repeat(50))
     console.log('Running comprehensive frontend tests...\n')
   }
 
-  private runTestSuite(suite: TestSuite): void {
+  runTestSuite(suite) {
     console.log(`🧪 Running ${suite.name}...`)
     console.log(`📝 ${suite.description}`)
     console.log('-'.repeat(40))
@@ -99,7 +95,7 @@ class FrontendTestRunner {
     }
   }
 
-  private runCoverageTests(): void {
+  runCoverageTests() {
     console.log('📊 Running full test suite with coverage...')
     console.log('-'.repeat(40))
 
@@ -114,13 +110,13 @@ class FrontendTestRunner {
     }
   }
 
-  private findTestFiles(pattern: string): string[] {
+  findTestFiles(pattern) {
     try {
       // Simple glob-like pattern matching for test files
       const baseDir = 'src/__tests__'
-      const testFiles: string[] = []
+      const testFiles = []
       
-      const scanDirectory = (dir: string) => {
+      const scanDirectory = (dir) => {
         if (!fs.existsSync(dir)) return
         
         const entries = fs.readdirSync(dir, { withFileTypes: true })
@@ -130,7 +126,7 @@ class FrontendTestRunner {
           
           if (entry.isDirectory()) {
             scanDirectory(fullPath)
-          } else if (entry.name.endsWith('.test.ts') || entry.name.endsWith('.test.tsx')) {
+          } else if (entry.name.endsWith('.test.js') || entry.name.endsWith('.test.jsx')) {
             testFiles.push(fullPath)
           }
         }
@@ -144,7 +140,7 @@ class FrontendTestRunner {
     }
   }
 
-  private generateTestReport(): void {
+  generateTestReport() {
     const reportData = {
       timestamp: new Date().toISOString(),
       totalSuites: this.testSuites.length,
@@ -158,7 +154,7 @@ class FrontendTestRunner {
     console.log(`📄 Test report saved to ${reportPath}`)
   }
 
-  private getCoverageData(): object {
+  getCoverageData() {
     try {
       const coveragePath = 'coverage/coverage-summary.json'
       if (fs.existsSync(coveragePath)) {
@@ -170,7 +166,7 @@ class FrontendTestRunner {
     return {}
   }
 
-  private printSummary(): void {
+  printSummary() {
     console.log('\n📋 Test Summary')
     console.log('='.repeat(50))
 
@@ -194,7 +190,7 @@ class FrontendTestRunner {
 }
 
 // Run if this script is executed directly
-if (require.main === module) {
+if (process.argv[1] === new URL(import.meta.url).pathname) {
   const runner = new FrontendTestRunner()
   runner.run()
 }

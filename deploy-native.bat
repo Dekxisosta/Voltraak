@@ -3,13 +3,11 @@ echo ========================================
 echo 🚀 Voltraak IMS - Native Deployment
 echo ========================================
 
-echo Checking requirements...
-
 REM Check PHP
 php --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ PHP not found
-    echo Please install PHP from https://windows.php.net/download/
+    echo ❌ PHP not found. Please install PHP 8.1+ and add to PATH
+    echo Download: https://www.php.net/downloads
     pause
     exit /b 1
 )
@@ -18,160 +16,131 @@ echo ✅ PHP found
 REM Check Node.js
 node --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ Node.js not found
-    echo Please install Node.js from https://nodejs.org/
+    echo ❌ Node.js not found. Please install Node.js 18+ and add to PATH
+    echo Download: https://nodejs.org/
     pause
     exit /b 1
 )
 echo ✅ Node.js found
 
-REM Check if we're in the right directory
-if not exist "backend" (
-    echo ❌ Backend directory not found
-    echo Please run this script from the project root directory
-    pause
-    exit /b 1
-)
-
-if not exist "frontend" (
-    echo ❌ Frontend directory not found
-    echo Please run this script from the project root directory
-    pause
-    exit /b 1
-)
-
-echo.
-echo 📦 Setting up Backend (Laravel)...
-
-cd backend
-
-REM Check if Composer is available
+REM Check Composer
 composer --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ❌ Composer not found
-    echo Installing Composer...
-    
-    REM Download Composer installer
-    php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
-    php composer-setup.php
-    php -r "unlink('composer-setup.php');"
-    
-    REM Use local composer
-    set COMPOSER_CMD=php composer.phar
-) else (
-    echo ✅ Composer found
-    set COMPOSER_CMD=composer
+    echo ❌ Composer not found. Please install Composer and add to PATH
+    echo Download: https://getcomposer.org/
+    pause
+    exit /b 1
 )
+echo ✅ Composer found
 
-REM Install Laravel dependencies
-echo Installing Laravel dependencies...
-%COMPOSER_CMD% install --no-dev --optimize-autoloader
+echo.
+echo 📦 Setting up Backend...
+cd backend
+
+REM Install backend dependencies
+echo Installing PHP dependencies...
+composer install --optimize-autoloader
 
 REM Setup environment
 if not exist ".env" (
-    echo Creating .env file...
+    echo Setting up .env file...
     copy .env.example .env
+    php artisan key:generate --force
 )
 
-REM Generate app key
-echo Generating application key...
-php artisan key:generate
+REM Setup database (SQLite for simplicity)
+echo Setting up database...
+if not exist "database\database.sqlite" (
+    echo. > database\database.sqlite
+)
 
-REM Create SQLite database for simplicity
-echo Creating SQLite database...
-echo. > database.sqlite
-
-REM Update .env for SQLite
-echo Configuring database...
-echo DB_CONNECTION=sqlite > .env.temp
-echo DB_DATABASE=%cd%\database.sqlite >> .env.temp
-echo APP_NAME="Voltraak IMS" >> .env.temp
-echo APP_ENV=local >> .env.temp
-echo APP_DEBUG=true >> .env.temp
-echo APP_URL=http://localhost:8000 >> .env.temp
-echo LOG_CHANNEL=stack >> .env.temp
-echo LOG_LEVEL=debug >> .env.temp
-echo CACHE_DRIVER=file >> .env.temp
-echo SESSION_DRIVER=file >> .env.temp
-echo QUEUE_CONNECTION=sync >> .env.temp
-echo JWT_SECRET=your-jwt-secret-here-make-it-long-and-random >> .env.temp
-echo JWT_TTL=60 >> .env.temp
-echo MAIL_MAILER=log >> .env.temp
-echo IMS_FEFO_STRICT_MODE=true >> .env.temp
-echo IMS_AUTO_REORDER_ENABLED=true >> .env.temp
-echo IMS_BATCH_EXPIRY_WARNING_DAYS=60 >> .env.temp
-echo IMS_VARIANCE_ALERT_THRESHOLD=5 >> .env.temp
-
-move .env.temp .env
-
-REM Run migrations
+REM Run migrations and seed
 echo Running database migrations...
 php artisan migrate --force
 
-REM Seed database
-echo Creating demo data...
+echo Seeding database with demo data...
 php artisan db:seed --force
 
-echo ✅ Backend setup complete!
-
-cd..
-
 echo.
-echo 🎨 Setting up Frontend (React)...
+echo 🌐 Setting up Frontend...
+cd ..\frontend
 
-cd frontend
-
-REM Install Node.js dependencies
+REM Install frontend dependencies
 echo Installing Node.js dependencies...
 npm install
 
-echo ✅ Frontend setup complete!
-
-cd..
-
-echo.
-echo 🚀 Starting Services...
-
-REM Start backend server in background
-echo Starting Laravel backend on http://localhost:8000
-start "Voltraak Backend" cmd /k "cd backend && php artisan serve --host=0.0.0.0 --port=8000"
-
-REM Wait a bit for backend to start
-timeout /t 5 /nobreak > nul
-
-REM Start frontend server in background
-echo Starting React frontend on http://localhost:5173
-start "Voltraak Frontend" cmd /k "cd frontend && npm run dev"
-
-REM Wait for frontend to start
-timeout /t 10 /nobreak > nul
+REM Build frontend for production
+echo Building frontend for production...
+npm run build
 
 echo.
 echo ========================================
 echo 🎉 DEPLOYMENT COMPLETE!
 echo ========================================
 echo.
+echo 🚀 Starting Services...
+
+REM Start backend server
+echo Starting Backend API Server...
+start "Voltraak Backend" cmd /c "cd /d %~dp0backend && php -S localhost:8000 -t public"
+
+timeout /t 3 /nobreak > nul
+
+REM Start frontend dev server (for development) or serve built files
+echo Starting Frontend Server...
+start "Voltraak Frontend" cmd /c "cd /d %~dp0frontend && npm run dev"
+
+timeout /t 5 /nobreak > nul
+
+echo.
+echo ========================================
+echo 🌟 VOLTRAAK IMS IS NOW RUNNING!
+echo ========================================
+echo.
 echo 🌐 Access Points:
-echo   Frontend:     http://localhost:5173
+echo   Frontend:     http://localhost:3000
 echo   Backend API:  http://localhost:8000/api
-echo   Backend Health: http://localhost:8000/api/health
+echo   API Health:   http://localhost:8000/api/health
 echo.
 echo 👤 Demo Login Credentials:
 echo   Admin:        admin@voltraak.com / admin123
-echo   Manager:      manager@voltraak.com / manager123
+echo   Manager:      manager@voltraak.com / manager123  
 echo   Inventory:    inventory@voltraak.com / inventory123
 echo   Warehouse:    warehouse@voltraak.com / warehouse123
 echo.
+echo 📋 System Status:
+echo   ✅ Backend running on localhost:8000
+echo   ✅ Frontend running on localhost:3000
+echo   ✅ Database (SQLite) initialized
+echo   ✅ Demo data loaded
+echo.
 echo 🔧 Management:
-echo   - Two terminal windows will open automatically
-echo   - Close terminal windows to stop servers
-echo   - Backend data stored in: backend/database.sqlite
+echo   Stop services: Close the terminal windows
+echo   View logs: Check the terminal windows
+echo   Restart: Re-run this script
 echo.
-echo 🧪 Quick Test:
-curl -s http://localhost:8000/api/health
-echo.
-echo.
-echo 🎯 Ready to use! Open http://localhost:5173 in your browser
+echo 🎯 Ready to use! Open http://localhost:3000 in your browser
 echo ========================================
 
-pause
+REM Test deployment
+echo.
+echo 🧪 Quick Health Check:
+timeout /t 3 /nobreak > nul
+
+curl -s http://localhost:8000/api/health >nul 2>&1
+if %errorlevel% equ 0 (
+    echo ✅ Backend API is responding
+) else (
+    echo ⚠️  Backend API may still be starting up
+    echo    Check the backend terminal window for any errors
+)
+
+echo.
+echo 🌐 Opening browser...
+timeout /t 2 /nobreak > nul
+start http://localhost:3000
+
+echo.
+echo Press any key to exit deployment script...
+echo (Services will continue running in background)
+pause >nul

@@ -8,7 +8,7 @@ import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { NotificationProvider } from '@/hooks/useNotifications'
-import * as authApi from '@/api/auth'
+import { authApi } from '@/api/auth'
 
 // Mock the auth API
 vi.mock('@/api/auth', () => ({
@@ -85,7 +85,7 @@ function TestComponent() {
   )
 }
 
-function renderWithProviders(component: React.ReactElement) {
+function renderWithProviders(component) {
   return render(
     <BrowserRouter>
       <NotificationProvider>
@@ -129,8 +129,8 @@ describe('AuthContext', () => {
   })
 
   it('initializes with no authenticated user', async () => {
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue(null)
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(null)
+    vi.mocked(authApi.getStoredToken).mockReturnValue(null)
+    vi.mocked(authApi.getStoredUser).mockReturnValue(null)
 
     renderWithProviders(<TestComponent />)
 
@@ -143,9 +143,9 @@ describe('AuthContext', () => {
   })
 
   it('initializes with stored authenticated user', async () => {
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
 
     renderWithProviders(<TestComponent />)
 
@@ -159,7 +159,7 @@ describe('AuthContext', () => {
   })
 
   it('handles login successfully', async () => {
-    vi.mocked(authApi.authApi.login).mockResolvedValue(mockAuthResponse)
+    vi.mocked(authApi.login).mockResolvedValue(mockAuthResponse)
     
     const user = userEvent.setup()
     renderWithProviders(<TestComponent />)
@@ -177,14 +177,14 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('user-name')).toHaveTextContent('John Doe')
-    expect(vi.mocked(authApi.authApi.login)).toHaveBeenCalledWith({
+    expect(vi.mocked(authApi.login)).toHaveBeenCalledWith({
       email: 'test@example.com',
       password: 'password'
     })
   })
 
   it('handles login failure', async () => {
-    vi.mocked(authApi.authApi.login).mockRejectedValue(new Error('Invalid credentials'))
+    vi.mocked(authApi.login).mockRejectedValue(new Error('Invalid credentials'))
     
     const user = userEvent.setup()
     renderWithProviders(<TestComponent />)
@@ -203,10 +203,10 @@ describe('AuthContext', () => {
   })
 
   it('handles logout', async () => {
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
-    vi.mocked(authApi.authApi.logout).mockResolvedValue()
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.logout).mockResolvedValue()
 
     const user = userEvent.setup()
     renderWithProviders(<TestComponent />)
@@ -223,13 +223,13 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated')
     })
 
-    expect(vi.mocked(authApi.authApi.logout)).toHaveBeenCalled()
+    expect(vi.mocked(authApi.logout)).toHaveBeenCalled()
   })
 
   it('checks user roles correctly', async () => {
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
 
     renderWithProviders(<TestComponent />)
 
@@ -239,9 +239,9 @@ describe('AuthContext', () => {
   })
 
   it('checks user permissions correctly', async () => {
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
 
     renderWithProviders(<TestComponent />)
 
@@ -251,9 +251,9 @@ describe('AuthContext', () => {
   })
 
   it('checks route access correctly', async () => {
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
 
     renderWithProviders(<TestComponent />)
 
@@ -265,10 +265,10 @@ describe('AuthContext', () => {
   it('handles token refresh automatically', async () => {
     vi.useFakeTimers()
     
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
-    vi.mocked(authApi.authApi.refreshToken).mockResolvedValue({
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.refreshToken).mockResolvedValue({
       token: 'new-jwt-token',
       api_token: 'new-api-token',
       expires_in: 3600,
@@ -286,7 +286,7 @@ describe('AuthContext', () => {
     })
 
     await waitFor(() => {
-      expect(vi.mocked(authApi.authApi.refreshToken)).toHaveBeenCalled()
+      expect(vi.mocked(authApi.refreshToken)).toHaveBeenCalled()
     })
 
     vi.useRealTimers()
@@ -295,10 +295,10 @@ describe('AuthContext', () => {
   it('handles session expiry', async () => {
     vi.useFakeTimers()
     
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
-    vi.mocked(authApi.authApi.refreshToken).mockRejectedValue(new Error('Token expired'))
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.refreshToken).mockRejectedValue(new Error('Token expired'))
 
     renderWithProviders(<TestComponent />)
 
@@ -321,9 +321,9 @@ describe('AuthContext', () => {
   it('shows session expiry warning', async () => {
     vi.useFakeTimers()
     
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(mockUser)
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockResolvedValue(mockUser)
 
     renderWithProviders(<TestComponent />)
 
@@ -343,9 +343,9 @@ describe('AuthContext', () => {
   })
 
   it('handles invalid stored token', async () => {
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('invalid-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(mockUser)
-    vi.mocked(authApi.authApi.me).mockRejectedValue(new Error('Unauthorized'))
+    vi.mocked(authApi.getStoredToken).mockReturnValue('invalid-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(mockUser)
+    vi.mocked(authApi.me).mockRejectedValue(new Error('Unauthorized'))
 
     renderWithProviders(<TestComponent />)
 
@@ -354,7 +354,7 @@ describe('AuthContext', () => {
     })
 
     expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated')
-    expect(vi.mocked(authApi.authApi.clearAuth)).toHaveBeenCalled()
+    expect(vi.mocked(authApi.clearAuth)).toHaveBeenCalled()
   })
 
   it('handles different user roles', async () => {
@@ -364,9 +364,9 @@ describe('AuthContext', () => {
       permissions: ['inventory.view'],
     }
 
-    vi.mocked(authApi.authApi.getStoredToken).mockReturnValue('stored-token')
-    vi.mocked(authApi.authApi.getStoredUser).mockReturnValue(warehouseUser)
-    vi.mocked(authApi.authApi.me).mockResolvedValue(warehouseUser)
+    vi.mocked(authApi.getStoredToken).mockReturnValue('stored-token')
+    vi.mocked(authApi.getStoredUser).mockReturnValue(warehouseUser)
+    vi.mocked(authApi.me).mockResolvedValue(warehouseUser)
 
     renderWithProviders(<TestComponent />)
 

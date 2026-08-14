@@ -49,19 +49,40 @@ Route::post('/auth/login', function (Illuminate\Http\Request $request) {
         'warehouse@voltraak.com' => 'warehouse123'
     ];
     
+    $users = [
+        'admin@voltraak.com' => [
+            'id' => 1, 'name' => 'System Administrator', 'email' => 'admin@voltraak.com',
+            'role' => 'manager', 'role_display' => 'Manager',
+            'permissions' => ['*'], 'is_active' => true
+        ],
+        'manager@voltraak.com' => [
+            'id' => 2, 'name' => 'Store Manager', 'email' => 'manager@voltraak.com',
+            'role' => 'manager', 'role_display' => 'Manager',
+            'permissions' => ['*'], 'is_active' => true
+        ],
+        'inventory@voltraak.com' => [
+            'id' => 3, 'name' => 'Inventory Staff', 'email' => 'inventory@voltraak.com',
+            'role' => 'inventory_staff', 'role_display' => 'Inventory Staff',
+            'permissions' => ['inventory.view', 'inventory.edit', 'batches.view', 'batches.edit', 'physical_counts.create'],
+            'is_active' => true
+        ],
+        'warehouse@voltraak.com' => [
+            'id' => 4, 'name' => 'Warehouse Staff', 'email' => 'warehouse@voltraak.com',
+            'role' => 'warehouse', 'role_display' => 'Warehouse Staff',
+            'permissions' => ['inventory.view', 'picking.view', 'picking.edit', 'receiving.view', 'receiving.edit'],
+            'is_active' => true
+        ],
+    ];
+    
     $email = $request->input('email');
     $password = $request->input('password');
     
     if (isset($credentials[$email]) && $credentials[$email] === $password) {
+        $user = $users[$email];
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => [
-                    'id' => 1,
-                    'name' => 'Demo User',
-                    'email' => $email,
-                    'role' => 'manager'
-                ],
+                'user' => $user,
                 'token' => 'demo_token_' . base64_encode($email),
                 'api_token' => 'demo_api_' . uniqid(),
                 'expires_in' => 3600
@@ -75,6 +96,50 @@ Route::post('/auth/login', function (Illuminate\Http\Request $request) {
         'message' => 'Invalid credentials',
         'timestamp' => now()->toISOString()
     ], 401);
+});
+
+// Auth me endpoint
+Route::get('/auth/me', function (Illuminate\Http\Request $request) {
+    $authHeader = $request->header('Authorization', '');
+    $token = str_replace('Bearer ', '', $authHeader);
+    $email = base64_decode(str_replace('demo_token_', '', $token));
+    
+    $users = [
+        'admin@voltraak.com' => [
+            'id' => 1, 'name' => 'System Administrator', 'email' => 'admin@voltraak.com',
+            'role' => 'manager', 'role_display' => 'Manager',
+            'permissions' => ['*'], 'is_active' => true
+        ],
+        'manager@voltraak.com' => [
+            'id' => 2, 'name' => 'Store Manager', 'email' => 'manager@voltraak.com',
+            'role' => 'manager', 'role_display' => 'Manager',
+            'permissions' => ['*'], 'is_active' => true
+        ],
+        'inventory@voltraak.com' => [
+            'id' => 3, 'name' => 'Inventory Staff', 'email' => 'inventory@voltraak.com',
+            'role' => 'inventory_staff', 'role_display' => 'Inventory Staff',
+            'permissions' => ['inventory.view', 'inventory.edit', 'batches.view', 'batches.edit', 'physical_counts.create'],
+            'is_active' => true
+        ],
+        'warehouse@voltraak.com' => [
+            'id' => 4, 'name' => 'Warehouse Staff', 'email' => 'warehouse@voltraak.com',
+            'role' => 'warehouse', 'role_display' => 'Warehouse Staff',
+            'permissions' => ['inventory.view', 'picking.view', 'picking.edit', 'receiving.view', 'receiving.edit'],
+            'is_active' => true
+        ],
+    ];
+    
+    if (!$authHeader) {
+        return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+    }
+    
+    $user = $users[$email] ?? $users['admin@voltraak.com'];
+    return response()->json(['success' => true, 'data' => $user]);
+});
+
+// Auth logout
+Route::post('/auth/logout', function () {
+    return response()->json(['success' => true, 'message' => 'Logged out']);
 });
 
 // Demo products endpoint

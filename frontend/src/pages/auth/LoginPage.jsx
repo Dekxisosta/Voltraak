@@ -2,19 +2,16 @@
  * Login page component
  */
 
-import React, { useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import { Eye, EyeOff, LogIn } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useFormNotifications } from '@/hooks/useNotifications'
 import { cn } from '@/utils'
 
-interface LocationState {
-  from?: string
-}
+
 
 export default function LoginPage() {
-  const navigate = useNavigate()
   const location = useLocation()
   const { login } = useAuth()
   const { showValidationErrors } = useFormNotifications()
@@ -23,14 +20,14 @@ export default function LoginPage() {
     email: '',
     password: '',
   })
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Get the page user was trying to access before login
-  const from = (location.state as LocationState)?.from || '/dashboard'
+  const from = (location.state)?.from || '/dashboard'
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
     
@@ -41,7 +38,7 @@ export default function LoginPage() {
   }
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {}
+    const newErrors = {}
 
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
@@ -59,7 +56,7 @@ export default function LoginPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     if (!validateForm()) {
@@ -201,9 +198,9 @@ export default function LoginPage() {
       </form>
 
       {/* Demo credentials */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
-        <h3 className="text-sm font-medium text-blue-800 mb-2">Demo Credentials</h3>
-        <div className="text-sm text-blue-700 space-y-1">
+      <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-md">
+        <h3 className="text-sm font-medium text-amber-800 mb-2">Demo Credentials</h3>
+        <div className="text-sm text-amber-700 space-y-1">
           <p><strong>Manager:</strong> manager@voltraak.com / manager123</p>
           <p><strong>Inventory Staff:</strong> inventory@voltraak.com / inventory123</p>
           <p><strong>Warehouse Staff:</strong> warehouse@voltraak.com / warehouse123</p>

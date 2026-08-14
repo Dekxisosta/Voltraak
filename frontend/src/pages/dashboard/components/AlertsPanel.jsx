@@ -2,24 +2,10 @@
  * Alerts panel showing critical notifications and warnings
  */
 
-import React from 'react'
 import { AlertTriangle, Clock, Package, TrendingDown } from 'lucide-react'
 import { formatRelativeTime } from '@/utils'
 
-interface Alert {
-  id: string
-  type: 'critical' | 'warning' | 'info'
-  title: string
-  message: string
-  timestamp: string
-  action?: {
-    label: string
-    onClick: () => void
-  }
-  icon: React.ComponentType<{ className?: string }>
-}
-
-const mockAlerts: Alert[] = [
+const mockAlerts = [
   {
     id: '1',
     type: 'critical',
@@ -114,7 +100,7 @@ export default function AlertsPanel() {
             </div>
           )}
         </div>
-        
+
         {mockAlerts.length > 3 && (
           <div className="mt-4 pt-4 border-t border-gray-200">
             <button className="w-full text-sm text-blue-600 hover:text-blue-500">
@@ -127,11 +113,7 @@ export default function AlertsPanel() {
   )
 }
 
-interface AlertItemProps {
-  alert: Alert
-}
-
-function AlertItem({ alert }: AlertItemProps) {
+function AlertItem({ alert }) {
   const styles = alertTypeStyles[alert.type]
 
   return (

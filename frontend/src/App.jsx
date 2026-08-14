@@ -2,10 +2,9 @@
  * Main application component with routing and providers
  */
 
-import React from 'react'
-import { BrowserRouter } from 'react-router-dom'
 import { ErrorBoundary, NotificationContainer } from '@/components/common'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import { NotificationProvider } from '@/hooks/useNotifications'
 import AppRoutes from '@/routes/AppRoutes'
 import ApiTest from '@/test/ApiTest'
@@ -19,9 +18,11 @@ export default function App() {
   if (testMode === 'api') {
     return (
       <ErrorBoundary>
-        <div className="min-h-screen bg-gray-50 py-8">
-          <ApiTest />
-        </div>
+        <ThemeProvider>
+          <div className="min-h-screen py-8">
+            <ApiTest />
+          </div>
+        </ThemeProvider>
       </ErrorBoundary>
     )
   }
@@ -29,31 +30,31 @@ export default function App() {
   if (testMode === 'auth') {
     return (
       <ErrorBoundary>
-        <BrowserRouter>
+        <ThemeProvider>
           <NotificationProvider>
             <AuthProvider>
-              <div className="min-h-screen bg-gray-50 py-8">
+              <div className="min-h-screen py-8">
                 <AuthFlowTest />
               </div>
             </AuthProvider>
           </NotificationProvider>
-        </BrowserRouter>
+        </ThemeProvider>
       </ErrorBoundary>
     )
   }
 
   return (
     <ErrorBoundary>
-      <BrowserRouter>
+      <ThemeProvider>
         <NotificationProvider>
           <AuthProvider>
-            <div className="min-h-screen bg-gray-50">
+            <div className="min-h-screen">
               <AppRoutes />
               <NotificationContainer />
             </div>
           </AuthProvider>
         </NotificationProvider>
-      </BrowserRouter>
+      </ThemeProvider>
     </ErrorBoundary>
   )
 }

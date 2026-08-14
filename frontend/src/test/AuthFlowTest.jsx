@@ -3,13 +3,12 @@
  * Tests the complete authentication system including login, session management, and routing guards
  */
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useAccessControl } from '@/components/common/RouteGuard'
 import { useSessionStatus } from '@/components/common/SessionManager'
 
 // Auth test result structure: { name, status, message, data }
-const createAuthTestResult = (name, status = 'pending', message = '', data = null) => ({
+const _createAuthTestResult = (name, status = 'pending', message = '', data = null) => ({
   name,
   status, // 'pending' | 'success' | 'error' | 'skipped'
   message,
@@ -23,10 +22,8 @@ export default function AuthFlowTest() {
     logout, 
     user, 
     hasRole, 
-    hasPermission,
     canAccessRoute
   } = useAuth()
-  const { checkAccess } = useAccessControl()
   const { timeRemaining, isExpiringSoon, formatTime } = useSessionStatus()
 
   const [results, setResults] = useState([])

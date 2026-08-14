@@ -2,7 +2,7 @@
  * Forgot password page component
  */
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Mail } from 'lucide-react'
 import { useFormNotifications } from '@/hooks/useNotifications'
@@ -11,12 +11,12 @@ import { cn } from '@/utils'
 export default function ForgotPasswordPage() {
   const { showValidationErrors, showFormSuccess } = useFormNotifications()
   const [email, setEmail] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
   const validateEmail = () => {
-    const newErrors: Record<string, string> = {}
+    const newErrors = {}
 
     if (!email.trim()) {
       newErrors.email = 'Email is required'
@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     if (!validateEmail()) {

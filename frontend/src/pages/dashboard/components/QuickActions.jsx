@@ -2,19 +2,8 @@
  * Quick actions panel for common tasks
  */
 
-import React from 'react'
 import { Plus, Search, FileText, Users } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
 import { ConditionalRender } from '@/components/common/ProtectedRoute'
-
-interface QuickAction {
-  label: string
-  description: string
-  icon: React.ComponentType<{ className?: string }>
-  onClick: () => void
-  roles?: string[]
-  color: 'blue' | 'green' | 'purple' | 'orange'
-}
 
 const colorClasses = {
   blue: 'bg-blue-600 hover:bg-blue-700',
@@ -24,7 +13,7 @@ const colorClasses = {
 }
 
 export default function QuickActions() {
-  const quickActions: QuickAction[] = [
+  const quickActions = [
     {
       label: 'Stock In',
       description: 'Record new inventory',
@@ -77,11 +66,9 @@ export default function QuickActions() {
   )
 }
 
-interface QuickActionButtonProps {
-  action: QuickAction
-}
 
-function QuickActionButton({ action }: QuickActionButtonProps) {
+
+function QuickActionButton({ action }) {
   return (
     <button
       onClick={action.onClick}
