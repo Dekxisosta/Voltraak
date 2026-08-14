@@ -1,8 +1,0 @@
-# Voltraak IMS - Kubernetes Namespace
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: voltraak-ims
-  labels:
-    app: voltraak
-    environment: production

@@ -4,6 +4,7 @@
 
 **Pattern:** Modular Monolith  
 **Deployment:** Single deployable Laravel backend + React SPA frontend
+**Hosting:** Docker Compose (development) or traditional hosting (production)
 
 ## Backend Stack
 
@@ -25,7 +26,7 @@ app/
 
 ## Frontend Stack
 
-- **Framework:** React 18 with TypeScript
+- **Framework:** React 18 with JavaScript
 - **Build Tool:** Vite
 - **Routing:** React Router DOM
 - **Styling:** Tailwind CSS
@@ -35,14 +36,13 @@ app/
 ### Frontend Structure
 ```
 src/
-├── api/           # Typed API clients per backend module
+├── api/           # API clients per backend module
 ├── components/    # Shared components (common/ + layout/)
 ├── features/      # Feature-scoped screens
 ├── hooks/         # Cross-cutting React hooks
 ├── pages/         # Role-scoped screens by user role
 ├── routes/        # Route definitions and guards
-├── styles/        # Tailwind config + design tokens
-└── types/         # TypeScript definitions
+└── styles/        # Tailwind config + design tokens
 ```
 
 ## Common Commands
