@@ -6,66 +6,116 @@
 
 ---
 
-## 1. Route Table
+## 1. Route Architecture
 
-Defined in `frontend/src/routes/AppRoutes.tsx`. Grouped by role, each group wrapped in a
-`RoleRoute` element that gates the whole group:
+Routes are organized by role with modular route definitions:
 
-| Path | Role(s) | Page |
+```
+routes/
+├── AppRoutes.jsx          # Main router with protected layouts
+├── inventory/             # Inventory staff routes
+│   └── InventoryRoutes.jsx
+├── manager/               # Manager routes  
+│   └── ManagerRoutes.jsx
+└── warehouse/             # Warehouse staff routes
+    └── WarehouseRoutes.jsx
+```
+
+Each role has its own route file that defines both public and protected routes for that domain.
+
+## 2. Current Route Table
+
+Defined across role-specific route files, each group protected by authentication and role checks:
+
+### Public Routes
+| Path | Component | Purpose |
 |---|---|---|
-| `/login` | Public | `LoginPage` |
-| `/warehouse/receiving` | warehouse, manager | `ReceivingPage` |
-| `/warehouse/picking` | warehouse, manager | `PickingPage` |
-| `/warehouse/fefo` | warehouse, manager | `FEFOPage` |
-| `/warehouse/discrepancies` | warehouse, manager | `DiscrepanciesPage` |
-| `/inventory/stock-in-out` | inventory, manager | `StockInOutPage` |
-| `/inventory/damage-report` | inventory, manager | `DamageReportPage` |
-| `/inventory/item-update` | inventory, manager | `ItemUpdatePage` |
-| `/inventory/stock-levels` | inventory, manager | `StockLevelsPage` |
-| `/inventory/reservations` | inventory, manager | `ReservationsPage` |
-| `/inventory/expiry-alerts` | inventory, manager | `ExpiryAlertsPage` |
-| `/manager/kpi` | manager | `KPIDashboardPage` |
-| `/manager/forecast` | manager | `ForecastReportsPage` |
-| `/manager/reports` | manager | `InventoryReportsPage` |
-| `/manager/low-stock` | manager | `LowStockAlertsPage` |
-| `/manager/po-approvals` | manager | `POApprovalsPage` |
-| `/` | any | Redirect — see §3 |
+| `/login` | `LoginPage` | Authentication |
+| `/forgot-password` | `ForgotPasswordPage` | Password recovery |
 
-Manager is allowed on every warehouse/inventory route (mirrors the "Manager can access everything
-Inventory/Warehouse can read" convention in `../Backend/API.md`).
+### Protected Routes (Role-Based)
+| Path | Role(s) | Page | Status |
+|---|---|---|---|
+| `/dashboard` | all authenticated | `DashboardPage` | ✅ Implemented |
+| `/warehouse/receiving` | warehouse, manager | `ReceivingPage` | 🚧 In Progress |
+| `/warehouse/picking` | warehouse, manager | `PickingPage` | 🚧 In Progress |
+| `/warehouse/fefo` | warehouse, manager | `FEFOPage` | 🚧 In Progress |
+| `/warehouse/discrepancies` | warehouse, manager | `DiscrepanciesPage` | 🚧 In Progress |
+| `/inventory/stock-in-out` | inventory_staff, manager | `StockInOutPage` | 🚧 In Progress |
+| `/inventory/damage-report` | inventory_staff, manager | `DamageReportPage` | 🚧 In Progress |
+| `/inventory/item-update` | inventory_staff, manager | `ItemUpdatePage` | 🚧 In Progress |
+| `/inventory/stock-levels` | inventory_staff, manager | `StockLevelsPage` | 🚧 In Progress |
+| `/inventory/reservations` | inventory_staff, manager | `ReservationsPage` | 🚧 In Progress |
+| `/inventory/expiry-alerts` | inventory_staff, manager | `ExpiryAlertsPage` | 🚧 In Progress |
+| `/manager/kpi` | manager | `KPIDashboardPage` | 🚧 In Progress |
+| `/manager/forecast` | manager | `ForecastReportsPage` | 🚧 In Progress |
+| `/manager/reports` | manager | `InventoryReportsPage` | 🚧 In Progress |
+| `/manager/low-stock` | manager | `LowStockAlertsPage` | 🚧 In Progress |
+| `/manager/po-approvals` | manager | `POApprovalsPage` | 🚧 In Progress |
 
-## 2. Route Guard — `RoleRoute`
+Manager role has access to all warehouse and inventory routes (hierarchical permissions).
 
-`frontend/src/routes/RoleRoute.tsx`:
+## 3. Route Protection — `ProtectedRoute` & Role Guards
 
-- No `user` → redirect to `/login`.
-- `user.role` not in `allowed` → redirect to `/`.
-- Otherwise renders `<AppShell role={user.role}><Outlet /></AppShell>` — the shell (sidebar + nav)
-  is applied once per route group, not per page.
+### Authentication Guard
+`ProtectedRoute` component (in AppRoutes.jsx):
+- Checks authentication status via `useAuth()`
+- Redirects to `/login` if not authenticated
+- Shows loading state while auth is being verified
 
-**This is UX-only gating.** The comment in the source is explicit about this and it's worth
-repeating here: the server enforces RBAC on every endpoint (`../Backend/API.md` §RBAC); this layer
-only prevents an authenticated-but-wrong-role user from *seeing* a screen they couldn't act on
-anyway. Never add a feature here as a substitute for a server-side check.
+### Role-Based Access
+Routes are further protected by role-specific checks:
+- Each role-specific router checks `user.role` matches allowed roles
+- Manager role has access to all warehouse and inventory routes
+- Unauthorized access redirects to appropriate dashboard
 
-## 3. Root Redirect
+**Important:** This is UX-only protection. Server-side RBAC enforcement happens at the API level (`../Backend/API.md` §RBAC).
 
-`/` resolves based on auth + role:
+## 4. Root Redirect Logic
+
+`/` redirects based on authentication and role:
 
 | State | Destination |
 |---|---|
-| Not logged in | `/login` |
-| `role === "warehouse"` | `/warehouse/picking` |
-| `role === "inventory"` | `/inventory/stock-in-out` |
-| `role === "manager"` | `/manager/kpi` |
+| Not authenticated | `/login` |
+| `role === "warehouse"` | `/dashboard` (with warehouse-specific content) |
+| `role === "inventory_staff"` | `/dashboard` (with inventory-specific content) |
+| `role === "manager"` | `/dashboard` (with manager dashboard) |
 
-This is each role's "landing" task — the one they'd start their shift on — not necessarily the
-first item in their sidebar.
+The dashboard serves as the universal landing page with role-specific content, rather than role-specific landing pages.
 
-## 4. Adding a New Route
+## 5. Error Handling & Navigation
 
-1. Add the page component under the right `pages/{role}/` folder.
-2. Import it in `AppRoutes.tsx` and add a `<Route>` inside the matching `RoleRoute` group (or start
-   a new group if it's a new role/permission shape).
-3. Add the nav entry to `Sidebar.tsx`'s `NAV_BY_ROLE` (see `Components.md`) — a route with no nav
-   entry is only reachable by typing the URL.
+### Route Error Boundaries
+- `ErrorBoundary` components wrap route groups to catch navigation errors
+- Failed route loads show user-friendly error messages
+- Automatic fallback to appropriate dashboard on error
+
+### Navigation State
+- Route state preserved during authentication flows
+- `from` parameter allows returning users to intended destination after login
+- Session expiry redirects preserve route intent for re-authentication
+
+## 6. Adding New Routes
+
+### For New Pages within Existing Roles:
+1. Add page component under appropriate `pages/{role}/` directory
+2. Import in corresponding `routes/{role}/{Role}Routes.jsx`
+3. Add `<Route>` definition with appropriate path
+4. Update navigation in `shared/components/layout/Sidebar.jsx`
+
+### For New Role or Permission Level:
+1. Create new role directory: `pages/{new-role}/`  
+2. Create new route file: `routes/{new-role}/{NewRole}Routes.jsx`
+3. Import and integrate in main `AppRoutes.jsx`
+4. Update role checks in `AuthContext` and route guards
+5. Update backend RBAC to match new role permissions
+
+## 7. Testing Routes
+
+The application includes route testing utilities:
+- **Auth flow testing:** `?test=auth` URL parameter loads authentication flow testing
+- **Route protection testing:** Verify role-based access controls
+- **Navigation testing:** Test route transitions and state preservation
+
+Route testing ensures both positive cases (authorized access) and negative cases (proper blocking of unauthorized access).
