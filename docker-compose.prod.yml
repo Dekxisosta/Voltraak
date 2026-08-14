@@ -1,0 +1,223 @@
+# Voltraak IMS - Docker Compose Production Environment
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: voltraak_mysql_prod
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql_prod_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d
+    networks:
+      - voltraak_prod_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: voltraak_redis_prod
+    restart: always
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - voltraak_prod_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Laravel Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: voltraak_backend_prod
+    restart: always
+    environment:
+      APP_ENV: production
+      APP_DEBUG: false
+      APP_KEY: ${APP_KEY}
+      APP_URL: ${APP_URL}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      JWT_SECRET: ${JWT_SECRET}
+      MAIL_MAILER: ${MAIL_MAILER}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+    volumes:
+      - backend_prod_storage:/var/www/html/storage
+      - backend_prod_logs:/var/www/html/storage/logs
+    networks:
+      - voltraak_prod_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_APP_ENV: production
+    container_name: voltraak_frontend_prod
+    restart: always
+    networks:
+      - voltraak_prod_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 128M
+
+  # Nginx Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: voltraak_nginx_prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/prod.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/sites-prod:/etc/nginx/conf.d
+      - ./docker/ssl:/etc/nginx/ssl
+      - nginx_prod_logs:/var/log/nginx
+    networks:
+      - voltraak_prod_network
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Queue Workers (Multiple instances)
+  queue-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    restart: always
+    environment:
+      APP_ENV: production
+      APP_KEY: ${APP_KEY}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: redis
+    volumes:
+      - backend_prod_storage:/var/www/html/storage
+    networks:
+      - voltraak_prod_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["php", "artisan", "queue:work", "--verbose", "--tries=3", "--timeout=90", "--memory=128"]
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          memory: 256M
+
+  # Task Scheduler
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: voltraak_scheduler_prod
+    restart: always
+    environment:
+      APP_ENV: production
+      APP_KEY: ${APP_KEY}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - backend_prod_storage:/var/www/html/storage
+    networks:
+      - voltraak_prod_network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    command: ["crond", "-f"]
+
+volumes:
+  mysql_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local
+  backend_prod_storage:
+    driver: local
+  backend_prod_logs:
+    driver: local
+  nginx_prod_logs:
+    driver: local
+
+networks:
+  voltraak_prod_network:
+    driver: bridge

@@ -1,0 +1,442 @@
+openapi: 3.0.3
+info:
+  title: Inventory Management System API
+  description: |
+    RESTful API for WalangBrownout Appliances Inventory Management System (IMS).
+    
+    This API provides comprehensive inventory management capabilities including:
+    - User management and authentication
+    - Product and batch tracking with FEFO support
+    - Stock transactions and physical counts
+    - Supplier management and procurement workflows
+    - Reporting and analytics
+    
+    ## Authentication
+    All endpoints except `/auth/login` require Bearer token authentication using JWT tokens.
+    
+    ## Status Code Standards
+    This API follows RFC 7231 HTTP status code standards with IMS-specific extensions:
+    
+    ### Success Responses (2xx)
+    - **200 OK**: Successful GET, PATCH operations, and POST operations without resource creation
+    - **201 Created**: Successful POST operations that create new resources
+    - **204 No Content**: Successful DELETE operations
+    
+    ### Client Error Responses (4xx)
+    - **400 Bad Request**: Malformed request syntax or invalid parameters
+    - **401 Unauthorized**: Missing or invalid authentication credentials
+    - **403 Forbidden**: Valid credentials but insufficient permissions for the operation
+    - **404 Not Found**: Requested resource does not exist
+    - **405 Method Not Allowed**: HTTP method not supported for the endpoint
+    - **409 Conflict**: Business logic conflicts (insufficient inventory, FEFO violations, resource state conflicts)
+    - **413 Payload Too Large**: Request payload exceeds size limits
+    - **422 Unprocessable Entity**: Validation failures and business rule violations
+    
+    ### Server Error Responses (5xx)
+    - **500 Internal Server Error**: Unexpected server errors
+    - **503 Service Unavailable**: Database or external service failures, maintenance mode
+    - **504 Gateway Timeout**: Request processing timeout or external service timeout
+    
+    ## Error Response Format
+    All error responses follow a standardized format with error codes for programmatic handling.
+    
+    ## Business Logic Error Codes
+    - `INSUFFICIENT_INVENTORY`: Stock operations exceeding available inventory
+    - `FEFO_VIOLATION`: First Expired, First Out rule violations
+    - `RESERVATION_CONFLICT`: Resource reservation conflicts
+    - `INVALID_RESOURCE_STATE`: Operations on resources in incorrect states
+    - `EXPIRED_BATCH_OPERATION`: Operations on expired product batches
+    
+  version: 1.0.0
+  contact:
+    name: IMS API Support
+    email: api-support@walangbrownout.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+  - url: https://api.walangbrownout.com/v1
+    description: Production server
+
+# Security schemes
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from `/auth/login` endpoint
+
+  schemas:
+    # Standard response schemas
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          example: true
+          description: Indicates successful operation
+        data:
+          oneOf:
+            - type: object
+            - type: array
+            - type: string
+            - type: number
+            - type: boolean
+            - type: "null"
+          description: Response payload data
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00.000Z"
+          description: ISO 8601 timestamp of the response
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Indicates failed operation
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-15T10:30:00.000Z"
+          description: ISO 8601 timestamp of the response
+
+    ErrorDetail:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - UNAUTHENTICATED
+            - TOKEN_EXPIRED
+            - UNAUTHORIZED
+            - ROLE_MISMATCH
+            - VALIDATION_FAILED
+            - BUSINESS_RULE_VIOLATION
+            - RESOURCE_NOT_FOUND
+            - RESOURCE_CONFLICT
+            - INSUFFICIENT_INVENTORY
+            - FEFO_VIOLATION
+            - RESERVATION_CONFLICT
+            - INVALID_RESOURCE_STATE
+            - EXPIRED_BATCH_OPERATION
+            - METHOD_NOT_ALLOWED
+            - PAYLOAD_TOO_LARGE
+            - BAD_REQUEST
+            - INTERNAL_SERVER_ERROR
+            - DATABASE_UNAVAILABLE
+            - SERVICE_UNAVAILABLE
+            - GATEWAY_TIMEOUT
+          description: Machine-readable error code for programmatic handling
+        message:
+          type: string
+          description: Human-readable error description
+          example: "The given data was invalid."
+        context:
+          type: object
+          additionalProperties: true
+          description: Additional context information about the error
+          example:
+            errors:
+              name: ["The name field is required."]
+              quantity: ["The quantity must be a positive integer."]
+
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              allOf:
+                - $ref: '#/components/schemas/ErrorDetail'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum: [VALIDATION_FAILED]
+                    context:
+                      type: object
+                      required:
+                        - errors
+                      properties:
+                        errors:
+                          type: object
+                          additionalProperties:
+                            type: array
+                            items:
+                              type: string
+                          description: Field-specific validation errors
+                          example:
+                            name: ["The name field is required."]
+                            quantity: ["The quantity must be a positive integer."]
+                            unit_price: ["The unit price must be a valid number."]
+
+    BusinessConflictErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            error:
+              allOf:
+                - $ref: '#/components/schemas/ErrorDetail'
+                - type: object
+                  properties:
+                    code:
+                      type: string
+                      enum:
+                        - RESOURCE_CONFLICT
+                        - INSUFFICIENT_INVENTORY
+                        - FEFO_VIOLATION
+                        - RESERVATION_CONFLICT
+                        - INVALID_RESOURCE_STATE
+                    context:
+                      type: object
+                      description: Business-specific conflict details
+                      examples:
+                        insufficient_inventory:
+                          summary: Insufficient inventory conflict
+                          value:
+                            type: "insufficient_inventory"
+                            available: 5
+                            requested: 10
+                            product: "Widget A"
+                        fefo_violation:
+                          summary: FEFO rule violation
+                          value:
+                            type: "fefo_violation"
+                            attempted_batch: "BATCH-002"
+                            earlier_batch: "BATCH-001"
+                        reservation_conflict:
+                          summary: Reservation conflict
+                          value:
+                            type: "reservation_conflict"
+                            resource_id: "product-123"
+                            existing_reservation: "RES-456"
+
+    # Status code extension schemas
+    StatusCodeDocumentation:
+      type: object
+      description: Extended status code documentation for API endpoints
+      required:
+        - success
+        - clientError
+        - serverError
+      properties:
+        success:
+          type: object
+          description: Success status codes (2xx range)
+          additionalProperties:
+            $ref: '#/components/schemas/StatusCodeDefinition'
+          example:
+            "200":
+              description: "Resource retrieved successfully"
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+            "201":
+              description: "Resource created successfully"
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+            "204":
+              description: "Resource deleted successfully"
+        clientError:
+          type: object
+          description: Client error status codes (4xx range)
+          additionalProperties:
+            $ref: '#/components/schemas/StatusCodeDefinition'
+          example:
+            "401":
+              description: "Authentication required"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+            "403":
+              description: "Insufficient permissions"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+            "404":
+              description: "Resource not found"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+            "409":
+              description: "Business logic conflict"
+              schema:
+                $ref: "#/components/schemas/BusinessConflictErrorResponse"
+            "422":
+              description: "Validation failed"
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        serverError:
+          type: object
+          description: Server error status codes (5xx range)
+          additionalProperties:
+            $ref: '#/components/schemas/StatusCodeDefinition'
+          example:
+            "500":
+              description: "Internal server error"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+            "503":
+              description: "Service unavailable"
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    StatusCodeDefinition:
+      type: object
+      required:
+        - description
+        - schema
+      properties:
+        description:
+          type: string
+          description: Human-readable description of when this status code is returned
+        schema:
+          oneOf:
+            - $ref: '#/components/schemas/SuccessResponse'
+            - $ref: '#/components/schemas/ErrorResponse'
+            - $ref: '#/components/schemas/ValidationErrorResponse'
+            - $ref: '#/components/schemas/BusinessConflictErrorResponse'
+          description: Response schema for this status code
+        examples:
+          type: object
+          additionalProperties: true
+          description: Example response payloads for this status code
+
+    # Domain-specific schemas
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+      properties:
+        id:
+          type: integer
+          description: Unique user identifier
+          example: 1
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: "john.doe@walangbrownout.com"
+        role:
+          type: string
+          enum: [warehouse, inventory, manager]
+          description: User's role determining permissions
+          example: "inventory"
+        created_at:
+          type: string
+          format: date-time
+          description: User creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - category_id
+        - unit_price
+        - quantity
+      properties:
+        id:
+          type: integer
+          description: Unique product identifier
+          example: 123
+        name:
+          type: string
+          description: Product name
+          example: "Widget A"
+        category_id:
+          type: integer
+          description: Product category identifier
+          example: 5
+        unit_price:
+          type: number
+          format: decimal
+          description: Unit price in local currency
+          example: 29.99
+        quantity:
+          type: integer
+          minimum: 0
+          description: Current available quantity
+          example: 50
+        reorder_level:
+          type: integer
+          minimum: 0
+          description: Minimum quantity before reorder alert
+          example: 10
+        is_seasonal:
+          type: boolean
+          description: Whether product is seasonal
+          example: false
+        storage_bin:
+          type: string
+          nullable: true
+          description: Physical storage location
+          example: "A-12-C"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+# API endpoints will be defined in separate files for modularity
+paths: {}
+
+# Tags for organizing endpoints by module
+tags:
+  - name: Authentication
+    description: User authentication and token management
+  - name: User Management
+    description: User CRUD operations and role management
+  - name: Products
+    description: Product catalog management
+  - name: Batches
+    description: Product batch and expiry management
+  - name: Stock Transactions
+    description: Stock movements and transaction logging
+  - name: Physical Counts
+    description: Inventory counting and discrepancy management
+  - name: Damage Reports
+    description: Damaged inventory reporting
+  - name: Reservations
+    description: Stock reservation and customer order management
+  - name: Suppliers
+    description: Supplier management
+  - name: Procurement
+    description: Purchase orders and procurement workflows
+  - name: Reporting
+    description: Reports and analytics
+  - name: Cross-Cutting
+    description: Health checks and notifications
+
+# Global security requirement
+security:
+  - BearerAuth: []

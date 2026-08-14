@@ -1,0 +1,63 @@
+# Voltraak IMS - Configuration Maps
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voltraak-backend-config
+  namespace: voltraak-ims
+  labels:
+    app: voltraak-backend
+data:
+  APP_ENV: "production"
+  APP_DEBUG: "false"
+  DB_CONNECTION: "mysql"
+  DB_HOST: "mysql-service"
+  DB_PORT: "3306"
+  DB_DATABASE: "voltraak_ims"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  CACHE_DRIVER: "redis"
+  SESSION_DRIVER: "redis"
+  QUEUE_CONNECTION: "redis"
+  LOG_CHANNEL: "stack"
+  LOG_LEVEL: "error"
+  IMS_FEFO_STRICT_MODE: "true"
+  IMS_AUTO_REORDER_ENABLED: "true"
+  IMS_BATCH_EXPIRY_WARNING_DAYS: "60"
+  IMS_VARIANCE_ALERT_THRESHOLD: "5"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voltraak-frontend-config
+  namespace: voltraak-ims
+  labels:
+    app: voltraak-frontend
+data:
+  VITE_APP_NAME: "Voltraak IMS"
+  VITE_APP_ENV: "production"
+  VITE_API_BASE_URL: "https://api.voltraak.com/api"
+  VITE_ENABLE_DEBUG_MODE: "false"
+  VITE_ENABLE_ANALYTICS: "true"
+  VITE_DEFAULT_THEME: "light"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-config
+  namespace: voltraak-ims
+  labels:
+    app: mysql
+data:
+  mysql.cnf: |
+    [mysqld]
+    default-time-zone='+08:00'
+    character-set-server=utf8mb4
+    collation-server=utf8mb4_unicode_ci
+    max_connections=200
+    innodb_buffer_pool_size=512M
+    innodb_log_file_size=64M
+    slow_query_log=1
+    slow_query_log_file=/var/log/mysql/slow.log
+    long_query_time=2
