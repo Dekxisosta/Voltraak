@@ -8,12 +8,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAccessControl } from '@/components/common/RouteGuard'
 import { useSessionStatus } from '@/components/common/SessionManager'
 
-interface AuthTestResult {
-  name: string
-  status: 'pending' | 'success' | 'error' | 'skipped'
-  message: string
-  data?: any
-}
+// Auth test result structure: { name, status, message, data }
+const createAuthTestResult = (name, status = 'pending', message = '', data = null) => ({
+  name,
+  status, // 'pending' | 'success' | 'error' | 'skipped'
+  message,
+  data
+})
 
 export default function AuthFlowTest() {
   const { 
@@ -28,11 +29,11 @@ export default function AuthFlowTest() {
   const { checkAccess } = useAccessControl()
   const { timeRemaining, isExpiringSoon, formatTime } = useSessionStatus()
 
-  const [results, setResults] = useState<AuthTestResult[]>([])
+  const [results, setResults] = useState([])
   const [isRunning, setIsRunning] = useState(false)
-  const [currentStep, setCurrentStep] = useState<string>('')
+  const [currentStep, setCurrentStep] = useState('')
 
-  const updateResult = (name: string, status: AuthTestResult['status'], message: string, data?: any) => {
+  const updateResult = (name, status, message, data) => {
     setResults(prev => prev.map(r => 
       r.name === name ? { ...r, status, message, data } : r
     ))
@@ -43,13 +44,13 @@ export default function AuthFlowTest() {
     setCurrentStep('Initializing...')
     
     const testSuites = [
-      { name: 'Initial State Check', status: 'pending' as const, message: 'Testing...' },
-      { name: 'Login Flow', status: 'pending' as const, message: 'Testing...' },
-      { name: 'User Context', status: 'pending' as const, message: 'Testing...' },
-      { name: 'Role Checking', status: 'pending' as const, message: 'Testing...' },
-      { name: 'Route Access Control', status: 'pending' as const, message: 'Testing...' },
-      { name: 'Session Management', status: 'pending' as const, message: 'Testing...' },
-      { name: 'Logout Flow', status: 'pending' as const, message: 'Testing...' },
+      { name: 'Initial State Check', status: 'pending', message: 'Testing...' },
+      { name: 'Login Flow', status: 'pending', message: 'Testing...' },
+      { name: 'User Context', status: 'pending', message: 'Testing...' },
+      { name: 'Role Checking', status: 'pending', message: 'Testing...' },
+      { name: 'Route Access Control', status: 'pending', message: 'Testing...' },
+      { name: 'Session Management', status: 'pending', message: 'Testing...' },
+      { name: 'Logout Flow', status: 'pending', message: 'Testing...' },
     ]
     
     setResults(testSuites)
@@ -165,7 +166,7 @@ export default function AuthFlowTest() {
     return () => clearTimeout(timer)
   }, [])
 
-  const getStatusColor = (status: AuthTestResult['status']) => {
+  const getStatusColor = (status) => {
     switch (status) {
       case 'success': return 'text-green-800 bg-green-100'
       case 'error': return 'text-red-800 bg-red-100'
@@ -174,7 +175,7 @@ export default function AuthFlowTest() {
     }
   }
 
-  const getStatusIcon = (status: AuthTestResult['status']) => {
+  const getStatusIcon = (status) => {
     switch (status) {
       case 'success': return '✓'
       case 'error': return '✗'

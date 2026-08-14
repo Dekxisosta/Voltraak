@@ -7,12 +7,13 @@ import React, { useState, useEffect } from 'react'
 import { apiClient } from '@/api/client'
 import { authApi } from '@/api/auth'
 
-interface ApiTestResult {
-  name: string
-  status: 'pending' | 'success' | 'error'
-  message: string
-  data?: any
-}
+// Test result structure: { name, status, message, data }
+const createTestResult = (name, status = 'pending', message = '', data = null) => ({
+  name,
+  status, // 'pending' | 'success' | 'error'
+  message,
+  data
+})
 
 export default function ApiTest() {
   const [results, setResults] = useState<ApiTestResult[]>([])
