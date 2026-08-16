@@ -1,0 +1,607 @@
+# Product Management Endpoints
+# Example implementation of status code standardization for product-related endpoints
+
+paths:
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List products with filtering and pagination
+      description: |
+        Retrieve a paginated list of products with optional filtering by category, 
+        seasonal status, and low stock conditions. Supports standard pagination parameters.
+        
+        Returns 200 with empty results when pagination exceeds available data.
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-based)
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          description: Items per page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: category
+          in: query
+          description: Filter by category ID
+          required: false
+          schema:
+            type: integer
+        - name: is_seasonal
+          in: query
+          description: Filter by seasonal status
+          required: false
+          schema:
+            type: boolean
+        - name: low_stock
+          in: query
+          description: Filter for low stock items only
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          $ref: '../schemas/status-codes.yaml#/EndpointTemplates/PaginationEndpoint/200'
+        "401":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error401'
+        "403":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error403'
+        "422":
+          $ref: '../schemas/status-codes.yaml#/EndpointTemplates/PaginationEndpoint/422'
+        "500":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error500'
+        "503":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error503'
+      security:
+        - BearerAuth: []
+
+    post:
+      tags:
+        - Products
+      summary: Create a new product
+      description: |
+        Create a new product in the inventory system. Requires Inventory role or higher.
+        
+        Business Rules:
+        - Product names must be unique within the same category
+        - Unit price must be positive
+        - Reorder level must be non-negative
+        - Category must exist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - category_id
+                - unit_price
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  description: Product name (must be unique within category)
+                category_id:
+                  type: integer
+                  minimum: 1
+                  description: Valid category identifier
+                unit_price:
+                  type: number
+                  format: decimal
+                  minimum: 0.01
+                  description: Product unit price
+                reorder_level:
+                  type: integer
+                  minimum: 0
+                  default: 0
+                  description: Minimum quantity before reorder alert
+                is_seasonal:
+                  type: boolean
+                  default: false
+                  description: Whether product is seasonal
+                storage_bin:
+                  type: string
+                  nullable: true
+                  maxLength: 50
+                  description: Physical storage location
+            examples:
+              valid_product:
+                summary: Valid product creation
+                value:
+                  name: "New Widget Pro"
+                  category_id: 5
+                  unit_price: 49.99
+                  reorder_level: 15
+                  is_seasonal: false
+                  storage_bin: "B-15-A"
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+              examples:
+                product_created:
+                  summary: Product created successfully
+                  value:
+                    success: true
+                    data:
+                      id: 125
+                      name: "New Widget Pro"
+                      category_id: 5
+                      unit_price: 49.99
+                      quantity: 0
+                      reorder_level: 15
+                      is_seasonal: false
+                      storage_bin: "B-15-A"
+                      created_at: "2024-01-15T10:30:00.000Z"
+                      updated_at: "2024-01-15T10:30:00.000Z"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "401":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error401'
+        "403":
+          description: Insufficient permissions - Inventory role required
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              examples:
+                role_insufficient:
+                  summary: Insufficient role permissions
+                  value:
+                    success: false
+                    error:
+                      code: "UNAUTHORIZED"
+                      message: "Inventory role or higher required for product creation"
+                      context:
+                        required_role: "inventory"
+                        operation: "product_create"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "409":
+          description: Business logic conflict - duplicate product name in category
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/BusinessConflictErrorResponse'
+              examples:
+                duplicate_name:
+                  summary: Duplicate product name in category
+                  value:
+                    success: false
+                    error:
+                      code: "RESOURCE_CONFLICT"
+                      message: "Product name 'Widget Pro' already exists in category 'Electronics'"
+                      context:
+                        type: "duplicate_resource"
+                        field: "name"
+                        value: "Widget Pro"
+                        category_id: 5
+                        existing_product_id: 98
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "413":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error413'
+        "422":
+          description: Validation failed - invalid product data
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ValidationErrorResponse'
+              examples:
+                validation_errors:
+                  summary: Multiple validation failures
+                  value:
+                    success: false
+                    error:
+                      code: "VALIDATION_FAILED"
+                      message: "The given data was invalid."
+                      context:
+                        errors:
+                          name: ["The name field is required."]
+                          category_id: ["The selected category id is invalid."]
+                          unit_price: ["The unit price must be a positive number."]
+                          reorder_level: ["The reorder level must be a non-negative integer."]
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                invalid_category:
+                  summary: Invalid category reference
+                  value:
+                    success: false
+                    error:
+                      code: "VALIDATION_FAILED"
+                      message: "Invalid category reference"
+                      context:
+                        errors:
+                          category_id: ["The selected category does not exist."]
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "500":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error500'
+        "503":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error503'
+      security:
+        - BearerAuth: []
+
+  /products/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Product identifier
+        schema:
+          type: integer
+          minimum: 1
+
+    get:
+      tags:
+        - Products
+      summary: Get product details
+      description: |
+        Retrieve detailed information for a specific product including current stock levels,
+        active batches, and storage location.
+      responses:
+        "200":
+          description: Product retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+              examples:
+                product_found:
+                  summary: Product details retrieved
+                  value:
+                    success: true
+                    data:
+                      id: 123
+                      name: "Widget A"
+                      category_id: 5
+                      category_name: "Electronics"
+                      unit_price: 29.99
+                      quantity: 50
+                      reorder_level: 10
+                      is_seasonal: false
+                      storage_bin: "A-12-C"
+                      status: "in_stock"
+                      active_batches: 3
+                      oldest_batch_expiry: "2024-06-15T00:00:00.000Z"
+                      created_at: "2024-01-01T10:00:00.000Z"
+                      updated_at: "2024-01-10T15:30:00.000Z"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "401":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error401'
+        "403":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error403'
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              examples:
+                product_not_found:
+                  summary: Product does not exist
+                  value:
+                    success: false
+                    error:
+                      code: "RESOURCE_NOT_FOUND"
+                      message: "Product with ID '999' not found"
+                      context:
+                        resource_type: "Product"
+                        resource_id: "999"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "500":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error500'
+        "503":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error503'
+      security:
+        - BearerAuth: []
+
+    patch:
+      tags:
+        - Products
+      summary: Update product information
+      description: |
+        Update product details including description, category, pricing, and reorder settings.
+        Requires Inventory role or higher.
+        
+        Business Rules:
+        - Cannot change product name to conflict with existing products in the same category
+        - Cannot set negative unit price or reorder level
+        - Category changes must be to valid categories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                category_id:
+                  type: integer
+                  minimum: 1
+                unit_price:
+                  type: number
+                  format: decimal
+                  minimum: 0.01
+                reorder_level:
+                  type: integer
+                  minimum: 0
+                is_seasonal:
+                  type: boolean
+                storage_bin:
+                  type: string
+                  nullable: true
+                  maxLength: 50
+            examples:
+              price_update:
+                summary: Update product price
+                value:
+                  unit_price: 34.99
+              full_update:
+                summary: Update multiple fields
+                value:
+                  name: "Widget A Pro"
+                  unit_price: 39.99
+                  reorder_level: 20
+                  storage_bin: "A-15-B"
+      responses:
+        "200":
+          description: Product updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+              examples:
+                product_updated:
+                  summary: Product updated successfully
+                  value:
+                    success: true
+                    data:
+                      id: 123
+                      name: "Widget A Pro"
+                      category_id: 5
+                      unit_price: 39.99
+                      quantity: 50
+                      reorder_level: 20
+                      is_seasonal: false
+                      storage_bin: "A-15-B"
+                      updated_at: "2024-01-15T10:30:00.000Z"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "401":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error401'
+        "403":
+          description: Insufficient permissions - Inventory role required
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              examples:
+                role_insufficient:
+                  summary: Insufficient role permissions
+                  value:
+                    success: false
+                    error:
+                      code: "UNAUTHORIZED"
+                      message: "Inventory role or higher required for product updates"
+                      context:
+                        required_role: "inventory"
+                        operation: "product_update"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "404":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error404'
+        "409":
+          description: Business logic conflict during update
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/BusinessConflictErrorResponse'
+              examples:
+                name_conflict:
+                  summary: Product name conflicts with existing product
+                  value:
+                    success: false
+                    error:
+                      code: "RESOURCE_CONFLICT"
+                      message: "Product name 'Widget Pro' already exists in category 'Electronics'"
+                      context:
+                        type: "duplicate_resource"
+                        field: "name"
+                        value: "Widget Pro"
+                        category_id: 5
+                        existing_product_id: 98
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "422":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error422'
+        "500":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error500'
+        "503":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error503'
+      security:
+        - BearerAuth: []
+
+    delete:
+      tags:
+        - Products
+      summary: Archive a product
+      description: |
+        Mark a product as archived/discontinued. Only Managers can archive products.
+        
+        Business Rules:
+        - Cannot archive products with active reservations
+        - Cannot archive products with positive inventory quantities
+        - Cannot archive products with pending purchase orders
+      responses:
+        "204":
+          description: Product archived successfully - no content returned
+        "401":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error401'
+        "403":
+          description: Insufficient permissions - Manager role required
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+              examples:
+                manager_required:
+                  summary: Manager role required
+                  value:
+                    success: false
+                    error:
+                      code: "UNAUTHORIZED"
+                      message: "Manager role required for product archival"
+                      context:
+                        required_role: "manager"
+                        operation: "product_archive"
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "404":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error404'
+        "409":
+          description: Cannot archive product due to business constraints
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/BusinessConflictErrorResponse'
+              examples:
+                has_inventory:
+                  summary: Product has positive inventory
+                  value:
+                    success: false
+                    error:
+                      code: "RESOURCE_CONFLICT"
+                      message: "Cannot archive product with positive inventory quantity"
+                      context:
+                        type: "archive_constraint"
+                        constraint: "positive_inventory"
+                        current_quantity: 50
+                        product_id: 123
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                has_reservations:
+                  summary: Product has active reservations
+                  value:
+                    success: false
+                    error:
+                      code: "RESOURCE_CONFLICT"
+                      message: "Cannot archive product with active reservations"
+                      context:
+                        type: "archive_constraint"
+                        constraint: "active_reservations"
+                        active_reservations: 3
+                        product_id: 123
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                pending_po:
+                  summary: Product has pending purchase orders
+                  value:
+                    success: false
+                    error:
+                      code: "RESOURCE_CONFLICT"
+                      message: "Cannot archive product with pending purchase orders"
+                      context:
+                        type: "archive_constraint"
+                        constraint: "pending_purchase_orders"
+                        pending_pos: ["PO-2024-001", "PO-2024-003"]
+                        product_id: 123
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "500":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error500'
+        "503":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error503'
+      security:
+        - BearerAuth: []
+
+  /products/{id}/stock-levels:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Product identifier
+        schema:
+          type: integer
+          minimum: 1
+
+    get:
+      tags:
+        - Products
+      summary: Get product stock levels
+      description: |
+        Retrieve current stock level information including quantity, location, and status indicators.
+        Returns stock status badges (in-stock/low/critical) based on reorder levels.
+      responses:
+        "200":
+          description: Stock levels retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+              examples:
+                in_stock:
+                  summary: Product in stock
+                  value:
+                    success: true
+                    data:
+                      product_id: 123
+                      product_name: "Widget A"
+                      current_quantity: 50
+                      reorder_level: 10
+                      status: "in_stock"
+                      status_badge: "success"
+                      location: "A-12-C"
+                      last_movement: "2024-01-10T15:30:00.000Z"
+                      reserved_quantity: 5
+                      available_quantity: 45
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                low_stock:
+                  summary: Product low stock
+                  value:
+                    success: true
+                    data:
+                      product_id: 124
+                      product_name: "Widget B"
+                      current_quantity: 8
+                      reorder_level: 10
+                      status: "low_stock"
+                      status_badge: "warning"
+                      location: "B-05-A"
+                      last_movement: "2024-01-12T09:15:00.000Z"
+                      reserved_quantity: 2
+                      available_quantity: 6
+                    timestamp: "2024-01-15T10:30:00.000Z"
+                critical_stock:
+                  summary: Product critical stock
+                  value:
+                    success: true
+                    data:
+                      product_id: 125
+                      product_name: "Widget C"
+                      current_quantity: 2
+                      reorder_level: 10
+                      status: "critical"
+                      status_badge: "danger"
+                      location: "C-03-B"
+                      last_movement: "2024-01-14T14:20:00.000Z"
+                      reserved_quantity: 1
+                      available_quantity: 1
+                    timestamp: "2024-01-15T10:30:00.000Z"
+        "401":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error401'
+        "403":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error403'
+        "404":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error404'
+        "500":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error500'
+        "503":
+          $ref: '../schemas/status-codes.yaml#/StandardStatusCodes/Error503'
+      security:
+        - BearerAuth: []
