@@ -1,0 +1,93 @@
+/**
+ * Forecast Reports Page - Manager
+ * Demand forecasting and reorder point calculations
+ */
+
+import { useState, useEffect } from 'react'
+import { TrendingUp, ArrowUp, ArrowDown } from 'lucide-react'
+import { Card, Table, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import { PageHeader } from '@/shared/components/layout'
+import { useNotifications } from '@/shared/hooks/useNotifications'
+import { fetchData } from '@/shared/services/dataSource'
+import { mockForecasts } from '@/shared/mocks/manager/forecast'
+// TODO: import { reportingApi } from '@/api'
+
+export default function ForecastPage() {
+  const [data, setData] = useState({ forecasts: [], loading: true })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [timeframe, setTimeframe] = useState('8w')
+  const { addNotification } = useNotifications()
+
+  useEffect(() => {
+    loadForecasts()
+  }, [timeframe])
+
+  const loadForecasts = async () => {
+    try {
+      setData(prev => ({ ...prev, loading: true }))
+      const result = await fetchData(
+        () => mockForecasts,
+        () => null // TODO: reportingApi.getForecasts()
+      )
+      setData({ forecasts: result, loading: false })
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: 'Failed to load forecast data' })
+      setData(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const getTrendIcon = (trend) => {
+    if (trend === 'up') return <span className="flex items-center text-green-600"><ArrowUp className="h-4 w-4" /> Rising</span>
+    if (trend === 'down') return <span className="flex items-center text-red-600"><ArrowDown className="h-4 w-4" /> Falling</span>
+    return <span className="text-gray-500">Stable</span>
+  }
+
+  const columns = [
+    { key: 'product_name', label: 'Product', sortable: true },
+    { key: 'current_stock', label: 'Current Stock' },
+    { key: 'avg_weekly_demand', label: 'Avg Weekly Demand' },
+    { key: 'forecast_demand_8w', label: '8-Week Forecast' },
+    { key: 'reorder_point', label: 'Reorder Point' },
+    { key: 'suggested_order', label: 'Suggested Order', render: (val) => val > 0 ? <span className="font-bold text-blue-600">{val} units</span> : <span className="text-gray-400">None needed</span> },
+    { key: 'trend', label: 'Trend', render: (val) => getTrendIcon(val) },
+    { key: 'confidence', label: 'Confidence', render: (val) => <span className={`font-medium ${val >= 90 ? 'text-green-600' : val >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>{val}%</span> },
+  ]
+
+  const filteredForecasts = data.forecasts.filter(f =>
+    f.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    f.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  if (data.loading) {
+    return <div className="flex items-center justify-center min-h-96"><LoadingSpinner size="lg" message="Generating forecasts..." /></div>
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Demand Forecasts" subtitle="AI-powered demand prediction and reorder suggestions" icon={TrendingUp} />
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-blue-600">{data.forecasts.filter(f => f.suggested_order > 0).length}</p><p className="text-sm text-gray-600">Items Need Reorder</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-green-600">{data.forecasts.filter(f => f.trend === 'up').length}</p><p className="text-sm text-gray-600">Trending Up</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900">{Math.round(data.forecasts.reduce((s, f) => s + f.confidence, 0) / data.forecasts.length)}%</p><p className="text-sm text-gray-600">Avg Confidence</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-purple-600">{data.forecasts.reduce((s, f) => s + f.forecast_demand_8w, 0)}</p><p className="text-sm text-gray-600">Total 8-Week Demand</p></div></Card.Body></Card>
+      </div>
+
+      <Card>
+        <Card.Body>
+          <div className="flex justify-between items-center mb-6">
+            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products..." className="max-w-md" />
+            <div className="flex space-x-2">
+              {[{ val: '4w', label: '4 Weeks' }, { val: '8w', label: '8 Weeks' }, { val: '12w', label: '12 Weeks' }].map(t => (
+                <button key={t.val} onClick={() => setTimeframe(t.val)} className={`px-3 py-1 text-sm rounded-full ${timeframe === t.val ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <Table data={filteredForecasts} columns={columns} emptyMessage="No forecast data available" />
+        </Card.Body>
+      </Card>
+    </div>
+  )
+}

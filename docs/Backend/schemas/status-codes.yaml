@@ -1,0 +1,649 @@
+# Status Code Schema Extensions for IMS API
+# This file defines standardized status code documentation and response formats
+# that can be referenced across all API endpoint definitions.
+
+# Standard Status Code Templates
+# These templates provide consistent status code definitions across all endpoints
+
+StandardStatusCodes:
+  # Success Status Codes (2xx)
+  Success200:
+    description: "Operation successful - resource retrieved or updated"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+        examples:
+          product_retrieved:
+            summary: "Product retrieved successfully"
+            value:
+              success: true
+              data:
+                id: 123
+                name: "Widget A"
+                quantity: 50
+                unit_price: 29.99
+              timestamp: "2024-01-15T10:30:00.000Z"
+          
+  Success201:
+    description: "Resource created successfully"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+        examples:
+          product_created:
+            summary: "Product created successfully"
+            value:
+              success: true
+              data:
+                id: 124
+                name: "New Widget"
+                quantity: 100
+                unit_price: 39.99
+                created_at: "2024-01-15T10:30:00.000Z"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Success204:
+    description: "Resource deleted successfully - no content returned"
+
+  # Authentication and Authorization Errors (401, 403)
+  Error401:
+    description: "Authentication required - missing or invalid credentials"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          missing_token:
+            summary: "Missing authentication token"
+            value:
+              success: false
+              error:
+                code: "UNAUTHENTICATED"
+                message: "Authentication required"
+                context: {}
+              timestamp: "2024-01-15T10:30:00.000Z"
+          invalid_token:
+            summary: "Invalid authentication token"
+            value:
+              success: false
+              error:
+                code: "UNAUTHENTICATED"
+                message: "Invalid authentication credentials"
+                context: {}
+              timestamp: "2024-01-15T10:30:00.000Z"
+          expired_token:
+            summary: "Expired authentication token"
+            value:
+              success: false
+              error:
+                code: "TOKEN_EXPIRED"
+                message: "Authentication token has expired"
+                context: {}
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Error403:
+    description: "Forbidden - insufficient permissions for this operation"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          insufficient_permissions:
+            summary: "Insufficient permissions"
+            value:
+              success: false
+              error:
+                code: "UNAUTHORIZED"
+                message: "Insufficient permissions for this operation"
+                context: {}
+              timestamp: "2024-01-15T10:30:00.000Z"
+          role_mismatch:
+            summary: "Role-based access denied"
+            value:
+              success: false
+              error:
+                code: "ROLE_MISMATCH"
+                message: "Manager role required for this operation"
+                context:
+                  required_role: "manager"
+                  user_role: "inventory"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  # Client Errors (404, 405, 409, 413, 422)
+  Error404:
+    description: "Resource not found"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          resource_not_found:
+            summary: "Resource not found"
+            value:
+              success: false
+              error:
+                code: "RESOURCE_NOT_FOUND"
+                message: "Product with ID '999' not found"
+                context:
+                  resource_type: "Product"
+                  resource_id: "999"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Error405:
+    description: "Method not allowed for this endpoint"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          method_not_allowed:
+            summary: "HTTP method not allowed"
+            value:
+              success: false
+              error:
+                code: "METHOD_NOT_ALLOWED"
+                message: "POST method not allowed for this endpoint"
+                context:
+                  allowed_methods: ["GET", "PATCH"]
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Error409:
+    description: "Conflict - business logic constraint violation"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/BusinessConflictErrorResponse'
+        examples:
+          insufficient_inventory:
+            summary: "Insufficient inventory conflict"
+            value:
+              success: false
+              error:
+                code: "INSUFFICIENT_INVENTORY"
+                message: "Insufficient inventory for product 'Widget A'. Available: 5, Requested: 10"
+                context:
+                  type: "insufficient_inventory"
+                  available: 5
+                  requested: 10
+                  product: "Widget A"
+              timestamp: "2024-01-15T10:30:00.000Z"
+          fefo_violation:
+            summary: "FEFO rule violation"
+            value:
+              success: false
+              error:
+                code: "FEFO_VIOLATION"
+                message: "Cannot use batch 'BATCH-002' before earlier expiring batch 'BATCH-001'"
+                context:
+                  type: "fefo_violation"
+                  attempted_batch: "BATCH-002"
+                  earlier_batch: "BATCH-001"
+              timestamp: "2024-01-15T10:30:00.000Z"
+          reservation_conflict:
+            summary: "Resource reservation conflict"
+            value:
+              success: false
+              error:
+                code: "RESERVATION_CONFLICT"
+                message: "Resource 'product-123' is already reserved by reservation 'RES-456'"
+                context:
+                  type: "reservation_conflict"
+                  resource_id: "product-123"
+                  existing_reservation: "RES-456"
+              timestamp: "2024-01-15T10:30:00.000Z"
+          invalid_resource_state:
+            summary: "Invalid resource state"
+            value:
+              success: false
+              error:
+                code: "INVALID_RESOURCE_STATE"
+                message: "Purchase order 'PO-789' is in 'approved' state, but 'pending' state is required"
+                context:
+                  type: "invalid_state"
+                  resource: "PO-789"
+                  current_state: "approved"
+                  required_state: "pending"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Error413:
+    description: "Payload too large - request exceeds size limits"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          payload_too_large:
+            summary: "Request payload exceeds limits"
+            value:
+              success: false
+              error:
+                code: "PAYLOAD_TOO_LARGE"
+                message: "Request payload exceeds maximum allowed size"
+                context:
+                  max_size: "2MB"
+                  received_size: "3.5MB"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Error422:
+    description: "Validation failed - invalid request data"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ValidationErrorResponse'
+        examples:
+          validation_failed:
+            summary: "Form validation errors"
+            value:
+              success: false
+              error:
+                code: "VALIDATION_FAILED"
+                message: "The given data was invalid."
+                context:
+                  errors:
+                    name: ["The name field is required."]
+                    quantity: ["The quantity must be a positive integer."]
+                    unit_price: ["The unit price must be a valid number."]
+                    category_id: ["The selected category id is invalid."]
+              timestamp: "2024-01-15T10:30:00.000Z"
+          business_rule_violation:
+            summary: "Business rule validation failure"
+            value:
+              success: false
+              error:
+                code: "BUSINESS_RULE_VIOLATION"
+                message: "Cannot perform operations on expired batches"
+                context:
+                  batch_id: "BATCH-001"
+                  expiry_date: "2024-01-10T00:00:00.000Z"
+                  operation: "stock_out"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  # Server Errors (500, 503, 504)
+  Error500:
+    description: "Internal server error - unexpected system failure"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          internal_error:
+            summary: "Generic internal server error"
+            value:
+              success: false
+              error:
+                code: "INTERNAL_SERVER_ERROR"
+                message: "An unexpected error occurred"
+                context:
+                  request_id: "req-12345"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Error503:
+    description: "Service unavailable - temporary system or dependency failure"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          database_unavailable:
+            summary: "Database connection failure"
+            value:
+              success: false
+              error:
+                code: "DATABASE_UNAVAILABLE"
+                message: "Database is temporarily unavailable"
+                context:
+                  service: "database"
+              timestamp: "2024-01-15T10:30:00.000Z"
+          service_unavailable:
+            summary: "External service failure"
+            value:
+              success: false
+              error:
+                code: "SERVICE_UNAVAILABLE"
+                message: "External service 'payment-gateway' is temporarily unavailable"
+                context:
+                  service: "payment-gateway"
+                  type: "external_service"
+              timestamp: "2024-01-15T10:30:00.000Z"
+          maintenance_mode:
+            summary: "System maintenance"
+            value:
+              success: false
+              error:
+                code: "SERVICE_UNAVAILABLE"
+                message: "System is temporarily under maintenance"
+                context:
+                  service: "system"
+                  type: "maintenance"
+                  estimated_completion: "2024-01-15T12:00:00.000Z"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+  Error504:
+    description: "Gateway timeout - request processing or external service timeout"
+    content:
+      application/json:
+        schema:
+          $ref: '../openapi.yaml#/components/schemas/ErrorResponse'
+        examples:
+          gateway_timeout:
+            summary: "Request processing timeout"
+            value:
+              success: false
+              error:
+                code: "GATEWAY_TIMEOUT"
+                message: "Request processing timeout"
+                context:
+                  timeout_duration: "30s"
+              timestamp: "2024-01-15T10:30:00.000Z"
+
+# Endpoint Status Code Templates
+# These templates define complete status code sets for common endpoint patterns
+
+EndpointTemplates:
+  # Authentication endpoints (public access)
+  AuthenticationEndpoint:
+    "200":
+      $ref: '#/StandardStatusCodes/Success200'
+    "422":
+      $ref: '#/StandardStatusCodes/Error422'
+    "500":
+      $ref: '#/StandardStatusCodes/Error500'
+    "503":
+      $ref: '#/StandardStatusCodes/Error503'
+
+  # Read-only endpoints (GET operations)
+  ReadOnlyEndpoint:
+    "200":
+      $ref: '#/StandardStatusCodes/Success200'
+    "401":
+      $ref: '#/StandardStatusCodes/Error401'
+    "403":
+      $ref: '#/StandardStatusCodes/Error403'
+    "404":
+      $ref: '#/StandardStatusCodes/Error404'
+    "500":
+      $ref: '#/StandardStatusCodes/Error500'
+    "503":
+      $ref: '#/StandardStatusCodes/Error503'
+
+  # Create endpoints (POST operations)
+  CreateEndpoint:
+    "201":
+      $ref: '#/StandardStatusCodes/Success201'
+    "401":
+      $ref: '#/StandardStatusCodes/Error401'
+    "403":
+      $ref: '#/StandardStatusCodes/Error403'
+    "409":
+      $ref: '#/StandardStatusCodes/Error409'
+    "413":
+      $ref: '#/StandardStatusCodes/Error413'
+    "422":
+      $ref: '#/StandardStatusCodes/Error422'
+    "500":
+      $ref: '#/StandardStatusCodes/Error500'
+    "503":
+      $ref: '#/StandardStatusCodes/Error503'
+
+  # Update endpoints (PATCH operations)
+  UpdateEndpoint:
+    "200":
+      $ref: '#/StandardStatusCodes/Success200'
+    "401":
+      $ref: '#/StandardStatusCodes/Error401'
+    "403":
+      $ref: '#/StandardStatusCodes/Error403'
+    "404":
+      $ref: '#/StandardStatusCodes/Error404'
+    "409":
+      $ref: '#/StandardStatusCodes/Error409'
+    "422":
+      $ref: '#/StandardStatusCodes/Error422'
+    "500":
+      $ref: '#/StandardStatusCodes/Error500'
+    "503":
+      $ref: '#/StandardStatusCodes/Error503'
+
+  # Delete endpoints (DELETE operations)
+  DeleteEndpoint:
+    "204":
+      $ref: '#/StandardStatusCodes/Success204'
+    "401":
+      $ref: '#/StandardStatusCodes/Error401'
+    "403":
+      $ref: '#/StandardStatusCodes/Error403'
+    "404":
+      $ref: '#/StandardStatusCodes/Error404'
+    "409":
+      $ref: '#/StandardStatusCodes/Error409'
+    "500":
+      $ref: '#/StandardStatusCodes/Error500'
+    "503":
+      $ref: '#/StandardStatusCodes/Error503'
+
+  # Stock operation endpoints (inventory-specific business logic)
+  StockOperationEndpoint:
+    "200":
+      $ref: '#/StandardStatusCodes/Success200'
+    "401":
+      $ref: '#/StandardStatusCodes/Error401'
+    "403":
+      $ref: '#/StandardStatusCodes/Error403'
+    "409":
+      $ref: '#/StandardStatusCodes/Error409'
+    "422":
+      $ref: '#/StandardStatusCodes/Error422'
+    "500":
+      $ref: '#/StandardStatusCodes/Error500'
+    "503":
+      $ref: '#/StandardStatusCodes/Error503'
+
+  # Pagination endpoints (list operations with pagination)
+  PaginationEndpoint:
+    "200":
+      description: "List retrieved successfully - may include empty results for pagination beyond available data"
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '../openapi.yaml#/components/schemas/SuccessResponse'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {}
+                      pagination:
+                        type: object
+                        properties:
+                          current_page:
+                            type: integer
+                          per_page:
+                            type: integer
+                          total:
+                            type: integer
+                          last_page:
+                            type: integer
+          examples:
+            with_results:
+              summary: "List with results"
+              value:
+                success: true
+                data:
+                  items:
+                    - id: 1
+                      name: "Item 1"
+                    - id: 2
+                      name: "Item 2"
+                  pagination:
+                    current_page: 1
+                    per_page: 20
+                    total: 45
+                    last_page: 3
+                timestamp: "2024-01-15T10:30:00.000Z"
+            empty_results:
+              summary: "Empty results (pagination beyond available data)"
+              value:
+                success: true
+                data:
+                  items: []
+                  pagination:
+                    current_page: 10
+                    per_page: 20
+                    total: 45
+                    last_page: 3
+                timestamp: "2024-01-15T10:30:00.000Z"
+    "401":
+      $ref: '#/StandardStatusCodes/Error401'
+    "403":
+      $ref: '#/StandardStatusCodes/Error403'
+    "422":
+      description: "Invalid pagination or query parameters"
+      content:
+        application/json:
+          schema:
+            $ref: '../openapi.yaml#/components/schemas/ValidationErrorResponse'
+          examples:
+            invalid_pagination:
+              summary: "Invalid pagination parameters"
+              value:
+                success: false
+                error:
+                  code: "VALIDATION_FAILED"
+                  message: "Invalid pagination parameters"
+                  context:
+                    errors:
+                      page: ["The page must be a positive integer."]
+                      per_page: ["The per_page must be between 1 and 100."]
+                timestamp: "2024-01-15T10:30:00.000Z"
+    "500":
+      $ref: '#/StandardStatusCodes/Error500'
+    "503":
+      $ref: '#/StandardStatusCodes/Error503'
+
+# Business-Specific Status Codes
+# IMS-specific business logic status codes and their contexts
+
+BusinessLogicStatusCodes:
+  InsufficientInventory:
+    status: 409
+    error_code: "INSUFFICIENT_INVENTORY"
+    description: "Stock operation exceeds available inventory quantity"
+    context_schema:
+      type: object
+      required: [type, available, requested]
+      properties:
+        type:
+          type: string
+          enum: [insufficient_inventory]
+        available:
+          type: integer
+          minimum: 0
+        requested:
+          type: integer
+          minimum: 1
+        product:
+          type: string
+
+  FefoViolation:
+    status: 409
+    error_code: "FEFO_VIOLATION"
+    description: "Operation violates First Expired, First Out (FEFO) rules"
+    context_schema:
+      type: object
+      required: [type, attempted_batch, earlier_batch]
+      properties:
+        type:
+          type: string
+          enum: [fefo_violation]
+        attempted_batch:
+          type: string
+        earlier_batch:
+          type: string
+
+  ReservationConflict:
+    status: 409
+    error_code: "RESERVATION_CONFLICT"
+    description: "Resource has conflicting reservations"
+    context_schema:
+      type: object
+      required: [type, resource_id]
+      properties:
+        type:
+          type: string
+          enum: [reservation_conflict]
+        resource_id:
+          type: string
+        existing_reservation:
+          type: string
+
+  InvalidResourceState:
+    status: 409
+    error_code: "INVALID_RESOURCE_STATE"
+    description: "Operation requires resource to be in a different state"
+    context_schema:
+      type: object
+      required: [type, resource, current_state, required_state]
+      properties:
+        type:
+          type: string
+          enum: [invalid_state]
+        resource:
+          type: string
+        current_state:
+          type: string
+        required_state:
+          type: string
+
+  ExpiredBatchOperation:
+    status: 422
+    error_code: "BUSINESS_RULE_VIOLATION"
+    description: "Cannot perform operations on expired product batches"
+    context_schema:
+      type: object
+      required: [batch_id, expiry_date, operation]
+      properties:
+        batch_id:
+          type: string
+        expiry_date:
+          type: string
+          format: date-time
+        operation:
+          type: string
+
+# Module-Specific Status Code Patterns
+ModuleStatusCodes:
+  UserManagement:
+    common_errors:
+      - 401  # Authentication failures
+      - 403  # Role-based access control
+      - 422  # User validation failures
+    manager_only_endpoints:
+      - 403  # Non-manager access attempts
+
+  Inventory:
+    common_errors:
+      - 409  # Business logic conflicts (inventory, FEFO, reservations)
+      - 422  # Validation and business rule violations
+    stock_operations:
+      - insufficient_inventory: 409
+      - fefo_violation: 409
+      - expired_batch_operation: 422
+
+  Procurement:
+    common_errors:
+      - 409  # Purchase order state conflicts
+      - 403  # Manager-only approval operations
+    po_workflow:
+      - invalid_po_state: 409
+      - supplier_conflict: 409
+
+  Reporting:
+    common_errors:
+      - 403  # Role-based report access
+      - 422  # Invalid query parameters
+      - 500  # Report generation failures
