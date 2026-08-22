@@ -1,0 +1,432 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   THEME SYSTEM - data-theme attribute on <html>
+   ============================================ */
+
+@layer base {
+  /* --- Light Theme (default) ---
+     Neutral, near-monochrome base. A single restrained accent (slate-ink)
+     is used for primary actions, links, focus, and "current" states.
+     Color is otherwise reserved for status (ok / warning / critical). */
+  [data-theme="light"],
+  :root {
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #fafafa;
+    --color-bg-tertiary: #f4f4f5;
+    --color-bg-inverse: #18181b;
+
+    --color-text-primary: #18181b;
+    --color-text-secondary: #52525b;
+    --color-text-tertiary: #71717a;
+    --color-text-inverse: #fafafa;
+    --color-text-muted: #a1a1aa;
+
+    --color-border-primary: #e4e4e7;
+    --color-border-secondary: #d4d4d8;
+    --color-border-focus: #18181b;
+
+    --color-surface-card: #ffffff;
+    --color-surface-modal: #ffffff;
+    --color-surface-popover: #ffffff;
+    --color-surface-sidebar: #18181b;
+
+    --color-input-bg: #ffffff;
+    --color-input-border: #d4d4d8;
+    --color-input-focus: #18181b;
+
+    --color-accent: #18181b;
+    --color-accent-hover: #3f3f46;
+    --color-accent-soft: #f4f4f5;
+
+    --color-danger: #dc2626;
+    --color-danger-hover: #b91c1c;
+    --color-danger-soft: #fef2f2;
+
+    --color-highlight-soft: #fef3c7;
+
+    --color-overlay: rgba(24, 24, 27, 0.5);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+  }
+
+  /* --- Dark Theme --- */
+  [data-theme="dark"] {
+    --color-bg-primary: #0a0a0b;
+    --color-bg-secondary: #131316;
+    --color-bg-tertiary: #1f1f23;
+    --color-bg-inverse: #fafafa;
+
+    --color-text-primary: #f4f4f5;
+    --color-text-secondary: #d4d4d8;
+    --color-text-tertiary: #a1a1aa;
+    --color-text-inverse: #18181b;
+    --color-text-muted: #71717a;
+
+    --color-border-primary: #27272a;
+    --color-border-secondary: #3f3f46;
+    --color-border-focus: #e4e4e7;
+
+    --color-surface-card: #131316;
+    --color-surface-modal: #18181b;
+    --color-surface-popover: #1f1f23;
+    --color-surface-sidebar: #0a0a0b;
+
+    --color-input-bg: #18181b;
+    --color-input-border: #3f3f46;
+    --color-input-focus: #e4e4e7;
+
+    --color-accent: #e4e4e7;
+    --color-accent-hover: #ffffff;
+    --color-accent-soft: #27272a;
+
+    --color-danger: #f87171;
+    --color-danger-hover: #ef4444;
+    --color-danger-soft: rgba(248, 113, 113, 0.12);
+
+    --color-highlight-soft: rgba(245, 158, 11, 0.18);
+
+    --color-overlay: rgba(0, 0, 0, 0.7);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ============================================
+     DENSITY SYSTEM - data-density attribute on <html>
+     Controls spacing for tables, cards, and form controls
+     app-wide without touching individual page components.
+     ============================================ */
+  :root,
+  [data-density="comfortable"] {
+    --density-cell-py: 1rem;       /* table cell vertical padding */
+    --density-cell-px: 1.5rem;     /* table cell horizontal padding */
+    --density-header-py: 0.75rem;  /* table header cell vertical padding */
+    --density-card-py: 1rem;       /* card header/body/footer vertical padding */
+    --density-card-px: 1.5rem;     /* card header/body/footer horizontal padding */
+    --density-input-py: 0.5rem;    /* form input vertical padding */
+    --density-nav-py: 0.5rem;      /* sidebar nav link vertical padding */
+    --density-row-gap: 1rem;       /* generic stacked-content gap */
+  }
+
+  [data-density="compact"] {
+    --density-cell-py: 0.5rem;
+    --density-cell-px: 1rem;
+    --density-header-py: 0.5rem;
+    --density-card-py: 0.625rem;
+    --density-card-px: 1rem;
+    --density-input-py: 0.325rem;
+    --density-nav-py: 0.25rem;
+    --density-row-gap: 0.5rem;
+  }
+
+  html {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  /* Headings use a distinct display face app-wide; body copy stays on Plus Jakarta Sans. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  body {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    @apply antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    @apply w-2 h-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    background-color: var(--color-bg-tertiary);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-text-muted);
+    @apply rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-text-tertiary);
+  }
+}
+
+@layer components {
+  /* Status badge base styles */
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full transition-colors;
+  }
+
+  .status-badge-ok {
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/60;
+  }
+
+  .status-badge-warning {
+    @apply bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/60;
+  }
+
+  .status-badge-critical {
+    @apply bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/60;
+  }
+
+  .status-badge-neutral {
+    background-color: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border-primary);
+  }
+
+  /* Button base styles */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    --tw-ring-color: var(--color-accent);
+  }
+
+  .btn-primary {
+    background-color: var(--color-accent);
+    color: var(--color-text-inverse);
+  }
+  .btn-primary:hover {
+    background-color: var(--color-accent-hover);
+  }
+
+  .btn-secondary {
+    background-color: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+  }
+  .btn-secondary:hover {
+    background-color: var(--color-border-secondary);
+  }
+
+  .btn-success {
+    @apply bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800;
+  }
+
+  .btn-warning {
+    @apply bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 active:bg-red-800;
+  }
+
+  .btn-ghost {
+    color: var(--color-text-secondary);
+  }
+  .btn-ghost:hover {
+    background-color: var(--color-bg-tertiary);
+  }
+
+  .btn-sm {
+    @apply h-8 px-3 text-xs;
+  }
+
+  .btn-md {
+    @apply h-10 px-4 text-sm;
+  }
+
+  .btn-lg {
+    @apply h-12 px-6 text-base;
+  }
+
+  /* Form styles */
+  .form-input {
+    display: block;
+    width: 100%;
+    border-radius: 0.375rem;
+    background-color: var(--color-input-bg);
+    border: 1px solid var(--color-input-border);
+    color: var(--color-text-primary);
+    padding: var(--density-input-py) 0.75rem;
+    @apply shadow-sm sm:text-sm;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, padding 0.15s ease;
+  }
+  .form-input:focus {
+    border-color: var(--color-input-focus);
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+  }
+  [data-theme="dark"] .form-input:focus {
+    box-shadow: 0 0 0 3px rgba(228, 228, 231, 0.12);
+  }
+
+  .form-label {
+    color: var(--color-text-secondary);
+    @apply block text-sm font-medium mb-1;
+  }
+
+  .form-error {
+    @apply mt-1 text-sm text-red-600 dark:text-red-400;
+  }
+
+  .form-help {
+    color: var(--color-text-muted);
+    @apply mt-1 text-sm;
+  }
+
+  /* Card styles */
+  .card {
+    background-color: var(--color-surface-card);
+    border: 1px solid var(--color-border-primary);
+    box-shadow: var(--shadow-sm);
+    @apply rounded-lg;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .card-header {
+    border-bottom: 1px solid var(--color-border-primary);
+    padding: var(--density-card-py) var(--density-card-px);
+    transition: padding 0.15s ease;
+  }
+
+  .card-body {
+    padding: var(--density-card-py) var(--density-card-px);
+    transition: padding 0.15s ease;
+  }
+
+  .card-footer {
+    border-top: 1px solid var(--color-border-primary);
+    background-color: var(--color-bg-secondary);
+    padding: var(--density-card-py) var(--density-card-px);
+    transition: padding 0.15s ease;
+  }
+
+  /* Navigation styles */
+  .nav-link {
+    padding: var(--density-nav-py) 0.75rem;
+    transition: padding 0.15s ease, background-color 0.1s ease, color 0.1s ease;
+    @apply flex items-center gap-3 text-sm font-medium rounded-md;
+  }
+
+  .nav-link-active {
+    background-color: var(--color-accent-soft);
+    color: var(--color-text-primary);
+    border-right: 2px solid var(--color-accent);
+    font-weight: 600;
+  }
+
+  .nav-link-inactive {
+    color: var(--color-text-tertiary);
+  }
+  .nav-link-inactive:hover {
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-tertiary);
+  }
+
+  /* Table styles */
+  .table {
+    @apply min-w-full;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .table-header {
+    background-color: var(--color-bg-tertiary);
+  }
+
+  .table-header-cell {
+    color: var(--color-text-tertiary);
+    padding: var(--density-header-py) var(--density-cell-px);
+    transition: padding 0.15s ease;
+    @apply text-left text-xs font-medium uppercase tracking-wider;
+  }
+
+  .table-body {
+    background-color: var(--color-surface-card);
+  }
+
+  .table-row {
+    border-bottom: 1px solid var(--color-border-primary);
+    transition: background-color 0.1s ease;
+  }
+  .table-row:hover {
+    background-color: var(--color-bg-tertiary);
+  }
+
+  /* Applied to a row that was just jumped to from the global search bar. */
+  .table-row-highlight {
+    animation: row-highlight-fade 2.5s ease-out;
+  }
+  @keyframes row-highlight-fade {
+    0% { background-color: var(--color-highlight-soft); }
+    70% { background-color: var(--color-highlight-soft); }
+    100% { background-color: transparent; }
+  }
+
+  .table-cell {
+    color: var(--color-text-primary);
+    padding: var(--density-cell-py) var(--density-cell-px);
+    transition: padding 0.15s ease;
+    @apply whitespace-nowrap text-sm;
+  }
+
+  /* Loading states */
+  .loading-spinner {
+    @apply animate-spin h-4 w-4 border-2 rounded-full;
+    border-color: var(--color-border-primary);
+    border-top-color: var(--color-accent);
+  }
+
+  /* Focus states for accessibility */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    --tw-ring-color: var(--color-accent);
+  }
+
+  /* Modal overlay */
+  .modal-overlay {
+    @apply fixed inset-0 z-50 flex items-center justify-center;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+  }
+
+  .modal-content {
+    background-color: var(--color-surface-modal);
+    border: 1px solid var(--color-border-primary);
+    box-shadow: var(--shadow-lg);
+    @apply rounded-xl w-full max-w-md mx-4 animate-fade-in;
+  }
+}
+
+@layer utilities {
+  /* Text truncation utilities */
+  .truncate-2-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .truncate-3-lines {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-in-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  /* Safe area utilities for mobile */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
