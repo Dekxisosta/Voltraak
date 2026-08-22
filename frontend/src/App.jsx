@@ -6,6 +6,7 @@ import { ErrorBoundary, NotificationContainer } from '@/components/common'
 import { AuthProvider } from '@/shared/contexts/AuthContext'
 import { ThemeProvider } from '@/shared/contexts/ThemeContext'
 import { DensityProvider } from '@/shared/contexts/DensityContext'
+import { LayoutPreferenceProvider } from '@/shared/contexts/LayoutPreferenceContext'
 import { NotificationProvider } from '@/shared/hooks/useNotifications'
 import AppRoutes from '@/routes/AppRoutes'
 import ApiTest from '@/test/ApiTest'
@@ -48,14 +49,16 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <DensityProvider>
-          <NotificationProvider>
-            <AuthProvider>
-              <div className="min-h-screen">
-                <AppRoutes />
-                <NotificationContainer />
-              </div>
-            </AuthProvider>
-          </NotificationProvider>
+          <LayoutPreferenceProvider>
+            <NotificationProvider>
+              <AuthProvider>
+                <div className="min-h-screen">
+                  <AppRoutes />
+                  <NotificationContainer />
+                </div>
+              </AuthProvider>
+            </NotificationProvider>
+          </LayoutPreferenceProvider>
         </DensityProvider>
       </ThemeProvider>
     </ErrorBoundary>

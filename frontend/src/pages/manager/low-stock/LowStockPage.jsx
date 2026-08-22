@@ -54,9 +54,9 @@ export default function LowStockPage() {
   const columns = [
     { key: 'product_name', label: 'Product', sortable: true },
     { key: 'sku', label: 'SKU' },
-    { key: 'current_stock', label: 'Current', render: (val, row) => <span className={val <= row.minimum_stock ? 'text-red-600 dark:text-red-400 font-bold' : 'font-medium'}>{val}</span> },
+    { key: 'current_stock', label: 'Current', render: (val, row) => <span className={val <= row.minimum_stock ? 'text-gray-600 dark:text-gray-400 font-bold' : 'font-medium'}>{val}</span> },
     { key: 'reorder_point', label: 'Reorder Point' },
-    { key: 'days_until_stockout', label: 'Days to Stockout', render: (val) => <span className={`font-bold ${val === 0 ? 'text-red-600 dark:text-red-400' : val <= 7 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-700 dark:text-gray-300'}`}>{val === 0 ? 'NOW' : `${val} days`}</span> },
+    { key: 'days_until_stockout', label: 'Days to Stockout', render: (val) => <span className={`font-bold ${val === 0 ? 'text-gray-600 dark:text-gray-400' : val <= 7 ? 'text-gray-600 dark:text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>{val === 0 ? 'NOW' : `${val} days`}</span> },
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'suggested_order_qty', label: 'Suggested Order' },
     { key: 'actions', label: 'Actions', render: (_, row) => (
@@ -78,16 +78,16 @@ export default function LowStockPage() {
       <PageHeader title="Low Stock Alerts" subtitle="Products at or below reorder point" icon={AlertTriangle} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-red-600 dark:text-red-400">{data.alerts.filter(a => a.status === 'out_of_stock').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Out of Stock</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{data.alerts.filter(a => a.status === 'critical').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Critical</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{data.alerts.filter(a => a.status === 'low').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Low Stock</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{data.alerts.reduce((s, a) => s + a.suggested_order_qty, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Units to Order</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.alerts.filter(a => a.status === 'out_of_stock').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Out of Stock</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.alerts.filter(a => a.status === 'critical').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Critical</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.alerts.filter(a => a.status === 'low').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Low Stock</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.alerts.reduce((s, a) => s + a.suggested_order_qty, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Units to Order</p></div></Card.Body></Card>
       </div>
 
       <Card>
         <Card.Body>
           <div className="mb-6">
-            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products..." className="max-w-md" />
+            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products..." className="w-full sm:max-w-md" />
           </div>
           <Table data={filteredAlerts} columns={columns} emptyMessage="No low stock alerts" highlightRowId={highlightRowId} />
         </Card.Body>

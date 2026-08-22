@@ -2,11 +2,12 @@
  * Preferences Modal - theme and display settings
  */
 
-import { X, Sun, Moon, Monitor, RotateCcw, Maximize2, Minimize2, User, Mail, Lock, Save, Sliders, UserCircle } from 'lucide-react'
+import { X, Sun, Moon, Monitor, RotateCcw, Maximize2, Minimize2, User, Mail, Lock, Save, Sliders, UserCircle, Rows, LayoutGrid, Wand2 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useDensity } from '@/shared/contexts/DensityContext'
+import { useLayoutPreference } from '@/shared/contexts/LayoutPreferenceContext'
 import { useAuth } from '@/shared/contexts/AuthContext'
 import { resetAllCollections } from '@/shared/services/mockStore'
 import { dataSourceMode } from '@/shared/services/dataSource'
@@ -51,6 +52,27 @@ const densityOptions = [
   },
 ]
 
+const layoutOptions = [
+  {
+    id: 'auto',
+    label: 'Auto',
+    description: 'Lists on desktop, cards on tablet and mobile for easier scanning. Boards with a workflow (like approvals) still switch to Kanban on tablet/desktop.',
+    icon: Wand2,
+  },
+  {
+    id: 'list',
+    label: 'List',
+    description: 'Always show data as a table, regardless of screen size.',
+    icon: Rows,
+  },
+  {
+    id: 'cards',
+    label: 'Cards',
+    description: 'Always show data as cards, regardless of screen size.',
+    icon: LayoutGrid,
+  },
+]
+
 const TABS = [
   { id: 'display', label: 'Display', icon: Sliders },
   { id: 'account', label: 'Account', icon: UserCircle },
@@ -59,6 +81,7 @@ const TABS = [
 export default function PreferencesModal({ isOpen, onClose }) {
   const { preference, setTheme } = useTheme()
   const { density, setDensity } = useDensity()
+  const { layoutPreference, setLayoutPreference } = useLayoutPreference()
   const { user, updateProfile } = useAuth()
   const { addNotification } = useNotifications()
   const [resetting, setResetting] = useState(false)
@@ -245,6 +268,44 @@ export default function PreferencesModal({ isOpen, onClose }) {
                 </div>
                 <p className="mt-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                   {densityOptions.find(o => o.id === density)?.description}
+                </p>
+              </div>
+
+              {/* Layout Section */}
+              <div>
+                <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--color-text-secondary)' }}>
+                  Data Layout
+                </h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {layoutOptions.map((option) => {
+                    const isSelected = layoutPreference === option.id
+                    const Icon = option.icon
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => setLayoutPreference(option.id)}
+                        className="flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all"
+                        style={{
+                          borderColor: isSelected ? 'var(--color-accent)' : 'var(--color-border-primary)',
+                          backgroundColor: isSelected ? 'var(--color-accent-soft)' : 'transparent',
+                        }}
+                      >
+                        <Icon
+                          className="h-6 w-6"
+                          style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}
+                        />
+                        <span
+                          className="text-sm font-medium"
+                          style={{ color: isSelected ? 'var(--color-accent)' : 'var(--color-text-primary)' }}
+                        >
+                          {option.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="mt-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  {layoutOptions.find(o => o.id === layoutPreference)?.description}
                 </p>
               </div>
 

@@ -15,7 +15,7 @@ const mockActivity = [
     user: 'Juan Dela Cruz',
     timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
     icon: ArrowUp,
-    color: 'green',
+    color: 'neutral',
   },
   {
     id: '2',
@@ -25,7 +25,7 @@ const mockActivity = [
     user: 'Maria Santos',
     timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), // 4 hours ago
     icon: ArrowDown,
-    color: 'blue',
+    color: 'neutral',
   },
   {
     id: '3',
@@ -35,7 +35,7 @@ const mockActivity = [
     user: 'Ana Rodriguez',
     timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), // 6 hours ago
     icon: Package,
-    color: 'yellow',
+    color: 'neutral',
   },
   {
     id: '4',
@@ -44,7 +44,7 @@ const mockActivity = [
     description: 'Xiaomi Redmi Note 12 below reorder point (8 units remaining)',
     timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(), // 8 hours ago
     icon: AlertCircle,
-    color: 'red',
+    color: 'critical',
   },
   {
     id: '5',
@@ -54,30 +54,24 @@ const mockActivity = [
     user: 'Carlos Mendoza',
     timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
     icon: ArrowUp,
-    color: 'green',
+    color: 'neutral',
   },
 ]
 
+// Everyday transaction log entries stay neutral; only genuine alerts
+// (e.g. a low-stock warning surfacing in the feed) get flagged with color.
 const colorClasses = {
-  blue: {
-    bg: 'bg-blue-100 dark:bg-blue-900/30',
-    icon: 'text-blue-600 dark:text-blue-400',
-  },
-  green: {
-    bg: 'bg-green-100 dark:bg-green-900/30',
-    icon: 'text-green-600 dark:text-green-400',
-  },
-  yellow: {
-    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
-    icon: 'text-yellow-600 dark:text-yellow-400',
-  },
-  red: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    icon: 'text-red-600 dark:text-red-400',
-  },
-  gray: {
-    bg: 'bg-gray-100 dark:bg-gray-700',
+  neutral: {
+    bg: 'bg-gray-100 dark:bg-gray-800',
     icon: 'text-gray-600 dark:text-gray-400',
+  },
+  warning: {
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    icon: 'text-amber-600 dark:text-amber-400',
+  },
+  critical: {
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    icon: 'text-red-600 dark:text-red-400',
   },
 }
 
@@ -87,7 +81,7 @@ export default function RecentActivity() {
       <div className="card-header">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Activity</h3>
-          <button className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-400">
+          <button className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
             View all
           </button>
         </div>

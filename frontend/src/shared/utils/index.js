@@ -42,6 +42,37 @@ export function formatNumber(
 }
 
 /**
+ * Format numbers compactly with a K/M/B suffix (e.g. 1247 -> "1.2K",
+ * 892450 -> "892.5K", 4200000 -> "4.2M"). Small values pass through
+ * unchanged, so this is a safe drop-in replacement for formatNumber
+ * anywhere large totals might show up, like dashboard stat cards.
+ */
+export function formatCompactNumber(value, maximumFractionDigits = 1) {
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits,
+  }).format(value)
+}
+
+/**
+ * Format currency compactly with a K/M/B suffix (e.g. ₱892,450 -> "₱892.5K").
+ * Same idea as formatCompactNumber, but keeps the currency symbol.
+ */
+export function formatCompactCurrency(
+  amount,
+  currency = 'PHP',
+  locale = 'en-PH',
+  maximumFractionDigits = 1
+) {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits,
+  }).format(amount)
+}
+
+/**
  * Format percentage values
  */
 export function formatPercentage(

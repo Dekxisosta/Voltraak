@@ -15,6 +15,8 @@
 import React from 'react'
 import { ChevronUp, ChevronDown, ArrowUpDown, List, LayoutGrid } from 'lucide-react'
 import { cn } from '@/utils'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
+import { useLayoutPreference } from '@/contexts/LayoutPreferenceContext'
 import LoadingSpinner from './LoadingSpinner'
 
 const VIEW_STORAGE_PREFIX = 'voltraak:table-view:'
@@ -28,6 +30,30 @@ function readStoredView(storageKey, fallback) {
   } catch {
     return fallback
   }
+}
+
+// Picks the view a table should open in when the user hasn't made an
+// explicit choice yet (no localStorage entry, no toggle click this
+// session). Two rules, in order:
+//   1. Kanban-enabled tables auto-pick the board on tablet/desktop, but
+//      fall back to cards on mobile - a multi-column board doesn't fit a
+//      phone screen, and cards keep the same grouping information
+//      scannable in a single column instead.
+//   2. Everything else follows the user's global layout preference from
+//      Preferences (List / Cards), or - when that's left on "Auto" -
+//      lists on desktop and cards on tablet/mobile, since cards are
+//      easier to scan one-handed / with a stylus at that width.
+function resolveAutoView({ views, breakpoint, layoutPreference, defaultView }) {
+  if (views.includes('kanban')) {
+    return breakpoint === 'mobile' ? 'card' : 'kanban'
+  }
+
+  if (layoutPreference === 'list') return 'list'
+  if (layoutPreference === 'cards') return 'card'
+
+  // layoutPreference === 'auto'
+  if (breakpoint === 'desktop') return views.includes(defaultView) ? defaultView : 'list'
+  return 'card'
 }
 
 // Small inline icon (not from lucide) so the Kanban toggle doesn't depend
@@ -80,12 +106,21 @@ export default function Table({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightRowId, data])
   const showToggle = views.length > 1
-  const [view, setView] = React.useState(() =>
-    readStoredView(viewStorageKey, views.includes(defaultView) ? defaultView : views[0])
-  )
+  const breakpoint = useBreakpoint()
+  const { layoutPreference } = useLayoutPreference()
+
+  // A stored choice means the user explicitly picked a view (via the
+  // toggle) on a previous visit - that's an intentional override and
+  // wins over auto-selection. `manualView` captures the same thing for
+  // clicks made during the current session, before it's persisted.
+  const storedView = readStoredView(viewStorageKey, null)
+  const [manualView, setManualView] = React.useState(null)
+
+  const autoView = resolveAutoView({ views, breakpoint, layoutPreference, defaultView })
+  const view = manualView ?? storedView ?? autoView
 
   const changeView = (next) => {
-    setView(next)
+    setManualView(next)
     if (viewStorageKey && typeof window !== 'undefined') {
       try {
         window.localStorage.setItem(VIEW_STORAGE_PREFIX + viewStorageKey, next)

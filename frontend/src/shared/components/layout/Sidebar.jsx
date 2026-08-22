@@ -359,8 +359,8 @@ function NavItem({ item, isActive, onClick }) {
       className={cn(
         'nav-link transition-colors',
         isActive
-          ? 'bg-amber-800 text-white'
-          : 'text-gray-300 hover:text-white hover:bg-sidebar-hover'
+          ? 'bg-sidebar-hover text-white border-l-2 border-white pl-[calc(0.75rem-2px)]'
+          : 'text-gray-400 hover:text-white hover:bg-sidebar-hover border-l-2 border-transparent pl-[calc(0.75rem-2px)]'
       )}
     >
       <item.icon className="h-5 w-5" />

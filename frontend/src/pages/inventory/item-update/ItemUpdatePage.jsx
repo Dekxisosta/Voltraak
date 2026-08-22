@@ -73,8 +73,8 @@ export default function ItemUpdatePage() {
 
       <Card>
         <Card.Body>
-          <div className="flex justify-between items-center mb-6">
-            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search by name, SKU, or category..." className="max-w-md" />
+          <div className="mb-6">
+            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search by name, SKU, or category..." className="w-full sm:max-w-md" />
           </div>
           <Table data={filteredProducts} columns={columns} emptyMessage="No products found" highlightRowId={highlightRowId} />
         </Card.Body>

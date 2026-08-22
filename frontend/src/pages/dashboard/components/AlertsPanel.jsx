@@ -65,22 +65,24 @@ const ROLE_SOURCES = {
 
 const alertTypeStyles = {
   critical: {
-    bg: 'bg-red-50 dark:bg-red-900/30',
-    border: 'border-red-200 dark:border-red-800',
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    border: 'border-red-200 dark:border-red-800/60',
     icon: 'text-red-600 dark:text-red-400',
     text: 'text-red-800 dark:text-red-300',
   },
   warning: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/30',
-    border: 'border-yellow-200 dark:border-yellow-800',
-    icon: 'text-yellow-600 dark:text-yellow-400',
-    text: 'text-yellow-800 dark:text-yellow-300',
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    border: 'border-amber-200 dark:border-amber-800/60',
+    icon: 'text-amber-600 dark:text-amber-400',
+    text: 'text-amber-800 dark:text-amber-300',
   },
+  // Informational, not urgent - kept neutral so it doesn't compete with
+  // the actual warning/critical alerts for attention.
   info: {
-    bg: 'bg-blue-50 dark:bg-blue-900/30',
-    border: 'border-blue-200 dark:border-blue-800',
-    icon: 'text-blue-600 dark:text-blue-400',
-    text: 'text-blue-800 dark:text-blue-300',
+    bg: 'bg-gray-100 dark:bg-gray-800',
+    border: 'border-gray-200 dark:border-gray-700',
+    icon: 'text-gray-600 dark:text-gray-400',
+    text: 'text-gray-800 dark:text-gray-300',
   },
 }
 

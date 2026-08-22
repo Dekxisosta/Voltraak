@@ -16,7 +16,7 @@ import {
   Truck,
   ArrowUpDown,
 } from 'lucide-react'
-import { formatCurrency } from '@/shared/utils'
+import { formatCompactCurrency, formatCompactNumber } from '@/shared/utils'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
@@ -34,7 +34,7 @@ function buildStats(poOrders) {
   return [
     {
       title: 'Pending PO Approvals',
-      value: pending.length,
+      value: formatCompactNumber(pending.length),
       change: `${highValuePending.length} over ₱50,000`,
       changeType: 'neutral',
       icon: ShoppingCart,
@@ -42,7 +42,7 @@ function buildStats(poOrders) {
     },
     {
       title: 'Monthly Revenue',
-      value: formatCurrency(125430),
+      value: formatCompactCurrency(125430),
       change: '+8.1% vs last month',
       changeType: 'increase',
       icon: TrendingUp,
@@ -50,7 +50,7 @@ function buildStats(poOrders) {
     },
     {
       title: 'Cost Savings',
-      value: formatCurrency(8250),
+      value: formatCompactCurrency(8250),
       change: 'from reorder optimization',
       changeType: 'increase',
       icon: FileBarChart,
@@ -58,7 +58,7 @@ function buildStats(poOrders) {
     },
     {
       title: 'Low Stock Items',
-      value: 23,
+      value: formatCompactNumber(23),
       change: 'across all warehouses',
       changeType: 'decrease',
       icon: AlertCircle,
@@ -138,11 +138,11 @@ const oversightRedirectItems = [
 ]
 
 const colorClasses = {
-  blue: { bg: 'bg-blue-50 dark:bg-blue-900/30', icon: 'text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800' },
-  green: { bg: 'bg-green-50 dark:bg-green-900/30', icon: 'text-green-600 dark:text-green-400', border: 'border-green-200 dark:border-green-800' },
-  yellow: { bg: 'bg-yellow-50 dark:bg-yellow-900/30', icon: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
-  red: { bg: 'bg-red-50 dark:bg-red-900/30', icon: 'text-red-600 dark:text-red-400', border: 'border-red-200 dark:border-red-800' },
-  purple: { bg: 'bg-purple-50 dark:bg-purple-900/30', icon: 'text-purple-600 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-800' },
+  blue: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+  green: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+  yellow: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+  red: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+  purple: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
 }
 
 export default function ManagerDashboard() {
@@ -193,9 +193,9 @@ function StatCard({ stat }) {
               <p
                 className={`text-xs mt-1 truncate ${
                   stat.changeType === 'increase'
-                    ? 'text-green-600 dark:text-green-400'
+                    ? 'text-gray-600 dark:text-gray-400'
                     : stat.changeType === 'decrease'
-                    ? 'text-red-600 dark:text-red-400'
+                    ? 'text-gray-600 dark:text-gray-400'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >

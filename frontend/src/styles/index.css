@@ -7,81 +7,88 @@
    ============================================ */
 
 @layer base {
-  /* --- Light Theme (default) --- */
+  /* --- Light Theme (default) ---
+     Neutral, near-monochrome base. A single restrained accent (slate-ink)
+     is used for primary actions, links, focus, and "current" states.
+     Color is otherwise reserved for status (ok / warning / critical). */
   [data-theme="light"],
   :root {
     --color-bg-primary: #ffffff;
-    --color-bg-secondary: #f9fafb;
-    --color-bg-tertiary: #f3f4f6;
-    --color-bg-inverse: #111827;
+    --color-bg-secondary: #fafafa;
+    --color-bg-tertiary: #f4f4f5;
+    --color-bg-inverse: #18181b;
 
-    --color-text-primary: #111827;
-    --color-text-secondary: #4b5563;
-    --color-text-tertiary: #6b7280;
-    --color-text-inverse: #f9fafb;
-    --color-text-muted: #9ca3af;
+    --color-text-primary: #18181b;
+    --color-text-secondary: #52525b;
+    --color-text-tertiary: #71717a;
+    --color-text-inverse: #fafafa;
+    --color-text-muted: #a1a1aa;
 
-    --color-border-primary: #e5e7eb;
-    --color-border-secondary: #d1d5db;
-    --color-border-focus: #92400e;
+    --color-border-primary: #e4e4e7;
+    --color-border-secondary: #d4d4d8;
+    --color-border-focus: #18181b;
 
     --color-surface-card: #ffffff;
     --color-surface-modal: #ffffff;
     --color-surface-popover: #ffffff;
-    --color-surface-sidebar: #1e293b;
+    --color-surface-sidebar: #18181b;
 
     --color-input-bg: #ffffff;
-    --color-input-border: #d1d5db;
-    --color-input-focus: #92400e;
+    --color-input-border: #d4d4d8;
+    --color-input-focus: #18181b;
 
-    --color-accent: #92400e;
-    --color-accent-hover: #78350f;
-    --color-accent-soft: #fef3c7;
+    --color-accent: #18181b;
+    --color-accent-hover: #3f3f46;
+    --color-accent-soft: #f4f4f5;
 
     --color-danger: #dc2626;
     --color-danger-hover: #b91c1c;
     --color-danger-soft: #fef2f2;
 
-    --color-overlay: rgba(15, 23, 42, 0.5);
+    --color-highlight-soft: #fef3c7;
 
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --color-overlay: rgba(24, 24, 27, 0.5);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
   }
 
   /* --- Dark Theme --- */
   [data-theme="dark"] {
-    --color-bg-primary: #0f172a;
-    --color-bg-secondary: #1e293b;
-    --color-bg-tertiary: #334155;
-    --color-bg-inverse: #f8fafc;
+    --color-bg-primary: #0a0a0b;
+    --color-bg-secondary: #131316;
+    --color-bg-tertiary: #1f1f23;
+    --color-bg-inverse: #fafafa;
 
-    --color-text-primary: #f1f5f9;
-    --color-text-secondary: #cbd5e1;
-    --color-text-tertiary: #94a3b8;
-    --color-text-inverse: #0f172a;
-    --color-text-muted: #64748b;
+    --color-text-primary: #f4f4f5;
+    --color-text-secondary: #d4d4d8;
+    --color-text-tertiary: #a1a1aa;
+    --color-text-inverse: #18181b;
+    --color-text-muted: #71717a;
 
-    --color-border-primary: #334155;
-    --color-border-secondary: #475569;
-    --color-border-focus: #d97706;
+    --color-border-primary: #27272a;
+    --color-border-secondary: #3f3f46;
+    --color-border-focus: #e4e4e7;
 
-    --color-surface-card: #1e293b;
-    --color-surface-modal: #1e293b;
-    --color-surface-popover: #334155;
-    --color-surface-sidebar: #0f172a;
+    --color-surface-card: #131316;
+    --color-surface-modal: #18181b;
+    --color-surface-popover: #1f1f23;
+    --color-surface-sidebar: #0a0a0b;
 
-    --color-input-bg: #1e293b;
-    --color-input-border: #475569;
-    --color-input-focus: #d97706;
+    --color-input-bg: #18181b;
+    --color-input-border: #3f3f46;
+    --color-input-focus: #e4e4e7;
 
-    --color-accent: #d97706;
-    --color-accent-hover: #b45309;
-    --color-accent-soft: #422006;
+    --color-accent: #e4e4e7;
+    --color-accent-hover: #ffffff;
+    --color-accent-soft: #27272a;
 
     --color-danger: #f87171;
     --color-danger-hover: #ef4444;
     --color-danger-soft: rgba(248, 113, 113, 0.12);
+
+    --color-highlight-soft: rgba(245, 158, 11, 0.18);
 
     --color-overlay: rgba(0, 0, 0, 0.7);
 
@@ -119,7 +126,12 @@
   }
 
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  /* Headings use a distinct display face app-wide; body copy stays on Plus Jakarta Sans. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 
   body {
@@ -155,15 +167,15 @@
   }
 
   .status-badge-ok {
-    @apply bg-green-100 text-green-800 border border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800;
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/60;
   }
 
   .status-badge-warning {
-    @apply bg-yellow-100 text-yellow-800 border border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:border-yellow-800;
+    @apply bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/60;
   }
 
   .status-badge-critical {
-    @apply bg-red-100 text-red-800 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800;
+    @apply bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/60;
   }
 
   .status-badge-neutral {
@@ -174,12 +186,13 @@
 
   /* Button base styles */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    --tw-ring-color: var(--color-accent);
   }
 
   .btn-primary {
     background-color: var(--color-accent);
-    color: #ffffff;
+    color: var(--color-text-inverse);
   }
   .btn-primary:hover {
     background-color: var(--color-accent-hover);
@@ -194,11 +207,11 @@
   }
 
   .btn-success {
-    @apply bg-green-600 text-white hover:bg-green-700 active:bg-green-800;
+    @apply bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800;
   }
 
   .btn-warning {
-    @apply bg-yellow-600 text-white hover:bg-yellow-700 active:bg-yellow-800;
+    @apply bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-800;
   }
 
   .btn-danger {
@@ -239,7 +252,10 @@
   .form-input:focus {
     border-color: var(--color-input-focus);
     outline: none;
-    box-shadow: 0 0 0 3px rgba(146, 64, 14, 0.15);
+    box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+  }
+  [data-theme="dark"] .form-input:focus {
+    box-shadow: 0 0 0 3px rgba(228, 228, 231, 0.12);
   }
 
   .form-label {
@@ -291,7 +307,10 @@
   }
 
   .nav-link-active {
-    @apply bg-blue-50 text-blue-700 border-r-2 border-blue-500 dark:bg-blue-900/30 dark:text-blue-300;
+    background-color: var(--color-accent-soft);
+    color: var(--color-text-primary);
+    border-right: 2px solid var(--color-accent);
+    font-weight: 600;
   }
 
   .nav-link-inactive {
@@ -337,8 +356,8 @@
     animation: row-highlight-fade 2.5s ease-out;
   }
   @keyframes row-highlight-fade {
-    0% { background-color: var(--color-accent-soft); }
-    70% { background-color: var(--color-accent-soft); }
+    0% { background-color: var(--color-highlight-soft); }
+    70% { background-color: var(--color-highlight-soft); }
     100% { background-color: transparent; }
   }
 
@@ -358,7 +377,8 @@
 
   /* Focus states for accessibility */
   .focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    --tw-ring-color: var(--color-accent);
   }
 
   /* Modal overlay */

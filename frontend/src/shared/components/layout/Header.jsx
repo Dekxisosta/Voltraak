@@ -3,21 +3,20 @@
  */
 
 import { useState } from 'react'
-import { Menu, Search, Bell, User, LogOut, Settings } from 'lucide-react'
+import { Menu, Search, User, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useNotifications } from '@/hooks/useNotifications'
-import { SessionManager, ProfileModal, GlobalSearchBar } from '@/components/common'
+import { SessionManager, ProfileModal, PreferencesModal, GlobalSearchBar } from '@/components/common'
+import LiveClock from './LiveClock'
+import WeatherBadge from './WeatherBadge'
 
 
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth()
-  const { notifications } = useNotifications()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   const [showMobileSearch, setShowMobileSearch] = useState(false)
-
-  const unreadCount = notifications.filter(n => !n.read).length
 
   const handleLogout = () => {
     setShowUserMenu(false)
@@ -25,14 +24,14 @@ export default function Header({ onMenuClick }) {
   }
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+    <header className="sticky top-0 z-30 bg-[var(--color-surface-card)] shadow-sm border-b border-[var(--color-border-primary)]">
       <div className="flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         {/* Left section */}
         <div className="flex items-center flex-1 min-w-0">
           {/* Mobile menu button */}
           <button
             type="button"
-            className="lg:hidden p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+            className="lg:hidden p-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-border-focus)] rounded"
             onClick={onMenuClick}
           >
             <Menu className="h-5 w-5" />
@@ -50,26 +49,20 @@ export default function Header({ onMenuClick }) {
           <button
             type="button"
             onClick={() => setShowMobileSearch((prev) => !prev)}
-            className="sm:hidden p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+            className="sm:hidden p-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-border-focus)] rounded"
           >
             <Search className="h-5 w-5" />
           </button>
 
-          {/* Notifications */}
-          <button className="relative p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
+          {/* Weather + live clock */}
+          <WeatherBadge />
+          <LiveClock />
 
           {/* User menu */}
           <div className="relative">
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center space-x-3 p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded max-w-[12rem]"
+              onClick={() => setShowUserMenu((prev) => !prev)}
+              className="flex items-center space-x-3 p-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-border-focus)] rounded max-w-[12rem]"
             >
               <img
                 src="/assets/profile/profile.png"
@@ -77,10 +70,10 @@ export default function Header({ onMenuClick }) {
                 className="w-8 h-8 rounded-full object-cover flex-shrink-0"
               />
               <div className="hidden md:block text-left min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                   {user?.display_name}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                <p className="text-xs text-[var(--color-text-tertiary)] truncate">
                   {user?.role_display}
                 </p>
               </div>
@@ -88,21 +81,21 @@ export default function Header({ onMenuClick }) {
 
             {/* User dropdown menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-200 dark:border-gray-700">
+              <div className="absolute right-0 mt-2 w-56 bg-[var(--color-surface-popover)] rounded-md shadow-lg py-1 z-50 border border-[var(--color-border-primary)]">
                 {/* User info */}
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-700 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                <div className="px-4 py-3 border-b border-[var(--color-border-primary)] min-w-0">
+                  <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                     {user?.display_name}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-1 truncate">
+                  <p className="text-sm text-[var(--color-text-tertiary)] truncate">{user?.email}</p>
+                  <p className="text-xs text-[var(--color-text-tertiary)] font-medium mt-1 truncate">
                     {user?.role_display}
                   </p>
                 </div>
 
                 {/* Menu items */}
                 <button 
-                  className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
+                  className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] focus:outline-none focus:bg-[var(--color-bg-tertiary)]"
                   onClick={() => {
                     setShowUserMenu(false)
                     setShowProfileModal(true)
@@ -113,17 +106,20 @@ export default function Header({ onMenuClick }) {
                 </button>
                 
                 <button 
-                  className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:bg-gray-100 dark:focus:bg-gray-700"
-                  onClick={() => setShowUserMenu(false)}
+                  className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] focus:outline-none focus:bg-[var(--color-bg-tertiary)]"
+                  onClick={() => {
+                    setShowUserMenu(false)
+                    setShowPreferencesModal(true)
+                  }}
                 >
                   <Settings className="w-4 h-4" />
                   <span>Preferences</span>
                 </button>
                 
                 {/* Logout */}
-                <div className="border-t border-gray-100 dark:border-gray-700 mt-1">
+                <div className="border-t border-[var(--color-border-primary)] mt-1">
                   <button 
-                    className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 focus:outline-none focus:bg-red-50 dark:focus:bg-red-900/30"
+                    className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] focus:outline-none focus:bg-[var(--color-danger-soft)]"
                     onClick={handleLogout}
                   >
                     <LogOut className="w-4 h-4" />
@@ -156,6 +152,9 @@ export default function Header({ onMenuClick }) {
 
       {/* Profile modal */}
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
+
+      {/* Preferences modal */}
+      <PreferencesModal isOpen={showPreferencesModal} onClose={() => setShowPreferencesModal(false)} />
     </header>
   )
 }

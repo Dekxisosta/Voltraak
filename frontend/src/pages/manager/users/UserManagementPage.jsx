@@ -84,19 +84,19 @@ export default function UserManagementPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.users.length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-green-600 dark:text-green-400">{data.users.filter(u => u.is_active).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Active</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{data.users.filter(u => u.role === 'manager').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Managers</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{data.users.filter(u => { const d = new Date(u.last_login); const now = new Date(); return (now - d) < 24 * 60 * 60 * 1000 }).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Active Today</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.users.filter(u => u.is_active).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Active</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.users.filter(u => u.role === 'manager').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Managers</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.users.filter(u => { const d = new Date(u.last_login); const now = new Date(); return (now - d) < 24 * 60 * 60 * 1000 }).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Active Today</p></div></Card.Body></Card>
       </div>
 
       <Card>
         <Card.Body>
-          <div className="flex justify-between items-center mb-6">
-            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search by name or email..." className="max-w-md" />
-            <div className="flex items-center space-x-3">
-              <div className="flex space-x-2">
+          <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search by name or email..." className="w-full sm:max-w-md" />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-2">
                 {['all', 'manager', 'inventory_staff', 'warehouse'].map(r => (
-                  <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1 text-sm rounded-full ${roleFilter === r ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                  <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1 text-sm rounded-full ${roleFilter === r ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                     {r === 'all' ? 'All' : r === 'inventory_staff' ? 'Inventory' : r.charAt(0).toUpperCase() + r.slice(1)}
                   </button>
                 ))}

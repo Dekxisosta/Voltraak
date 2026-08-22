@@ -14,11 +14,14 @@ const NotificationContext = createContext(undefined)
 export function NotificationProvider({ 
   children, 
   maxNotifications = 10,
-  autoRemoveDelay = 5000 
 }) {
   const [notifications, setNotifications] = useState([])
 
   // Add notification
+  // Note: auto-dismissal (10s) and its exit animation are handled by
+  // NotificationItem itself, not here - that keeps the "how long is this
+  // on screen" timing next to the component that actually animates it out,
+  // and avoids a race between two independent removal timers.
   const addNotification = useCallback((notification) => {
     const id = generateId()
     const newNotification = {
@@ -39,15 +42,8 @@ export function NotificationProvider({
       return updated
     })
 
-    // Auto-remove non-error notifications after delay
-    if (notification.type !== 'error' && autoRemoveDelay > 0) {
-      setTimeout(() => {
-        removeNotification(id)
-      }, autoRemoveDelay)
-    }
-
     return id
-  }, [maxNotifications, autoRemoveDelay])
+  }, [maxNotifications])
 
   // Remove notification
   const removeNotification = useCallback((id) => {

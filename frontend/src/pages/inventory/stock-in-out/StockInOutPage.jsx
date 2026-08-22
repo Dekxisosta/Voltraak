@@ -148,7 +148,7 @@ export default function StockInOutPage() {
       key: 'quantity',
       label: 'Quantity',
       render: (value, row) => (
-        <div className={`font-medium ${row.type === 'stock_in' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+        <div className={`font-medium ${row.type === 'stock_in' ? 'text-gray-600 dark:text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
           {row.type === 'stock_in' ? '+' : '-'}{value}
         </div>
       )
@@ -395,8 +395,8 @@ export default function StockInOutPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <ArrowUp className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <ArrowUp className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -413,8 +413,8 @@ export default function StockInOutPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                <ArrowDown className="h-6 w-6 text-red-600 dark:text-red-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <ArrowDown className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -431,8 +431,8 @@ export default function StockInOutPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <Package className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">

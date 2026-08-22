@@ -14,6 +14,7 @@ export { default as StatusBadge, StockStatusBadge, BatchStatusBadge, UserStatusB
 export { default as Card, CardHeader, CardBody, CardFooter, StatCard, EmptyCard } from './Card'
 export { default as Modal, ModalHeader, ModalBody, ModalFooter, ConfirmModal } from './Modal'
 export { default as ProfileModal } from './ProfileModal'
+export { default as PreferencesModal } from './PreferencesModal'
 export { default as Table, useTableSort, ResponsiveTable, AdaptiveTable } from './Table'
 export { default as Pagination, PaginationInfo, usePagination } from './Pagination'
 

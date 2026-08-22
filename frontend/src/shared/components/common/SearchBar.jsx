@@ -127,7 +127,7 @@ export default function SearchBar({
             onClick={() => setFiltersOpen(!filtersOpen)}
             className={cn(
               'btn btn-secondary',
-              filtersOpen && 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+              filtersOpen && 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-900 dark:border-gray-100'
             )}
           >
             <Filter className="h-4 w-4" />

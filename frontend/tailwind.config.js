@@ -8,18 +8,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Status colors - semantic color system
+        // Status colors - semantic color system (the only place color should
+        // carry meaning in the UI - stock/order/discrepancy health, etc.)
         status: {
-          ok: "#22c55e",
-          warning: "#f59e0b", 
+          ok: "#10b981",
+          warning: "#f59e0b",
           critical: "#ef4444",
-          neutral: "#94a3b8"
+          neutral: "#a1a1aa"
         },
-        // Layout colors
+        // Layout colors - neutral graphite, matches the theme's --color-*
+        // sidebar variables
         sidebar: {
-          bg: "#1e293b",
-          text: "#f1f5f9",
-          hover: "#334155"
+          bg: "#18181b",
+          text: "#f4f4f5",
+          hover: "#27272a"
         },
         // Extended grays for better contrast
         gray: {
@@ -34,7 +36,7 @@ export default {
       },
       fontFamily: {
         sans: [
-          'Inter',
+          '"Plus Jakarta Sans"',
           '-apple-system',
           'BlinkMacSystemFont',
           '"Segoe UI"',
@@ -42,6 +44,27 @@ export default {
           '"Helvetica Neue"',
           'Arial',
           'sans-serif'
+        ],
+        heading: [
+          '"Space Grotesk"',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          '"Helvetica Neue"',
+          'Arial',
+          'sans-serif'
+        ],
+        mono: [
+          '"JetBrains Mono"',
+          'ui-monospace',
+          'SFMono-Regular',
+          'Menlo',
+          'Monaco',
+          'Consolas',
+          '"Liberation Mono"',
+          '"Courier New"',
+          'monospace'
         ]
       },
       spacing: {
@@ -59,7 +82,12 @@ export default {
       animation: {
         'fade-in': 'fadeIn 0.2s ease-in-out',
         'slide-in': 'slideIn 0.3s ease-out',
-        'pulse-soft': 'pulseSoft 2s infinite'
+        'pulse-soft': 'pulseSoft 2s infinite',
+        // Toast enter/exit - slide from the right edge (toasts are docked
+        // top-right), with a snappier ease-out on the way in and a quick
+        // ease-in on the way out so it feels responsive rather than laggy.
+        'toast-in': 'toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+        'toast-out': 'toastOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards'
       },
       keyframes: {
         fadeIn: {
@@ -73,6 +101,15 @@ export default {
         pulseSoft: {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.8' }
+        },
+        toastIn: {
+          '0%': { transform: 'translateX(110%) scale(0.95)', opacity: '0' },
+          '100%': { transform: 'translateX(0) scale(1)', opacity: '1' }
+        },
+        toastOut: {
+          '0%': { transform: 'translateX(0) scale(1)', opacity: '1', maxHeight: '200px', marginBottom: '0.5rem' },
+          '60%': { transform: 'translateX(110%) scale(0.95)', opacity: '0', maxHeight: '200px', marginBottom: '0.5rem' },
+          '100%': { transform: 'translateX(110%) scale(0.95)', opacity: '0', maxHeight: '0px', marginBottom: '0px' }
         }
       }
     },

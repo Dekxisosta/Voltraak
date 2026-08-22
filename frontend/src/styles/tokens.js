@@ -74,6 +74,8 @@ export const spacing = {
 export const typography = {
   fontFamily: {
     sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+    // Used for headings (h1-h6) app-wide; body copy stays on sans/Inter.
+    mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
   },
   
   fontSize: {

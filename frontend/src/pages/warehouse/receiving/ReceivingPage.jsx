@@ -170,7 +170,7 @@ export default function ReceivingPage() {
               value={searchTerm}
               onChange={setSearchTerm}
               placeholder="Search by PO number or supplier..."
-              className="max-w-md"
+              className="w-full sm:max-w-md"
             />
           </div>
 
@@ -188,8 +188,8 @@ export default function ReceivingPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Truck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <Truck className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -204,8 +204,8 @@ export default function ReceivingPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">

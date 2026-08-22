@@ -39,8 +39,8 @@ export default function ForecastPage() {
   }
 
   const getTrendIcon = (trend) => {
-    if (trend === 'up') return <span className="flex items-center text-green-600 dark:text-green-400"><ArrowUp className="h-4 w-4" /> Rising</span>
-    if (trend === 'down') return <span className="flex items-center text-red-600 dark:text-red-400"><ArrowDown className="h-4 w-4" /> Falling</span>
+    if (trend === 'up') return <span className="flex items-center text-gray-600 dark:text-gray-400"><ArrowUp className="h-4 w-4" /> Rising</span>
+    if (trend === 'down') return <span className="flex items-center text-gray-600 dark:text-gray-400"><ArrowDown className="h-4 w-4" /> Falling</span>
     return <span className="text-gray-500 dark:text-gray-400">Stable</span>
   }
 
@@ -50,9 +50,9 @@ export default function ForecastPage() {
     { key: 'avg_weekly_demand', label: 'Avg Weekly Demand' },
     { key: 'forecast_demand_8w', label: '8-Week Forecast' },
     { key: 'reorder_point', label: 'Reorder Point' },
-    { key: 'suggested_order', label: 'Suggested Order', render: (val) => val > 0 ? <span className="font-bold text-blue-600 dark:text-blue-400">{val} units</span> : <span className="text-gray-400 dark:text-gray-500">None needed</span> },
+    { key: 'suggested_order', label: 'Suggested Order', render: (val) => val > 0 ? <span className="font-bold text-gray-600 dark:text-gray-400">{val} units</span> : <span className="text-gray-400 dark:text-gray-500">None needed</span> },
     { key: 'trend', label: 'Trend', render: (val) => getTrendIcon(val) },
-    { key: 'confidence', label: 'Confidence', render: (val) => <span className={`font-medium ${val >= 90 ? 'text-green-600 dark:text-green-400' : val >= 80 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{val}%</span> },
+    { key: 'confidence', label: 'Confidence', render: (val) => <span className={`font-medium ${val >= 90 ? 'text-gray-600 dark:text-gray-400' : val >= 80 ? 'text-gray-600 dark:text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>{val}%</span> },
   ]
 
   const filteredForecasts = data.forecasts.filter(f =>
@@ -69,19 +69,19 @@ export default function ForecastPage() {
       <PageHeader title="Demand Forecasts" subtitle="AI-powered demand prediction and reorder suggestions" icon={TrendingUp} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{data.forecasts.filter(f => f.suggested_order > 0).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Items Need Reorder</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-green-600 dark:text-green-400">{data.forecasts.filter(f => f.trend === 'up').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Trending Up</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.forecasts.filter(f => f.suggested_order > 0).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Items Need Reorder</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.forecasts.filter(f => f.trend === 'up').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Trending Up</p></div></Card.Body></Card>
         <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{Math.round(data.forecasts.reduce((s, f) => s + f.confidence, 0) / data.forecasts.length)}%</p><p className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{data.forecasts.reduce((s, f) => s + f.forecast_demand_8w, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total 8-Week Demand</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.forecasts.reduce((s, f) => s + f.forecast_demand_8w, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total 8-Week Demand</p></div></Card.Body></Card>
       </div>
 
       <Card>
         <Card.Body>
-          <div className="flex justify-between items-center mb-6">
-            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products..." className="max-w-md" />
-            <div className="flex space-x-2">
+          <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products..." className="w-full sm:max-w-md" />
+            <div className="flex flex-wrap gap-2">
               {[{ val: '4w', label: '4 Weeks' }, { val: '8w', label: '8 Weeks' }, { val: '12w', label: '12 Weeks' }].map(t => (
-                <button key={t.val} onClick={() => setTimeframe(t.val)} className={`px-3 py-1 text-sm rounded-full ${timeframe === t.val ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                <button key={t.val} onClick={() => setTimeframe(t.val)} className={`px-3 py-1 text-sm rounded-full ${timeframe === t.val ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                   {t.label}
                 </button>
               ))}

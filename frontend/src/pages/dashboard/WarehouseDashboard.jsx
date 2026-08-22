@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { Truck, Package, Calendar, AlertCircle } from 'lucide-react'
 import { createResourceDataSource } from '@/shared/services/dataSource'
+import { formatCompactNumber } from '@/shared/utils'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
 import AlertsPanel from './components/AlertsPanel'
@@ -22,7 +23,7 @@ function buildStats(discrepancies) {
   return [
     {
       title: 'Pending Receipts',
-      value: 8,
+      value: formatCompactNumber(8),
       change: '3 due today',
       changeType: 'neutral',
       icon: Truck,
@@ -30,7 +31,7 @@ function buildStats(discrepancies) {
     },
     {
       title: 'Active Picks',
-      value: 12,
+      value: formatCompactNumber(12),
       change: '4 ready to pack',
       changeType: 'neutral',
       icon: Package,
@@ -38,7 +39,7 @@ function buildStats(discrepancies) {
     },
     {
       title: 'FEFO Priority Batches',
-      value: 5,
+      value: formatCompactNumber(5),
       change: 'expiring within 7 days',
       changeType: 'decrease',
       icon: Calendar,
@@ -46,7 +47,7 @@ function buildStats(discrepancies) {
     },
     {
       title: 'Open Discrepancies',
-      value: open.length,
+      value: formatCompactNumber(open.length),
       change: open.length > 0 ? `${open.filter((d) => d.priority === 'high').length} high priority` : null,
       changeType: 'decrease',
       icon: AlertCircle,
@@ -91,10 +92,10 @@ const quickRedirectItems = [
 ]
 
 const colorClasses = {
-  blue: { bg: 'bg-blue-50 dark:bg-blue-900/30', icon: 'text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800' },
-  green: { bg: 'bg-green-50 dark:bg-green-900/30', icon: 'text-green-600 dark:text-green-400', border: 'border-green-200 dark:border-green-800' },
-  yellow: { bg: 'bg-yellow-50 dark:bg-yellow-900/30', icon: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-200 dark:border-yellow-800' },
-  red: { bg: 'bg-red-50 dark:bg-red-900/30', icon: 'text-red-600 dark:text-red-400', border: 'border-red-200 dark:border-red-800' },
+  blue: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+  green: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+  yellow: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
+  red: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
 }
 
 export default function WarehouseDashboard() {
@@ -144,9 +145,9 @@ function StatCard({ stat }) {
               <p
                 className={`text-xs mt-1 truncate ${
                   stat.changeType === 'increase'
-                    ? 'text-green-600 dark:text-green-400'
+                    ? 'text-gray-600 dark:text-gray-400'
                     : stat.changeType === 'decrease'
-                    ? 'text-red-600 dark:text-red-400'
+                    ? 'text-gray-600 dark:text-gray-400'
                     : 'text-gray-500 dark:text-gray-400'
                 }`}
               >

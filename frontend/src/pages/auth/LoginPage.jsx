@@ -168,7 +168,7 @@ export default function LoginPage() {
               id="remember-me"
               name="remember-me"
               type="checkbox"
-              className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+              className="h-4 w-4 text-gray-600 dark:text-gray-400 focus:ring-gray-400 dark:focus:ring-gray-500 border-gray-300 dark:border-gray-600 rounded"
             />
             <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-100">
               Remember me
@@ -177,7 +177,7 @@ export default function LoginPage() {
 
           <Link
             to="/auth/forgot-password"
-            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-400"
+            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           >
             Forgot your password?
           </Link>

@@ -71,19 +71,19 @@ export default function ExpiryAlertsPage() {
       <PageHeader title="Expiry Alerts" subtitle="Monitor batch expiration and FEFO compliance" icon={Calendar} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-red-600 dark:text-red-400">{data.batches.filter(b => b.status === 'expired').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Expired Batches</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{data.batches.filter(b => b.status === 'warning').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Expiring Soon (≤60d)</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-green-600 dark:text-green-400">{data.batches.filter(b => b.status === 'safe').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Safe Batches</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.batches.filter(b => b.status === 'expired').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Expired Batches</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.batches.filter(b => b.status === 'warning').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Expiring Soon (≤60d)</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.batches.filter(b => b.status === 'safe').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Safe Batches</p></div></Card.Body></Card>
         <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.batches.reduce((s, b) => s + b.quantity, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Units Tracked</p></div></Card.Body></Card>
       </div>
 
       <Card>
         <Card.Body>
-          <div className="flex justify-between items-center mb-6">
-            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products or batches..." className="max-w-md" />
-            <div className="flex space-x-2">
+          <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
+            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products or batches..." className="w-full sm:max-w-md" />
+            <div className="flex flex-wrap gap-2">
               {['all', 'expired', 'warning', 'safe'].map(s => (
-                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 text-sm rounded-full ${filterStatus === s ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 text-sm rounded-full ${filterStatus === s ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                   {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
               ))}

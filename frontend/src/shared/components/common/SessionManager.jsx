@@ -106,7 +106,7 @@ export default function SessionManager({
     
     const minutes = time / (60 * 1000)
     if (minutes <= 5) return 'text-red-600 dark:text-red-400'
-    if (minutes <= 15) return 'text-yellow-600 dark:text-yellow-400'
+    if (minutes <= 15) return 'text-amber-600 dark:text-amber-400'
     return 'text-green-600 dark:text-green-400'
   }
 
@@ -136,11 +136,11 @@ export default function SessionManager({
             <button
               onClick={handleExtendSession}
               disabled={isExtending}
-              className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 dark:focus:ring-gray-500"
               title="Extend session"
             >
               <RefreshCw 
-                className={`w-4 h-4 text-blue-600 dark:text-blue-400 ${isExtending ? 'animate-spin' : ''}`} 
+                className={`w-4 h-4 text-gray-600 dark:text-gray-400 ${isExtending ? 'animate-spin' : ''}`} 
               />
             </button>
           )}
@@ -156,8 +156,8 @@ export default function SessionManager({
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
             {/* Header */}
             <div className="flex items-center space-x-3 p-6 border-b">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
-                <AlertTriangle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/20 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">

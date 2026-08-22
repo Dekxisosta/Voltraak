@@ -3,33 +3,33 @@
  */
 
 import { Package, AlertTriangle, TrendingDown, CheckCircle } from 'lucide-react'
-import { formatNumber, formatCurrency, formatPercentage } from '@/shared/utils'
+import { formatCompactNumber, formatCompactCurrency, formatPercentage } from '@/shared/utils'
 
 
 const mockStats = [
   {
     title: 'Total Products',
-    value: formatNumber(1247),
+    value: formatCompactNumber(1247),
     change: '+12 this week',
     changeType: 'increase',
     icon: Package,
-    color: 'blue',
+    color: 'neutral',
   },
   {
     title: 'Low Stock Items',
-    value: 23,
+    value: formatCompactNumber(23),
     change: '-5 from yesterday',
     changeType: 'decrease',
     icon: AlertTriangle,
-    color: 'yellow',
+    color: 'warning',
   },
   {
     title: 'Inventory Value',
-    value: formatCurrency(892450),
+    value: formatCompactCurrency(892450),
     change: '+2.4% this month',
     changeType: 'increase',
     icon: TrendingDown,
-    color: 'green',
+    color: 'neutral',
   },
   {
     title: 'System Accuracy',
@@ -37,30 +37,28 @@ const mockStats = [
     change: '+1.2% improvement',
     changeType: 'increase',
     icon: CheckCircle,
-    color: 'green',
+    color: 'neutral',
   },
 ]
 
+// Only stats that represent an actual status worth flagging (e.g. low
+// stock) get a color. Plain counts and totals stay neutral so they don't
+// compete for attention.
 const colorClasses = {
-  blue: {
-    bg: 'bg-blue-50 dark:bg-blue-900/30',
-    icon: 'text-blue-600 dark:text-blue-400',
-    border: 'border-blue-200 dark:border-blue-800',
+  neutral: {
+    bg: 'bg-gray-100 dark:bg-gray-800',
+    icon: 'text-gray-600 dark:text-gray-400',
+    border: 'border-gray-200 dark:border-gray-700',
   },
-  green: {
-    bg: 'bg-green-50 dark:bg-green-900/30',
-    icon: 'text-green-600 dark:text-green-400',
-    border: 'border-green-200 dark:border-green-800',
+  warning: {
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    icon: 'text-amber-600 dark:text-amber-400',
+    border: 'border-amber-200 dark:border-amber-800/60',
   },
-  yellow: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/30',
-    icon: 'text-yellow-600 dark:text-yellow-400',
-    border: 'border-yellow-200 dark:border-yellow-800',
-  },
-  red: {
-    bg: 'bg-red-50 dark:bg-red-900/30',
+  critical: {
+    bg: 'bg-red-50 dark:bg-red-900/20',
     icon: 'text-red-600 dark:text-red-400',
-    border: 'border-red-200 dark:border-red-800',
+    border: 'border-red-200 dark:border-red-800/60',
   },
 }
 
@@ -93,9 +91,9 @@ function StatCard({ stat }) {
             {stat.change && (
               <p className={`text-xs mt-1 truncate ${
                 stat.changeType === 'increase' 
-                  ? 'text-green-600 dark:text-green-400' 
+                  ? 'text-emerald-600 dark:text-emerald-400' 
                   : stat.changeType === 'decrease' 
-                  ? 'text-red-600 dark:text-red-400' 
+                  ? 'text-gray-600 dark:text-gray-400' 
                   : 'text-gray-500 dark:text-gray-400'
               }`}>
                 {stat.change}

@@ -78,18 +78,26 @@ export function StatCard({
   change,
   changeType,
   icon: Icon,
-  color = 'blue',
+  color = 'gray',
 }) {
+  // Only 'good'/'warn'/'bad' carry status color. Everything else (including
+  // the old 'blue' default) renders as a neutral icon tile - most stats
+  // shown here are plain counts, not a status that needs to compete for
+  // attention.
   const colorStyles = {
-    blue: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-    green: 'bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800',
-    yellow: 'bg-yellow-50 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
-    red: 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800',
-    gray: 'bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700',
+    gray: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700',
+    good: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60',
+    warn: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60',
+    bad: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800/60',
+    // Legacy aliases so existing callers passing blue/green/yellow/red keep working
+    blue: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700',
+    green: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60',
+    yellow: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60',
+    red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800/60',
   }
 
   const changeStyles = {
-    increase: 'text-green-600 dark:text-green-400',
+    increase: 'text-emerald-600 dark:text-emerald-400',
     decrease: 'text-red-600 dark:text-red-400',
     neutral: 'text-gray-500 dark:text-gray-400',
   }

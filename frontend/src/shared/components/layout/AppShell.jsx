@@ -11,7 +11,7 @@ export default function AppShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-[var(--color-bg-secondary)]">
       {/* Sidebar for desktop */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <Sidebar />
@@ -22,12 +22,12 @@ export default function AppShell({ children }) {
         <div className="fixed inset-0 z-50 lg:hidden">
           {/* Sidebar backdrop */}
           <div
-            className="fixed inset-0 bg-gray-900/80"
+            className="fixed inset-0 bg-[var(--color-overlay)]"
             onClick={() => setSidebarOpen(false)}
           />
           
           {/* Sidebar panel */}
-          <div className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800">
+          <div className="fixed inset-y-0 left-0 w-64 bg-sidebar-bg">
             <Sidebar onClose={() => setSidebarOpen(false)} />
           </div>
         </div>

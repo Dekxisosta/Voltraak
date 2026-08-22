@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
     return (
       <div className="text-center space-y-6">
         <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-          <Mail className="h-8 w-8 text-green-600 dark:text-green-400" />
+          <Mail className="h-8 w-8 text-gray-600 dark:text-gray-400" />
         </div>
 
         <div>
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
           <p>Didn't receive the email? Check your spam folder.</p>
           <button
             onClick={() => setIsSubmitted(false)}
-            className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-400 font-medium"
+            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 font-medium"
           >
             Try a different email address
           </button>
@@ -159,7 +159,7 @@ export default function ForgotPasswordPage() {
       <div className="text-center">
         <Link
           to="/auth/login"
-          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-400 inline-flex items-center gap-1"
+          className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 inline-flex items-center gap-1"
         >
           <ArrowLeft className="h-3 w-3" />
           Back to login

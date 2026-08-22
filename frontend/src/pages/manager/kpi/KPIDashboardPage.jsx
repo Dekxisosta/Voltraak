@@ -5,12 +5,45 @@
 
 import { useState, useEffect } from 'react'
 import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, Users } from 'lucide-react'
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell,
+} from 'recharts'
 import { Card, LoadingSpinner, StatusBadge } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { fetchData } from '@/shared/services/dataSource'
 import { mockKPIData } from '@/shared/mocks/manager/kpi'
 // TODO: import { reportingApi } from '@/api'
+
+// Tooltips are themed manually (rather than relying on recharts' default
+// white tooltip) so they read correctly in dark mode too, using the same
+// CSS variable tokens as the rest of the app.
+function StockValueTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-md border border-[var(--color-border-primary)] bg-[var(--color-surface-popover)] px-3 py-2 shadow-lg">
+      <p className="text-xs font-medium text-[var(--color-text-tertiary)]">{label}</p>
+      <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+        ₱{(payload[0].value / 1000000).toFixed(2)}M
+      </p>
+    </div>
+  )
+}
+
+function CategoryTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const entry = payload[0]
+  return (
+    <div className="rounded-md border border-[var(--color-border-primary)] bg-[var(--color-surface-popover)] px-3 py-2 shadow-lg">
+      <div className="flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.payload.color }} />
+        <p className="text-sm font-medium text-[var(--color-text-primary)]">{entry.name}</p>
+      </div>
+      <p className="mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{entry.value}%</p>
+    </div>
+  )
+}
 
 
 
@@ -53,9 +86,9 @@ export default function KPIDashboardPage() {
     if (Math.abs(percentage) < 1) {
       return { trend: 'stable', color: 'text-gray-600 dark:text-gray-400', icon: '→' }
     } else if (percentage > 0) {
-      return { trend: 'up', color: 'text-green-600 dark:text-green-400', icon: '↗' }
+      return { trend: 'up', color: 'text-gray-600 dark:text-gray-400', icon: '↗' }
     } else {
-      return { trend: 'down', color: 'text-red-600 dark:text-red-400', icon: '↘' }
+      return { trend: 'down', color: 'text-gray-600 dark:text-gray-400', icon: '↘' }
     }
   }
 
@@ -87,7 +120,7 @@ export default function KPIDashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-red-600 dark:text-red-400 mx-auto mb-4" />
+          <AlertTriangle className="h-12 w-12 text-gray-600 dark:text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Failed to Load Dashboard</h3>
           <p className="text-gray-600 dark:text-gray-400">Unable to retrieve KPI data. Please try again.</p>
         </div>
@@ -120,14 +153,14 @@ export default function KPIDashboardPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <Package className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4 flex-1">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.totalSKUs}</p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total SKUs</p>
                 <div className="flex items-center mt-1">
-                  <span className="text-xs text-green-600 dark:text-green-400">+5 this month</span>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">+5 this month</span>
                 </div>
               </div>
             </div>
@@ -138,8 +171,8 @@ export default function KPIDashboardPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <DollarSign className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4 flex-1">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -147,8 +180,8 @@ export default function KPIDashboardPage() {
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Stock Value</p>
                 <div className="flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 text-green-600 dark:text-green-400 mr-1" />
-                  <span className="text-xs text-green-600 dark:text-green-400">+3.5% from last month</span>
+                  <TrendingUp className="h-3 w-3 text-gray-600 dark:text-gray-400 mr-1" />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">+3.5% from last month</span>
                 </div>
               </div>
             </div>
@@ -159,8 +192,8 @@ export default function KPIDashboardPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                <AlertTriangle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4 flex-1">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.lowStockItems}</p>
@@ -179,8 +212,8 @@ export default function KPIDashboardPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                <Users className="h-6 w-6 text-red-600 dark:text-red-400" />
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <Users className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4 flex-1">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.shrinkageRate}%</p>
@@ -210,7 +243,7 @@ export default function KPIDashboardPage() {
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
-                className="bg-green-500 h-2 rounded-full"
+                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
                 style={{ width: `${data.metrics.inventoryAccuracy}%` }}
               />
             </div>
@@ -230,7 +263,7 @@ export default function KPIDashboardPage() {
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
-                className="bg-blue-500 h-2 rounded-full"
+                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
                 style={{ width: `${Math.min((data.metrics.turnoverRate / 6) * 100, 100)}%` }}
               />
             </div>
@@ -250,7 +283,7 @@ export default function KPIDashboardPage() {
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
-                className="bg-green-500 h-2 rounded-full"
+                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
                 style={{ width: `${data.metrics.serviceLevel}%` }}
               />
             </div>
@@ -270,7 +303,7 @@ export default function KPIDashboardPage() {
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
               <div
-                className="bg-yellow-500 h-2 rounded-full"
+                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
                 style={{ width: `${data.metrics.fefoCompliance}%` }}
               />
             </div>
@@ -287,27 +320,40 @@ export default function KPIDashboardPage() {
             <h3 className="text-lg font-medium">Stock Value Trend</h3>
           </Card.Header>
           <Card.Body>
-            <div className="h-64 flex items-end justify-between space-x-2">
-              {data.trends.stockValue.map((item, index) => {
-                const maxValue = Math.max(...data.trends.stockValue.map(d => d.value))
-                const height = (item.value / maxValue) * 100
-                
-                return (
-                  <div key={index} className="flex-1 flex flex-col items-center">
-                    <div className="text-xs font-medium mb-2">
-                      ₱{(item.value / 1000000).toFixed(1)}M
-                    </div>
-                    <div
-                      className="w-full bg-blue-500 rounded-t"
-                      style={{ height: `${height}%`, minHeight: '20px' }}
-                    />
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                      {item.period.split(' ')[0]}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={data.trends.stockValue} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="stockValueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="var(--color-accent)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" vertical={false} />
+                <XAxis
+                  dataKey="period"
+                  tickFormatter={(value) => value.split(' ')[0]}
+                  tick={{ fill: 'var(--color-text-tertiary)', fontSize: 12 }}
+                  axisLine={{ stroke: 'var(--color-border-primary)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={(value) => `₱${(value / 1000000).toFixed(1)}M`}
+                  tick={{ fill: 'var(--color-text-tertiary)', fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={60}
+                />
+                <Tooltip content={<StockValueTooltip />} cursor={{ stroke: 'var(--color-border-secondary)', strokeDasharray: '3 3' }} />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="var(--color-accent)"
+                  strokeWidth={2.5}
+                  fill="url(#stockValueGradient)"
+                  activeDot={{ r: 5, fill: 'var(--color-accent)', stroke: 'var(--color-surface-card)', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </Card.Body>
         </Card>
 
@@ -317,30 +363,39 @@ export default function KPIDashboardPage() {
             <h3 className="text-lg font-medium">Category Distribution</h3>
           </Card.Header>
           <Card.Body>
-            <div className="space-y-4">
-              {data.categoryBreakdown.map((category, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div
-                      className="w-4 h-4 rounded mr-3"
-                      style={{ backgroundColor: category.color }}
-                    />
-                    <span className="text-sm font-medium">{category.category}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-32 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-3">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{ 
-                          width: `${category.value}%`,
-                          backgroundColor: category.color 
-                        }}
-                      />
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <ResponsiveContainer width="100%" height={220} className="sm:flex-1">
+                <PieChart>
+                  <Pie
+                    data={data.categoryBreakdown}
+                    dataKey="value"
+                    nameKey="category"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    strokeWidth={2}
+                    stroke="var(--color-surface-card)"
+                  >
+                    {data.categoryBreakdown.map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CategoryTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+
+              {/* Legend */}
+              <div className="w-full sm:w-40 space-y-2.5 flex-shrink-0">
+                {data.categoryBreakdown.map((category, index) => (
+                  <div key={index} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />
+                      <span className="text-sm text-[var(--color-text-secondary)] truncate">{category.category}</span>
                     </div>
-                    <span className="text-sm text-gray-600 dark:text-gray-400 w-10">{category.value}%</span>
+                    <span className="text-sm font-medium text-[var(--color-text-primary)] flex-shrink-0">{category.value}%</span>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </Card.Body>
         </Card>
@@ -351,7 +406,7 @@ export default function KPIDashboardPage() {
         <Card>
           <Card.Header>
             <div className="flex items-center">
-              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2" />
+              <AlertTriangle className="h-5 w-5 text-gray-600 dark:text-gray-400 mr-2" />
               <h3 className="text-lg font-medium">Active Alerts</h3>
             </div>
           </Card.Header>
@@ -362,19 +417,19 @@ export default function KPIDashboardPage() {
                   key={alert.id}
                   className={`p-4 rounded-lg border-l-4 ${
                     alert.type === 'critical' 
-                      ? 'bg-red-50 dark:bg-red-900/30 border-red-500' 
-                      : 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-500 dark:border-yellow-600'
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-500' 
+                      : 'bg-amber-50 dark:bg-amber-900/20 border-amber-500 dark:border-amber-600'
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className={`font-medium ${
-                        alert.type === 'critical' ? 'text-red-900 dark:text-red-200' : 'text-yellow-900 dark:text-yellow-200'
+                        alert.type === 'critical' ? 'text-red-900 dark:text-red-200' : 'text-amber-900 dark:text-amber-200'
                       }`}>
                         {alert.title}
                       </h4>
                       <p className={`text-sm ${
-                        alert.type === 'critical' ? 'text-red-700 dark:text-red-400' : 'text-yellow-700 dark:text-yellow-400'
+                        alert.type === 'critical' ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'
                       }`}>
                         {alert.message}
                       </p>

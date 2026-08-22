@@ -176,7 +176,7 @@ export function StatusFilter({
                   : currentValues.filter((v) => v !== option.value)
                 updateFilter(filterKey, newValues)
               }}
-              className="h-4 w-4 text-blue-600 dark:text-blue-400 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+              className="h-4 w-4 text-gray-900 dark:text-gray-100 focus:ring-gray-400 dark:focus:ring-gray-500 border-gray-300 dark:border-gray-600 rounded"
             />
             <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">{option.label}</span>
           </label>
