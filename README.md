@@ -72,7 +72,7 @@ full index and suggested read order. Quick links:
         <img src="https://github.com/Dekxisosta.png" width="90" height="90" style="border-radius:50%" alt="Dekxisosta"/><br />
         <b>Dekxisosta</b>
       </a><br />
-      Project Lead / Frontend Lead
+      Project Lead
     </td>
     <td align="center">
       <a href="https://github.com/brtbrt123">
