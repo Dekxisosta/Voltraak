@@ -9,9 +9,12 @@ import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/s
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { fetchData } from '@/shared/services/dataSource'
+import { fetchData, createResourceDataSource } from '@/shared/services/dataSource'
 import { mockLowStockAlerts } from '@/shared/mocks/manager/low-stock'
 // TODO: import { inventoryApi } from '@/api'
+
+// Create PO drafts directly in the po-approvals collection
+const poSource = createResourceDataSource('manager/po-approvals')
 
 export default function LowStockPage() {
   const [data, setData] = useState({ alerts: [], loading: true })
@@ -37,8 +40,32 @@ export default function LowStockPage() {
     }
   }
 
-  const handleCreatePO = (item) => {
-    addNotification({ type: 'success', title: 'PO Draft Created', message: `Purchase order for ${item.suggested_order_qty} units of ${item.product_name}` })
+  const [creatingId, setCreatingId] = useState(null)
+
+  const handleCreatePO = async (item) => {
+    setCreatingId(item.id)
+    try {
+      // Estimate a line value so the new PO carries a realistic amount;
+      // supplier is derived from the product's brand (first word).
+      const estUnitPrice = 5000
+      const supplier = `${item.product_name.split(' ')[0]} Supplier`
+      await poSource.create({
+        po_number: `PO-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`,
+        supplier,
+        total_amount: item.suggested_order_qty * estUnitPrice,
+        items_count: 1,
+        requested_by: 'Manager (Low Stock)',
+        requested_at: new Date().toISOString(),
+        status: 'pending',
+        priority: item.status === 'out_of_stock' ? 'high' : item.status === 'critical' ? 'high' : 'medium',
+        notes: `Auto-draft from Low Stock: ${item.suggested_order_qty} units of ${item.product_name} (${item.sku})`,
+      })
+      addNotification({ type: 'success', title: 'PO Draft Created', message: `Draft PO for ${item.suggested_order_qty} units of ${item.product_name} sent to PO Approvals` })
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: `Failed to create PO for ${item.product_name}` })
+    } finally {
+      setCreatingId(null)
+    }
   }
 
   const getStatusBadge = (status) => {
@@ -60,7 +87,7 @@ export default function LowStockPage() {
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'suggested_order_qty', label: 'Suggested Order' },
     { key: 'actions', label: 'Actions', render: (_, row) => (
-      <Button size="sm" variant="primary" icon={ShoppingCart} onClick={() => handleCreatePO(row)}>Create PO</Button>
+      <Button size="sm" variant="primary" icon={ShoppingCart} loading={creatingId === row.id} onClick={() => handleCreatePO(row)}>Create PO</Button>
     )},
   ]
 

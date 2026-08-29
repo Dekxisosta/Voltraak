@@ -37,8 +37,56 @@ export default function ReportsPage() {
     }
   }
 
+  const downloadCSV = () => {
+    // Build a single CSV covering each report section. Values with commas
+    // are quoted so the columns line up in a spreadsheet.
+    const q = (v) => {
+      const s = String(v ?? '')
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    }
+    const lines = []
+    lines.push(`Inventory Report,${reportPeriod}`)
+    lines.push('')
+    lines.push('Summary')
+    lines.push('Total Inventory Value,Total SKUs,Total Units,Avg Turnover Rate')
+    lines.push([data.summary.total_inventory_value, data.summary.total_skus, data.summary.total_units, data.summary.avg_turnover_rate].map(q).join(','))
+    lines.push('')
+    lines.push('Category Breakdown')
+    lines.push('Category,Value,Units,Percentage')
+    data.category_breakdown.forEach(c => lines.push([c.category, c.value, c.units, `${c.percentage}%`].map(q).join(',')))
+    lines.push('')
+    lines.push('Stock Movement')
+    lines.push('Stock In,Stock Out,Adjustments,Net Change')
+    lines.push([data.movement_summary.total_stock_in, data.movement_summary.total_stock_out, data.movement_summary.total_adjustments, data.movement_summary.net_change].map(q).join(','))
+    lines.push('')
+    lines.push('Top Movers')
+    lines.push('Product,Units Sold,Revenue')
+    data.top_movers.forEach(m => lines.push([m.name, m.units_sold, m.revenue].map(q).join(',')))
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `inventory-report-${reportPeriod}-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const handleExport = (format) => {
-    addNotification({ type: 'success', title: 'Export Started', message: `Report is being exported as ${format.toUpperCase()}` })
+    try {
+      if (format === 'csv') {
+        downloadCSV()
+        addNotification({ type: 'success', title: 'CSV Downloaded', message: 'Inventory report exported as CSV' })
+      } else {
+        // PDF: open the browser print dialog (Save as PDF) — no extra deps.
+        addNotification({ type: 'info', title: 'Print / Save as PDF', message: 'Use your browser dialog to save the report as PDF' })
+        window.print()
+      }
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Export Failed', message: `Could not export as ${format.toUpperCase()}` })
+    }
   }
 
   if (loading) {
@@ -49,15 +97,15 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <PageHeader title="Inventory Reports" subtitle="Comprehensive analytics and insights" icon={BarChart3} />
 
-      <div className="flex justify-between items-center">
-        <div className="flex space-x-2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+        <div className="flex flex-wrap gap-2">
           {[{ val: '7d', label: '7 Days' }, { val: '30d', label: '30 Days' }, { val: '90d', label: '90 Days' }].map(p => (
             <button key={p.val} onClick={() => setReportPeriod(p.val)} className={`px-4 py-2 text-sm rounded-lg ${reportPeriod === p.val ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
               {p.label}
             </button>
           ))}
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => handleExport('pdf')} className="btn btn-secondary btn-sm"><Download className="h-4 w-4" /> PDF</button>
           <button onClick={() => handleExport('csv')} className="btn btn-secondary btn-sm"><Download className="h-4 w-4" /> CSV</button>
         </div>
@@ -77,14 +125,14 @@ export default function ReportsPage() {
         <Card.Body>
           <div className="space-y-4">
             {data.category_breakdown.map(cat => (
-              <div key={cat.category} className="flex items-center">
-                <div className="w-40 text-sm font-medium text-gray-700 dark:text-gray-300">{cat.category}</div>
-                <div className="flex-1 mx-4">
+              <div key={cat.category} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-0">
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 sm:w-40 sm:flex-shrink-0">{cat.category}</div>
+                <div className="flex-1 sm:mx-4">
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                     <div className="bg-gray-800 dark:bg-gray-300 h-4 rounded-full" style={{ width: `${cat.percentage}%` }}></div>
                   </div>
                 </div>
-                <div className="w-32 text-right text-sm"><span className="font-medium">₱{(cat.value / 1000).toFixed(0)}K</span> <span className="text-gray-500 dark:text-gray-400">({cat.units} units)</span></div>
+                <div className="text-sm sm:w-32 sm:text-right sm:flex-shrink-0"><span className="font-medium">₱{(cat.value / 1000).toFixed(0)}K</span> <span className="text-gray-500 dark:text-gray-400">({cat.units} units)</span></div>
               </div>
             ))}
           </div>
