@@ -1,6 +1,7 @@
 /**
  * Authentication API client
- * Only the token is stored in localStorage. User data comes from the API.
+ * Token + user are both stored in localStorage (for now) so a page reload
+ * can rehydrate the session immediately instead of round-tripping to me().
  *
  * Follows the same VITE_DATA_SOURCE toggle as shared/services/dataSource.js:
  * with the default "mocks" setting, every method below resolves against
@@ -13,6 +14,7 @@ import { apiClient } from './client'
 import { mockAuthApi } from '../mocks/auth'
 
 const TOKEN_KEY = 'auth_token'
+const USER_KEY = 'auth_user'
 const USE_MOCKS = import.meta.env.VITE_DATA_SOURCE !== 'api'
 
 class AuthApi {
@@ -26,6 +28,9 @@ class AuthApi {
 
     if (data?.token) {
       localStorage.setItem(TOKEN_KEY, data.token)
+    }
+    if (data?.user) {
+      localStorage.setItem(USER_KEY, JSON.stringify(data.user))
     }
 
     return data
@@ -43,6 +48,7 @@ class AuthApi {
       }
     } finally {
       localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
     }
   }
 
@@ -98,11 +104,12 @@ class AuthApi {
    * Update current user's profile (name/email)
    */
   async updateProfile(patch) {
-    if (USE_MOCKS) {
-      return mockAuthApi.updateProfile(this.getStoredToken(), patch)
-    }
-    const response = await apiClient.patch('/auth/profile', patch)
-    return response.data
+    const user = USE_MOCKS
+      ? await mockAuthApi.updateProfile(this.getStoredToken(), patch)
+      : (await apiClient.patch('/auth/profile', patch)).data
+
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
+    return user
   }
 
   /**
@@ -124,6 +131,19 @@ class AuthApi {
   }
 
   /**
+   * Get stored user (parsed), or null if missing/corrupt
+   */
+  getStoredUser() {
+    try {
+      const raw = localStorage.getItem(USER_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch (error) {
+      console.warn('[auth] Failed to parse stored user:', error)
+      return null
+    }
+  }
+
+  /**
    * Check if a token exists (does NOT guarantee validity)
    */
   hasToken() {
@@ -131,10 +151,11 @@ class AuthApi {
   }
 
   /**
-   * Clear token from storage
+   * Clear token + user from storage
    */
   clearAuth() {
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
   }
 }
 

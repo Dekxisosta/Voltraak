@@ -18,7 +18,9 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Initialize authentication state
+  // Initialize authentication state — rehydrates straight from localStorage
+  // (token + user) so a page reload restores the session immediately,
+  // without waiting on a network round-trip first.
   const initializeAuth = useCallback(async () => {
     try {
       const storedToken = authApi.getStoredToken()
@@ -28,7 +30,16 @@ export function AuthProvider({ children }) {
         return
       }
 
-      // Token exists — validate with backend and get user data
+      const storedUser = authApi.getStoredUser()
+
+      if (storedUser) {
+        setToken(storedToken)
+        setUser(storedUser)
+        return
+      }
+
+      // Token exists but no cached user (e.g. an older session) — fall
+      // back to fetching it once so the session still resolves.
       try {
         const currentUser = await authApi.me()
         setToken(storedToken)
