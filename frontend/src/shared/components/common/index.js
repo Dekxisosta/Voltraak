@@ -33,8 +33,5 @@ export { default as ProtectedRoute, ConditionalRender, usePermissionCheck } from
 export { default as RouteGuard, RoleGuard, PermissionGuard, useAccessControl } from './RouteGuard'
 export { default as TabbedSection } from './TabbedSection'
 
-// Session management
-export { default as SessionManager, useSessionStatus } from './SessionManager'
-
 // Notifications
 export { default as NotificationContainer } from './NotificationContainer'

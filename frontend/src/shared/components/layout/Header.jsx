@@ -1,11 +1,11 @@
 /**
- * Application header with search, notifications, session management, and user menu
+ * Application header with search, notifications, and user menu
  */
 
 import { useState } from 'react'
 import { Menu, Search, User, LogOut, Settings } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { SessionManager, ProfileModal, PreferencesModal, GlobalSearchBar } from '@/components/common'
+import { ProfileModal, PreferencesModal, GlobalSearchBar } from '@/components/common'
 import LiveClock from './LiveClock'
 import WeatherBadge from './WeatherBadge'
 
@@ -146,9 +146,6 @@ export default function Header({ onMenuClick }) {
           onClick={() => setShowUserMenu(false)}
         />
       )}
-
-      {/* Session Manager (handles expiry warnings) */}
-      <SessionManager showInHeader={false} />
 
       {/* Profile modal */}
       <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
