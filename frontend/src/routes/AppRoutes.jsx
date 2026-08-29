@@ -15,9 +15,9 @@ import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 
 // Role-based route definitions
-// import { warehouseRoutes, warehouseLegacyRoutes } from './warehouse/WarehouseRoutes'
-// import { inventoryRoutes, inventoryLegacyRoutes } from './inventory/InventoryRoutes'
-// import { managerRoutes, managerLegacyRoutes } from './manager/ManagerRoutes'
+import { warehouseRoutes, warehouseLegacyRoutes } from './warehouse/WarehouseRoutes'
+import { inventoryRoutes, inventoryLegacyRoutes } from './inventory/InventoryRoutes'
+import { managerRoutes, managerLegacyRoutes } from './manager/ManagerRoutes'
 
 // Combine all protected routes
 const protectedRoutes = [
@@ -28,11 +28,11 @@ const protectedRoutes = [
 
 // Old per-page paths (e.g. /warehouse/picking), kept working as redirects
 // to the equivalent ?tab= route (e.g. /warehouse?tab=picking)
-// const legacyRoutes = [
-//   ...warehouseLegacyRoutes,
-//   ...inventoryLegacyRoutes,
-//   ...managerLegacyRoutes,
-// ]
+const legacyRoutes = [
+  ...warehouseLegacyRoutes,
+  ...inventoryLegacyRoutes,
+  ...managerLegacyRoutes,
+]
 
 // Root redirect based on role
 function RootRedirect() {
