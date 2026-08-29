@@ -5,6 +5,7 @@
  */
 
 import { useAuth } from '@/shared/contexts/AuthContext'
+import { HeroBanner } from '@/components/layout'
 import WarehouseDashboard from './WarehouseDashboard'
 import InventoryDashboard from './InventoryDashboard'
 import ManagerDashboard from './ManagerDashboard'
@@ -26,15 +27,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          Welcome back, {user?.display_name}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Here's what's happening with your inventory today
-        </p>
-      </div>
+      {/* Hero */}
+      <HeroBanner
+        title={`Welcome back, ${user?.display_name ?? ''}`}
+        subtitle="Here's what's happening with your inventory today"
+      />
 
       {RoleDashboard ? <RoleDashboard /> : <GenericDashboard />}
     </div>
