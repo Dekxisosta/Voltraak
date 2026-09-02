@@ -22,6 +22,7 @@
 import { createContext, useContext, useState } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
+import AlertsPanel from '@/pages/dashboard/components/AlertsPanel'
 
 // Context lets pages push content into the right panel slot
 export const AppShellContext = createContext({
@@ -85,21 +86,22 @@ export default function AppShell({ children }) {
             </div>
           </main>
 
-          {/* ── Right panel — collapses when empty ────────────────── */}
-          {rightPanel && (
-            <aside
-              className="hidden xl:flex flex-col w-[260px] shrink-0 overflow-y-auto border-l border-[var(--color-glass-border)]"
-              style={{
-                background: 'var(--color-glass-panel)',
-                backdropFilter: 'blur(16px) saturate(150%)',
-                WebkitBackdropFilter: 'blur(16px) saturate(150%)',
-              }}
-            >
-              <div className="p-4 space-y-4">
-                {rightPanel}
-              </div>
-            </aside>
-          )}
+          {/* ── Right panel — always visible, alerts persist across all routes ── */}
+          <aside
+            className="hidden xl:flex flex-col w-[280px] shrink-0 overflow-y-auto border-l border-[var(--color-glass-border)]"
+            style={{
+              background: 'var(--color-glass-panel)',
+              backdropFilter: 'blur(16px) saturate(150%)',
+              WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+            }}
+          >
+            <div className="p-4 space-y-4">
+              {/* Page-specific content injected via setRightPanel() */}
+              {rightPanel}
+              {/* Alerts always rendered beneath any page content */}
+              <AlertsPanel />
+            </div>
+          </aside>
 
         </div>
       </div>

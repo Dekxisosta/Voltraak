@@ -1,114 +1,126 @@
-<div align="center">
+# Voltraak — Inventory Management System
 
-# 📦 Voltraak
-### WalangBrownout Appliances
+**WalangBrownout Appliances**
 
-Real-time inventory, reconciliation, and FEFO-enforced batch tracking — replacing a manual
-spreadsheet that couldn't keep up with a 35% sales-growth curve.
+Real-time inventory management, stock reconciliation, and FEFO-enforced batch tracking — built to replace a manually maintained spreadsheet that could no longer support a 35% year-over-year sales growth curve.
 
-</div>
+---
+
+## Overview
+
+Three operational failures drove this build:
+
+| Problem | Root Cause | Solution |
+|---|---|---|
+| Panic-driven purchasing during peak demand | No real-time sales velocity data; reactive replenishment | Automated Reorder Point (ROP) calculation with demand forecasting |
+| 73% stock shrinkage rate (45 recorded vs. 12 physical units) | No real-time movement tracking or reconciliation cycle | Daily physical count reconciliation with automatic variance alerting |
+| ₱15,000+ per-incident expiry write-offs | LIFO picking habit, no batch or lot tracking | System-directed FEFO picking with a batch expiry state machine |
+
+For the full problem statement, success metrics, and release plan, see [`docs/PRD.md`](docs/PRD.md).
+
+---
+
+## Architecture
+
+The system is a **modular monolith**: a single deployable Laravel backend partitioned internally by business domain, paired with a React SPA.
+
+| Layer | Stack | Role |
+|---|---|---|
+| Frontend | React 18, Vite, Tailwind CSS | Role-scoped SPA with mock/API toggle and light/dark theming |
+| Backend | Laravel (PHP), MVC + Controller-Service-Repository | REST API organized into four business modules |
+| Database | MySQL | Inventory, transactions, batches, purchase orders, users |
+| Infrastructure | Docker Compose, Nginx, Redis | Containerized development environment |
+
+**Backend modules:** Inventory, Procurement, Reporting, User Management. Each maps to a physical folder under `backend/app/Modules/` — no cross-module folder sharing.
+
+**Development mode:** The frontend runs against mock data by default (`VITE_DATA_SOURCE=mocks`) and switches to the real Laravel API via environment variable. This lets frontend and backend development proceed independently.
+
+See [`docs/Architecture.md`](docs/Architecture.md) for the full system overview, non-functional requirements, and environment setup.
+
+---
+
+## Roles
+
+Three roles with server-side enforcement and client-side route guards:
+
+| Role | Scope |
+|---|---|
+| Warehouse Staff | Receiving, FEFO picking, discrepancy reporting — mobile-optimized interfaces |
+| Inventory Staff | Stock in/out, batch management, reservations, expiry monitoring |
+| Manager | KPI dashboard, forecasting, PO approvals, reporting |
 
 ---
 
 ## Tech Stack
 
-**Backend**
-
-![Laravel](https://img.shields.io/badge/Laravel-FF2D20?style=for-the-badge&logo=laravel&logoColor=white)
-![PHP](https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)
-
 **Frontend**
+- React 18, React Router v6
+- Vite 5
+- Tailwind CSS, tailwind-merge, clsx
+- Recharts
+- Lucide React
+- Vitest, Testing Library
 
-![React](https://img.shields.io/badge/React-61DAFB?style=for-the-badge&logo=react&logoColor=black)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwindcss&logoColor=white)
-![Framer Motion](https://img.shields.io/badge/Framer_Motion-0055FF?style=for-the-badge&logo=framer&logoColor=white)
-![Lucide](https://img.shields.io/badge/Lucide-F56565?style=for-the-badge&logo=lucide&logoColor=white)
-![React Router](https://img.shields.io/badge/React_Router-CA4245?style=for-the-badge&logo=reactrouter&logoColor=white)
+**Backend**
+- Laravel (PHP)
+- MySQL
+- Docker Compose, Nginx, Redis
 
 **Tooling**
-
-![ESLint](https://img.shields.io/badge/ESLint-4B32C3?style=for-the-badge&logo=eslint&logoColor=white)
-![Git](https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white)
-![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)
+- ESLint, Prettier
+- Git / GitHub
 
 ---
 
-## About
+## Getting Started
 
-Three problems drove this build — see [`docs/PRD.md`](docs/PRD.md) for the full breakdown:
+**Frontend only (mock data, default):**
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-| Problem | Fix |
-|---|---|
-| No real-time sales-velocity data → panic-driven purchasing | Automated Reorder Point (ROP) calculation + forecasting |
-| Recorded stock vs. physical stock diverging (73% shrinkage observed) | Daily reconciliation + variance alerting |
-| LIFO picking, no batch/lot tracking (₱15k+ write-offs) | FEFO-enforced picking, batch expiry state machine |
+**Full stack (requires Docker):**
+```bash
+# Set data source to real API
+# In frontend/.env: VITE_DATA_SOURCE=api
 
-Architecture is a **modular monolith** — one deployable Laravel backend, internally partitioned by
-business domain, paired with a React SPA. Full details in [`docs/Architecture.md`](docs/Architecture.md)
-and [`docs/Backend/Project-Structure.md`](docs/Backend/Project-Structure.md).
+docker compose up
+cd frontend && npm run dev
+```
+
+**Run tests:**
+```bash
+cd frontend
+npm run test       # watch mode
+npm run coverage   # single run with coverage
+```
+
+---
 
 ## Documentation
 
-All project docs live in [`docs/`](docs/) — start at [`docs/README.md`](docs/README.md) for the
-full index and suggested read order. Quick links:
+All project documentation lives in [`docs/`](docs/). Suggested read order:
 
-| | |
+| Document | Contents |
 |---|---|
-| 📋 [PRD](docs/PRD.md) | Problem statement, goals, success metrics, release plan |
-| 🏗️ [Architecture](docs/Architecture.md) | System overview, modules, roles, NFRs |
-| 🔧 [Backend](docs/Backend/) | Project structure, API spec, services/business logic |
-| 🗄️ [Database](docs/Database/) | Schema, relationships, migrations |
-| 🎨 [Frontend](docs/Frontend/) | Stack, routing, components, styling, pages |
-| ✅ [QA](docs/QA/) | Test plan, test cases, bug log |
-
-## Collaborators
-
-<table>
-  <tr>
-    <td align="center">
-      <a href="https://github.com/Dekxisosta">
-        <img src="https://github.com/Dekxisosta.png" width="90" height="90" style="border-radius:50%" alt="Dekxisosta"/><br />
-        <b>Dekxisosta</b>
-      </a><br />
-      Project Lead
-    </td>
-    <td align="center">
-      <a href="https://github.com/brtbrt123">
-        <img src="https://github.com/brtbrt123.png" width="90" height="90" style="border-radius:50%" alt="brtbrt123"/><br />
-        <b>brtbrt123</b>
-      </a><br />
-      Full-stack Lead
-    </td>
-    <td align="center">
-      <a href="https://github.com/SHUBARUUU">
-        <img src="https://github.com/SHUBARUUU.png" width="90" height="90" style="border-radius:50%" alt="SHUBARUUU"/><br />
-        <b>SHUBARUUU</b>
-      </a><br />
-      Backend Lead
-    </td>
-    <td align="center">
-      <a href="https://github.com/LiaKyutie">
-        <img src="https://github.com/LiaKyutie.png" width="90" height="90" style="border-radius:50%" alt="LiaKyutie"/><br />
-        <b>LiaKyutie</b>
-      </a><br />
-      Frontend Developer
-    </td>
-    <td align="center">
-      <a href="https://github.com/RylineAzurin">
-        <img src="https://github.com/RylineAzurin.png" width="90" height="90" style="border-radius:50%" alt="RylineAzurin"/><br />
-        <b>RylineAzurin</b>
-      </a><br />
-      Support Developer
-    </td>
-  </tr>
-</table>
+| [PRD](docs/PRD.md) | Problem statement, goals, success metrics, release plan |
+| [Architecture](docs/Architecture.md) | System overview, modules, roles, non-functional requirements |
+| [Frontend](docs/Frontend/) | Stack, routing, component structure, styling, pages |
 
 ---
 
-<div align="center">
+## Team
+
+| GitHub | Role |
+|---|---|
+| [Dekxisosta](https://github.com/Dekxisosta) | Project Lead |
+| [brtbrt123](https://github.com/brtbrt123) | Full-stack Lead |
+| [SHUBARUUU](https://github.com/SHUBARUUU) | Backend Lead |
+| [LiaKyutie](https://github.com/LiaKyutie) | Frontend Developer |
+| [RylineAzurin](https://github.com/RylineAzurin) | Support Developer |
+
+---
 
 Built for **WalangBrownout Appliances**
-
-</div>

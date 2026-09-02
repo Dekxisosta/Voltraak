@@ -16,6 +16,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
+  BellRing,
+  CheckCircle2,
   Clock,
   Package,
   TrendingDown,
@@ -76,26 +78,6 @@ const ROLE_SOURCES = {
   },
 }
 
-const alertTypeStyles = {
-  critical: {
-    bg: 'bg-red-50 dark:bg-red-900/30',
-    border: 'border-red-200 dark:border-red-800',
-    icon: 'text-red-600 dark:text-red-400',
-    text: 'text-red-800 dark:text-red-300',
-  },
-  warning: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/30',
-    border: 'border-yellow-200 dark:border-yellow-800',
-    icon: 'text-yellow-600 dark:text-yellow-400',
-    text: 'text-yellow-800 dark:text-yellow-300',
-  },
-  info: {
-    bg: 'bg-blue-50 dark:bg-blue-900/30',
-    border: 'border-blue-200 dark:border-blue-800',
-    icon: 'text-blue-600 dark:text-blue-400',
-    text: 'text-blue-800 dark:text-blue-300',
-  },
-}
 
 /**
  * Builds warehouse-role alerts from FEFO recommendations and picking
@@ -391,64 +373,133 @@ export default function AlertsPanel() {
     return builder(resourceData)
   }, [role, resourceData])
 
+  const criticalCount = alerts.filter((a) => a.type === 'critical').length
+
   return (
-    <div className="card">
-      <div className="card-header">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Alerts</h3>
-          <span className="text-sm text-gray-500 dark:text-gray-400">
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between px-0.5">
+        <div className="flex items-center gap-2">
+          <BellRing className="h-4 w-4 text-[var(--color-text-secondary)]" />
+          <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
+            Alerts
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {criticalCount > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">
+              {criticalCount}
+            </span>
+          )}
+          <span className="text-[11px] text-[var(--color-text-muted)]">
             {alerts.length} active
           </span>
         </div>
       </div>
-      <div className="card-body">
-        <div className="space-y-4">
-          {alerts.length > 0 ? (
-            alerts.map((alert) => (
-              <AlertItem key={alert.id} alert={alert} onNavigate={navigate} />
-            ))
-          ) : (
-            <div className="text-center py-6">
-              <AlertTriangle className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No alerts</h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                All systems are running smoothly
-              </p>
-            </div>
-          )}
+
+      {/* Alert list */}
+      {alerts.length > 0 ? (
+        <div className="space-y-2">
+          {alerts.map((alert) => (
+            <AlertItem key={alert.id} alert={alert} onNavigate={navigate} />
+          ))}
         </div>
-      </div>
+      ) : (
+        <div
+          className="rounded-xl px-4 py-6 text-center"
+          style={{
+            background: 'var(--color-bg-tertiary)',
+            border: '1px solid var(--color-border-primary)',
+          }}
+        >
+          <div
+            className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full"
+            style={{ background: 'var(--color-accent-soft)' }}
+          >
+            <CheckCircle2 className="h-5 w-5 text-[var(--color-text-muted)]" />
+          </div>
+          <p className="text-xs font-medium text-[var(--color-text-secondary)]">All clear</p>
+          <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)]">No active alerts</p>
+        </div>
+      )}
     </div>
   )
 }
 
+// ── Per-alert type config ──────────────────────────────────────────────────────
+
+const ALERT_ACCENT = {
+  critical: {
+    bar: 'bg-red-500',
+    iconBg: 'bg-red-500/10 dark:bg-red-500/15',
+    iconColor: 'text-red-500 dark:text-red-400',
+    label: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  },
+  warning: {
+    bar: 'bg-amber-400',
+    iconBg: 'bg-amber-400/10 dark:bg-amber-400/15',
+    iconColor: 'text-amber-500 dark:text-amber-400',
+    label: 'bg-amber-400/10 text-amber-600 dark:text-amber-400',
+  },
+  info: {
+    bar: 'bg-blue-500',
+    iconBg: 'bg-blue-500/10 dark:bg-blue-500/15',
+    iconColor: 'text-blue-500 dark:text-blue-400',
+    label: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  },
+}
+
 function AlertItem({ alert, onNavigate }) {
-  const styles = alertTypeStyles[alert.type]
+  const acc = ALERT_ACCENT[alert.type] ?? ALERT_ACCENT.info
 
   return (
-    <div className={`rounded-lg border p-3 ${styles.bg} ${styles.border}`}>
-      <div className="flex items-start">
-        <alert.icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${styles.icon}`} />
-        <div className="ml-3 flex-1">
-          <h4 className={`text-sm font-medium ${styles.text}`}>
+    <div
+      className="relative flex gap-3 rounded-xl pl-3 pr-3 py-3 overflow-hidden transition-colors"
+      style={{
+        background: 'var(--color-surface-card)',
+        border: '1px solid var(--color-border-primary)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      {/* Left accent bar */}
+      <div className={`absolute inset-y-0 left-0 w-[3px] rounded-l-xl ${acc.bar}`} />
+
+      {/* Icon */}
+      <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${acc.iconBg}`}>
+        <alert.icon className={`h-3.5 w-3.5 ${acc.iconColor}`} />
+      </div>
+
+      {/* Body */}
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-start justify-between gap-1">
+          <p className="text-xs font-semibold leading-snug text-[var(--color-text-primary)] truncate">
             {alert.title}
-          </h4>
-          <p className={`mt-1 text-sm ${styles.text} opacity-90`}>
-            {alert.message}
           </p>
-          <div className="mt-2 flex items-center justify-between">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {alert.timestamp ? formatRelativeTime(alert.timestamp) : ''}
-            </p>
-            {alert.action && (
-              <button
-                onClick={() => onNavigate(alert.action.to)}
-                className={`text-xs font-medium underline ${styles.icon} hover:opacity-75`}
-              >
-                {alert.action.label}
-              </button>
-            )}
-          </div>
+          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-none ${acc.label}`}>
+            {alert.type}
+          </span>
+        </div>
+
+        <p className="text-[11px] leading-relaxed text-[var(--color-text-tertiary)]">
+          {alert.message}
+        </p>
+
+        <div className="flex items-center justify-between pt-0.5">
+          {alert.timestamp ? (
+            <span className="text-[10px] text-[var(--color-text-muted)]">
+              {formatRelativeTime(alert.timestamp)}
+            </span>
+          ) : (
+            <span />
+          )}
+          {alert.action && (
+            <button
+              onClick={() => onNavigate(alert.action.to)}
+              className={`text-[11px] font-semibold ${acc.iconColor} hover:underline focus:outline-none focus-visible:underline`}
+            >
+              {alert.action.label} →
+            </button>
+          )}
         </div>
       </div>
     </div>
