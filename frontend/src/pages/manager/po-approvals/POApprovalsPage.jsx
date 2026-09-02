@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { ShoppingCart, CheckCircle, XCircle } from 'lucide-react'
-import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner, ConfirmModal } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
@@ -19,6 +19,8 @@ export default function POApprovalsPage() {
   const [filterStatus, setFilterStatus] = useState('pending')
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
+  const [rejectTarget, setRejectTarget] = useState(null)
+  const [rejecting, setRejecting] = useState(false)
 
   useEffect(() => {
     loadPurchaseOrders()
@@ -52,6 +54,17 @@ export default function POApprovalsPage() {
       loadPurchaseOrders()
     } catch (error) {
       addNotification({ type: 'error', title: 'Error', message: `Failed to reject ${po.po_number}` })
+    }
+  }
+
+  const handleConfirmReject = async () => {
+    if (!rejectTarget) return
+    setRejecting(true)
+    try {
+      await handleReject(rejectTarget)
+      setRejectTarget(null)
+    } finally {
+      setRejecting(false)
     }
   }
 
@@ -96,7 +109,7 @@ export default function POApprovalsPage() {
     { key: 'actions', label: 'Actions', render: (_, row) => row.status === 'pending' ? (
       <div className="flex space-x-2">
         <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => handleApprove(row)}>Approve</Button>
-        <Button size="sm" variant="danger" icon={XCircle} onClick={() => handleReject(row)}>Reject</Button>
+        <Button size="sm" variant="danger" icon={XCircle} onClick={() => setRejectTarget(row)}>Reject</Button>
       </div>
     ) : null },
   ]
@@ -150,6 +163,17 @@ export default function POApprovalsPage() {
           />
         </Card.Body>
       </Card>
+
+      <ConfirmModal
+        isOpen={Boolean(rejectTarget)}
+        onClose={() => setRejectTarget(null)}
+        onConfirm={handleConfirmReject}
+        title="Reject Purchase Order"
+        message={rejectTarget ? `Are you sure you want to reject ${rejectTarget.po_number} from ${rejectTarget.supplier}?` : ''}
+        confirmText="Reject"
+        variant="danger"
+        loading={rejecting}
+      />
     </div>
   )
 }

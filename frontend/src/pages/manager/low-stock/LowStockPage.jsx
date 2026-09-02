@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { AlertTriangle, ShoppingCart } from 'lucide-react'
-import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import { Card, Table, StatusBadge, Button, Input, SearchBar, LoadingSpinner, Modal, ModalBody, ModalFooter } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
@@ -18,6 +18,10 @@ export default function LowStockPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
+  const [poTarget, setPoTarget] = useState(null)
+  const [poQty, setPoQty] = useState('')
+  const [poQtyError, setPoQtyError] = useState('')
+  const [creatingPO, setCreatingPO] = useState(false)
 
   useEffect(() => {
     loadLowStockAlerts()
@@ -37,8 +41,37 @@ export default function LowStockPage() {
     }
   }
 
-  const handleCreatePO = (item) => {
-    addNotification({ type: 'success', title: 'PO Draft Created', message: `Purchase order for ${item.suggested_order_qty} units of ${item.product_name}` })
+  const openCreatePOModal = (item) => {
+    setPoTarget(item)
+    setPoQty(String(item.suggested_order_qty))
+    setPoQtyError('')
+  }
+
+  const closeCreatePOModal = () => {
+    if (creatingPO) return
+    setPoTarget(null)
+  }
+
+  const handleCreatePO = async (e) => {
+    e.preventDefault()
+    if (!poTarget) return
+    const qty = Number(poQty)
+    if (!poQty || qty <= 0) {
+      setPoQtyError('Enter a valid order quantity')
+      return
+    }
+
+    setCreatingPO(true)
+    try {
+      setData(prev => ({
+        ...prev,
+        alerts: prev.alerts.map(a => a.id === poTarget.id ? { ...a, po_created: true, suggested_order_qty: qty } : a)
+      }))
+      addNotification({ type: 'success', title: 'PO Draft Created', message: `Purchase order for ${qty} units of ${poTarget.product_name} has been drafted` })
+      setPoTarget(null)
+    } finally {
+      setCreatingPO(false)
+    }
   }
 
   const getStatusBadge = (status) => {
@@ -60,7 +93,9 @@ export default function LowStockPage() {
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'suggested_order_qty', label: 'Suggested Order' },
     { key: 'actions', label: 'Actions', render: (_, row) => (
-      <Button size="sm" variant="primary" icon={ShoppingCart} onClick={() => handleCreatePO(row)}>Create PO</Button>
+      <Button size="sm" variant="primary" icon={ShoppingCart} disabled={row.po_created} onClick={() => openCreatePOModal(row)}>
+        {row.po_created ? 'PO Created' : 'Create PO'}
+      </Button>
     )},
   ]
 
@@ -92,6 +127,37 @@ export default function LowStockPage() {
           <Table data={filteredAlerts} columns={columns} emptyMessage="No low stock alerts" highlightRowId={highlightRowId} />
         </Card.Body>
       </Card>
+
+      {/* Create PO Modal */}
+      <Modal isOpen={Boolean(poTarget)} onClose={closeCreatePOModal} title="Create Purchase Order" size="sm">
+        <form onSubmit={handleCreatePO}>
+          <ModalBody>
+            {poTarget && (
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-[var(--color-text-primary)]">{poTarget.product_name}</p>
+                  <p className="text-sm text-[var(--color-text-muted)]">SKU: {poTarget.sku} · Currently {poTarget.current_stock} in stock</p>
+                </div>
+                <Input
+                  label="Order Quantity"
+                  type="number"
+                  min="1"
+                  required
+                  value={poQty}
+                  onChange={(e) => { setPoQty(e.target.value); setPoQtyError('') }}
+                  error={poQtyError}
+                />
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={closeCreatePOModal} disabled={creatingPO}>Cancel</Button>
+              <Button type="submit" variant="primary" loading={creatingPO}>Create PO</Button>
+            </div>
+          </ModalFooter>
+        </form>
+      </Modal>
     </div>
   )
 }

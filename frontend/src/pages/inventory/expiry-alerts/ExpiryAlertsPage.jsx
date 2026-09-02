@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar } from 'lucide-react'
-import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner, ConfirmModal } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
@@ -19,6 +19,8 @@ export default function ExpiryAlertsPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
+  const [writeOffTarget, setWriteOffTarget] = useState(null)
+  const [writingOff, setWritingOff] = useState(false)
 
   useEffect(() => {
     loadExpiryData()
@@ -38,6 +40,26 @@ export default function ExpiryAlertsPage() {
     }
   }
 
+  const handlePrioritize = (batch) => {
+    setData(prev => ({
+      ...prev,
+      batches: prev.batches.map(b => b.id === batch.id ? { ...b, prioritized: true } : b)
+    }))
+    addNotification({ type: 'success', title: 'Prioritized', message: `${batch.product_name} (batch ${batch.batch_number}) flagged for priority picking` })
+  }
+
+  const handleConfirmWriteOff = async () => {
+    if (!writeOffTarget) return
+    setWritingOff(true)
+    try {
+      setData(prev => ({ ...prev, batches: prev.batches.filter(b => b.id !== writeOffTarget.id) }))
+      addNotification({ type: 'success', title: 'Written Off', message: `${writeOffTarget.product_name} (batch ${writeOffTarget.batch_number}) has been written off` })
+      setWriteOffTarget(null)
+    } finally {
+      setWritingOff(false)
+    }
+  }
+
   const getExpiryBadge = (status, days) => {
     if (status === 'expired') return <StatusBadge variant="critical" label={`Expired (${Math.abs(days)}d ago)`} />
     if (days <= 30) return <StatusBadge variant="critical" label={`${days} days`} />
@@ -52,9 +74,11 @@ export default function ExpiryAlertsPage() {
     { key: 'expiry_date', label: 'Expiry Date', sortable: true },
     { key: 'days_to_expiry', label: 'Days Remaining', render: (val, row) => getExpiryBadge(row.status, val) },
     { key: 'actions', label: 'Actions', render: (_, row) => row.status === 'expired' ? (
-      <Button size="sm" variant="danger">Write Off</Button>
+      <Button size="sm" variant="danger" onClick={() => setWriteOffTarget(row)}>Write Off</Button>
     ) : row.status === 'warning' ? (
-      <Button size="sm" variant="warning">Prioritize</Button>
+      <Button size="sm" variant="warning" disabled={row.prioritized} onClick={() => handlePrioritize(row)}>
+        {row.prioritized ? 'Prioritized' : 'Prioritize'}
+      </Button>
     ) : null },
   ]
 
@@ -92,6 +116,17 @@ export default function ExpiryAlertsPage() {
           <Table data={filteredBatches} columns={columns} emptyMessage="No batches match your filters" highlightRowId={highlightRowId} />
         </Card.Body>
       </Card>
+
+      <ConfirmModal
+        isOpen={Boolean(writeOffTarget)}
+        onClose={() => setWriteOffTarget(null)}
+        onConfirm={handleConfirmWriteOff}
+        title="Write Off Batch"
+        message={writeOffTarget ? `Write off ${writeOffTarget.quantity} units of ${writeOffTarget.product_name} (batch ${writeOffTarget.batch_number})? This removes the batch from inventory and cannot be undone.` : ''}
+        confirmText="Write Off"
+        variant="danger"
+        loading={writingOff}
+      />
     </div>
   )
 }

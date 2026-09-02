@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { AlertCircle, Plus, FileText, CheckCircle, Clock } from 'lucide-react'
+import { AlertCircle, Plus, FileText, CheckCircle, Clock, RotateCcw } from 'lucide-react'
 import { Card, Table, StatusBadge, Button, Input, Modal, SearchBar, LoadingSpinner } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
@@ -224,6 +224,33 @@ export default function DiscrepanciesPage() {
       key: 'created_at',
       label: 'Reported',
       render: (value) => new Date(value).toLocaleDateString()
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      // Rendered by both the list table and the card layout (Table.jsx
+      // treats the 'actions' key specially in each), so status can be
+      // mutated the same way regardless of which view is active. Kanban
+      // drag-and-drop (onKanbanMove below) calls the same handler.
+      render: (_, row) => (
+        <div className="flex flex-wrap gap-2">
+          {row.status === 'open' && (
+            <Button size="sm" variant="warning" icon={Clock} onClick={() => handleUpdateStatus(row, 'investigating')}>
+              Investigate
+            </Button>
+          )}
+          {row.status === 'investigating' && (
+            <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => handleUpdateStatus(row, 'resolved')}>
+              Resolve
+            </Button>
+          )}
+          {row.status === 'resolved' && (
+            <Button size="sm" variant="secondary" icon={RotateCcw} onClick={() => handleUpdateStatus(row, 'open')}>
+              Reopen
+            </Button>
+          )}
+        </div>
+      )
     }
   ]
 

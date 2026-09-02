@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { Package, Clock, CheckCircle, XCircle } from 'lucide-react'
-import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner, ConfirmModal } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
@@ -18,6 +18,8 @@ export default function ReservationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
+  const [cancelTarget, setCancelTarget] = useState(null)
+  const [cancelling, setCancelling] = useState(false)
 
   useEffect(() => {
     loadReservations()
@@ -38,13 +40,26 @@ export default function ReservationsPage() {
   }
 
   const handleFulfill = (id) => {
+    setData(prev => ({
+      ...prev,
+      reservations: prev.reservations.map(r => r.id === id ? { ...r, status: 'fulfilled' } : r)
+    }))
     addNotification({ type: 'success', title: 'Fulfilled', message: `Reservation #${id} marked as fulfilled` })
-    loadReservations()
   }
 
-  const handleCancel = (id) => {
-    addNotification({ type: 'warning', title: 'Cancelled', message: `Reservation #${id} cancelled, stock released` })
-    loadReservations()
+  const handleConfirmCancel = async () => {
+    if (!cancelTarget) return
+    setCancelling(true)
+    try {
+      setData(prev => ({
+        ...prev,
+        reservations: prev.reservations.map(r => r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r)
+      }))
+      addNotification({ type: 'warning', title: 'Cancelled', message: `Reservation #${cancelTarget.id} cancelled, stock released` })
+      setCancelTarget(null)
+    } finally {
+      setCancelling(false)
+    }
   }
 
   const getStatusBadge = (status) => {
@@ -69,7 +84,7 @@ export default function ReservationsPage() {
     { key: 'actions', label: 'Actions', render: (_, row) => row.status === 'active' ? (
       <div className="flex space-x-2">
         <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => handleFulfill(row.id)}>Fulfill</Button>
-        <Button size="sm" variant="danger" icon={XCircle} onClick={() => handleCancel(row.id)}>Cancel</Button>
+        <Button size="sm" variant="danger" icon={XCircle} onClick={() => setCancelTarget(row)}>Cancel</Button>
       </div>
     ) : null },
   ]
@@ -102,6 +117,17 @@ export default function ReservationsPage() {
         <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Package className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'active').reduce((s, r) => s + r.quantity, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Units Reserved</p></div></div></Card.Body></Card>
         <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Clock className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'expired').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Expired</p></div></div></Card.Body></Card>
       </div>
+
+      <ConfirmModal
+        isOpen={Boolean(cancelTarget)}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={handleConfirmCancel}
+        title="Cancel Reservation"
+        message={cancelTarget ? `Cancel reservation for order ${cancelTarget.order_number} (${cancelTarget.product_name})? The reserved stock will be released.` : ''}
+        confirmText="Cancel Reservation"
+        variant="danger"
+        loading={cancelling}
+      />
     </div>
   )
 }
