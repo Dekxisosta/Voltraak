@@ -23,30 +23,31 @@ const ROLES = [
   { icon: PackageSearch, label: 'Inventory Staff', sub: 'Logs stock counts', accent: 'bg-amber-400' },
 ]
 
-// Base bar heights for the sparkline.
+// Base bar heights for the sparkline — used as scaleY targets (0–1 range).
 const BAR_HEIGHTS = [38, 52, 46, 64, 58, 74, 66]
 
-// Each bar gets its own keyframe that oscillates between two hand-picked
-// heights. Pure CSS — no JS timers, no React state, no re-renders.
+// Each bar gets its own keyframe oscillating between two scale values.
+// Using scaleY instead of height keeps animation on the compositor thread
+// and avoids sub-pixel paint artifacts at the bar edges.
 const BAR_KEYFRAMES = BAR_HEIGHTS.map((base, i) => {
-  const lo = Math.max(14, base - 18)
-  const hi = Math.min(92, base + 18)
-  const mid = Math.round((lo + hi) / 2 + (i % 2 === 0 ? 6 : -6))
-  return { lo, hi, mid }
+  const lo  = Math.max(14, base - 18) / 100
+  const hi  = Math.min(92, base + 18) / 100
+  const mid = (Math.round((base * 100 / 100) + (i % 2 === 0 ? 6 : -6)) / 100)
+  return { lo, hi, mid: Math.min(0.92, Math.max(0.14, mid)) }
 })
 
 /**
- * Sparkline bars animated entirely in CSS.
- * Each bar has its own @keyframes and a different duration + delay so they
- * drift in and out of phase naturally, with no JS involvement after mount.
+ * Sparkline bars animated entirely in CSS via scaleY.
+ * scaleY is GPU-composited — no layout, no paint, no stray pixels.
+ * transform-origin is set to bottom so bars grow upward from the baseline.
  */
 function AnimatedBars() {
   const keyframeCSS = BAR_KEYFRAMES.map((kf, i) => `
     @keyframes bar-pulse-${i} {
-      0%   { height: ${kf.lo}%; }
-      40%  { height: ${kf.hi}%; }
-      70%  { height: ${kf.mid}%; }
-      100% { height: ${kf.lo}%; }
+      0%   { transform: scaleY(${kf.lo}); }
+      40%  { transform: scaleY(${kf.hi}); }
+      70%  { transform: scaleY(${kf.mid}); }
+      100% { transform: scaleY(${kf.lo}); }
     }
   `).join('')
 
@@ -55,14 +56,17 @@ function AnimatedBars() {
       <style>{keyframeCSS}</style>
       <div className="mt-6 flex items-end gap-2 h-20">
         {BAR_HEIGHTS.map((_, i) => {
-          const duration = 3.2 + i * 0.37          // 3.2 s – 5.5 s
-          const delay    = -(i * 0.61 + 0.4)       // negative = already mid-cycle on load
+          const duration = 3.2 + i * 0.37
+          const delay    = -(i * 0.61 + 0.4)
           return (
             <div
               key={i}
               className="flex-1 rounded-t-sm bg-gradient-to-t from-amber-400/30 to-amber-300/90"
               style={{
+                height: '100%',
+                transformOrigin: 'bottom',
                 animation: `bar-pulse-${i} ${duration}s ${delay}s ease-in-out infinite`,
+                willChange: 'transform',
               }}
             />
           )
