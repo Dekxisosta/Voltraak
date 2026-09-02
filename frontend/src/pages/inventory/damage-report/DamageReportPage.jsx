@@ -4,44 +4,38 @@
  */
 
 import { useState, useEffect } from 'react'
-import { AlertCircle, Plus, Camera, FileText, Edit, Trash2 } from 'lucide-react'
-import { Card, Table, StatusBadge, Button, Input, Select, SearchBar, LoadingSpinner, Modal, ModalBody, ModalFooter, ConfirmModal } from '@/shared/components/common'
+import { AlertCircle, Plus, Camera, FileText } from 'lucide-react'
+import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import Modal, { ModalBody, ModalFooter } from '@/shared/components/common/Modal'
+import Input, { NumberInput } from '@/shared/components/common/Input'
+import Select from '@/shared/components/common/Select'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { fetchData } from '@/shared/services/dataSource'
-import { mockDamageReports } from '@/shared/mocks/inventory/damage-report'
-// TODO: import { inventoryApi } from '@/api'
+import { createResourceDataSource } from '@/shared/services/dataSource'
+// TODO: pass { api: inventoryApi } once the endpoint exists
+const damageSource = createResourceDataSource('inventory/damage-report')
 
-const SEVERITY_OPTIONS = [
-  { value: 'minor', label: 'Minor' },
-  { value: 'moderate', label: 'Moderate' },
-  { value: 'severe', label: 'Severe' },
+const DAMAGE_TYPES = ['Physical Damage', 'Water Damage', 'Cosmetic Damage', 'Electrical Fault', 'Packaging Damage']
+const SEVERITIES = [
+  { label: 'Minor', value: 'minor' },
+  { label: 'Moderate', value: 'moderate' },
+  { label: 'Severe', value: 'severe' },
 ]
-
-const STATUS_OPTIONS = [
-  { value: 'pending_review', label: 'Pending Review' },
-  { value: 'under_investigation', label: 'Investigating' },
-  { value: 'resolved', label: 'Resolved' },
-  { value: 'written_off', label: 'Written Off' },
-]
-
-const emptyForm = { product_name: '', batch_number: '', damage_type: '', severity: 'minor', quantity_affected: '', status: 'pending_review' }
+const EMPTY_FORM = {
+  product_name: '', sku: '', batch_number: '', damage_type: 'Physical Damage',
+  severity: 'minor', quantity_affected: 1, notes: '',
+}
 
 export default function DamageReportPage() {
   const [data, setData] = useState({ reports: [], loading: true })
   const [searchTerm, setSearchTerm] = useState('')
-  const { addNotification } = useNotifications()
-  const highlightRowId = useHighlightParam()
-
-  const [formOpen, setFormOpen] = useState(false)
-  const [editingReport, setEditingReport] = useState(null)
-  const [form, setForm] = useState(emptyForm)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [saving, setSaving] = useState(false)
-
-  const [deleteTarget, setDeleteTarget] = useState(null)
-  const [deleting, setDeleting] = useState(false)
+  const { addNotification } = useNotifications()
+  const highlightRowId = useHighlightParam()
 
   useEffect(() => {
     loadDamageReports()
@@ -50,10 +44,7 @@ export default function DamageReportPage() {
   const loadDamageReports = async () => {
     try {
       setData(prev => ({ ...prev, loading: true }))
-      const result = await fetchData(
-        () => mockDamageReports,
-        () => null // TODO: inventoryApi.getDamageReports()
-      )
+      const result = await damageSource.list()
       setData({ reports: result, loading: false })
     } catch (error) {
       addNotification({ type: 'error', title: 'Error', message: 'Failed to load damage reports' })
@@ -61,87 +52,50 @@ export default function DamageReportPage() {
     }
   }
 
-  const openAddModal = () => {
-    setEditingReport(null)
-    setForm(emptyForm)
+  const openCreateModal = () => {
+    setForm(EMPTY_FORM)
     setFormErrors({})
-    setFormOpen(true)
+    setModalOpen(true)
   }
 
-  const openEditModal = (report) => {
-    setEditingReport(report)
-    setForm({
-      product_name: report.product_name,
-      batch_number: report.batch_number,
-      damage_type: report.damage_type,
-      severity: report.severity,
-      quantity_affected: String(report.quantity_affected),
-      status: report.status,
-    })
-    setFormErrors({})
-    setFormOpen(true)
-  }
-
-  const closeFormModal = () => {
+  const closeModal = () => {
     if (saving) return
-    setFormOpen(false)
+    setModalOpen(false)
   }
 
   const validateForm = () => {
     const errors = {}
     if (!form.product_name.trim()) errors.product_name = 'Product name is required'
     if (!form.batch_number.trim()) errors.batch_number = 'Batch number is required'
-    if (!form.damage_type.trim()) errors.damage_type = 'Damage type is required'
-    if (form.quantity_affected === '' || Number(form.quantity_affected) <= 0) errors.quantity_affected = 'Enter a valid quantity'
+    if (!Number(form.quantity_affected) || Number(form.quantity_affected) < 1) errors.quantity_affected = 'Enter a quantity of at least 1'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
-  const handleSubmitForm = async (e) => {
+  const handleSave = async (e) => {
     e.preventDefault()
     if (!validateForm()) return
-
     setSaving(true)
     try {
-      const payload = {
+      await damageSource.create({
         product_name: form.product_name.trim(),
+        sku: form.sku.trim(),
         batch_number: form.batch_number.trim(),
-        damage_type: form.damage_type.trim(),
+        damage_type: form.damage_type,
         severity: form.severity,
         quantity_affected: Number(form.quantity_affected),
-        status: form.status,
-      }
-
-      if (editingReport) {
-        setData(prev => ({
-          ...prev,
-          reports: prev.reports.map(r => r.id === editingReport.id ? { ...r, ...payload } : r)
-        }))
-        addNotification({ type: 'success', title: 'Report Updated', message: `Damage report for ${payload.product_name} has been updated` })
-      } else {
-        const newReport = {
-          id: Math.max(0, ...data.reports.map(r => r.id)) + 1,
-          ...payload,
-          reported_at: new Date().toISOString(),
-        }
-        setData(prev => ({ ...prev, reports: [newReport, ...prev.reports] }))
-        addNotification({ type: 'success', title: 'Report Created', message: `Damage report for ${payload.product_name} has been logged` })
-      }
-      setFormOpen(false)
+        status: 'pending_review',
+        reported_by: 'Inventory Staff',
+        reported_at: new Date().toISOString(),
+        notes: form.notes.trim(),
+      })
+      addNotification({ type: 'success', title: 'Report Created', message: `Damage report for ${form.product_name} submitted` })
+      setModalOpen(false)
+      loadDamageReports()
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: 'Failed to create damage report' })
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return
-    setDeleting(true)
-    try {
-      setData(prev => ({ ...prev, reports: prev.reports.filter(r => r.id !== deleteTarget.id) }))
-      addNotification({ type: 'success', title: 'Report Removed', message: `Damage report for ${deleteTarget.product_name} has been removed` })
-      setDeleteTarget(null)
-    } finally {
-      setDeleting(false)
     }
   }
 
@@ -174,12 +128,6 @@ export default function DamageReportPage() {
     { key: 'quantity_affected', label: 'Qty Affected' },
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'reported_at', label: 'Reported', render: (val) => new Date(val).toLocaleDateString() },
-    { key: 'actions', label: 'Actions', render: (_, row) => (
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" icon={Edit} onClick={() => openEditModal(row)}>Edit</Button>
-        <Button size="sm" variant="danger" icon={Trash2} onClick={() => setDeleteTarget(row)}>Delete</Button>
-      </div>
-    )},
   ]
 
   const filteredReports = data.reports.filter(r =>
@@ -199,7 +147,7 @@ export default function DamageReportPage() {
         <Card.Body>
           <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
             <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search reports..." className="w-full sm:max-w-md" />
-            <Button variant="primary" icon={Plus} onClick={openAddModal} className="w-full sm:w-auto">New Report</Button>
+            <Button variant="primary" icon={Plus} className="w-full sm:w-auto" onClick={openCreateModal}>New Report</Button>
           </div>
           <Table data={filteredReports} columns={columns} emptyMessage="No damage reports found" highlightRowId={highlightRowId} />
         </Card.Body>
@@ -241,82 +189,81 @@ export default function DamageReportPage() {
         </Card>
       </div>
 
-      {/* Add/Edit Damage Report Modal */}
-      <Modal isOpen={formOpen} onClose={closeFormModal} title={editingReport ? 'Edit Damage Report' : 'New Damage Report'} size="md">
-        <form onSubmit={handleSubmitForm}>
+      <Modal isOpen={modalOpen} onClose={closeModal} title="New Damage Report" size="md">
+        <form onSubmit={handleSave}>
           <ModalBody>
             <div className="space-y-4">
               <Input
+                id="dr-product"
                 label="Product Name"
                 required
                 value={form.product_name}
-                onChange={(e) => setForm(prev => ({ ...prev, product_name: e.target.value }))}
+                onChange={(e) => setForm(f => ({ ...f, product_name: e.target.value }))}
                 error={formErrors.product_name}
+                placeholder="e.g. Samsung Refrigerator 21cu"
               />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
+                  id="dr-sku"
+                  label="SKU"
+                  value={form.sku}
+                  onChange={(e) => setForm(f => ({ ...f, sku: e.target.value }))}
+                  placeholder="e.g. SAMSUNG-RF21"
+                />
+                <Input
+                  id="dr-batch"
                   label="Batch Number"
                   required
                   value={form.batch_number}
-                  onChange={(e) => setForm(prev => ({ ...prev, batch_number: e.target.value }))}
+                  onChange={(e) => setForm(f => ({ ...f, batch_number: e.target.value }))}
                   error={formErrors.batch_number}
-                />
-                <Input
-                  label="Damage Type"
-                  required
-                  value={form.damage_type}
-                  onChange={(e) => setForm(prev => ({ ...prev, damage_type: e.target.value }))}
-                  error={formErrors.damage_type}
-                  placeholder="Water damage, dent, etc."
+                  placeholder="e.g. BATCH-2024-001"
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Select
-                  label="Severity"
-                  required
-                  value={form.severity}
-                  onChange={(e) => setForm(prev => ({ ...prev, severity: e.target.value }))}
-                  options={SEVERITY_OPTIONS}
+                  id="dr-type"
+                  label="Damage Type"
+                  value={form.damage_type}
+                  onChange={(e) => setForm(f => ({ ...f, damage_type: e.target.value }))}
+                  options={DAMAGE_TYPES.map(t => ({ label: t, value: t }))}
                 />
-                <Input
-                  label="Quantity Affected"
-                  type="number"
-                  min="1"
-                  required
-                  value={form.quantity_affected}
-                  onChange={(e) => setForm(prev => ({ ...prev, quantity_affected: e.target.value }))}
-                  error={formErrors.quantity_affected}
+                <Select
+                  id="dr-severity"
+                  label="Severity"
+                  value={form.severity}
+                  onChange={(e) => setForm(f => ({ ...f, severity: e.target.value }))}
+                  options={SEVERITIES}
                 />
               </div>
-              <Select
-                label="Status"
+              <NumberInput
+                id="dr-qty"
+                label="Quantity Affected"
                 required
-                value={form.status}
-                onChange={(e) => setForm(prev => ({ ...prev, status: e.target.value }))}
-                options={STATUS_OPTIONS}
+                min={1}
+                value={form.quantity_affected}
+                onChange={(e) => setForm(f => ({ ...f, quantity_affected: e.target.value }))}
+                error={formErrors.quantity_affected}
+              />
+              <Input
+                id="dr-notes"
+                label="Notes"
+                value={form.notes}
+                onChange={(e) => setForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Describe the damage (optional)"
               />
             </div>
           </ModalBody>
           <ModalFooter>
-            <div className="flex justify-end gap-3">
-              <Button type="button" variant="secondary" onClick={closeFormModal} disabled={saving}>Cancel</Button>
-              <Button type="submit" variant="primary" loading={saving}>{editingReport ? 'Save Changes' : 'Create Report'}</Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
+              <Button type="button" variant="secondary" onClick={closeModal} disabled={saving} className="w-full sm:w-auto">Cancel</Button>
+              <Button type="submit" variant="primary" loading={saving} icon={Plus} className="w-full sm:w-auto">
+                Submit Report
+              </Button>
             </div>
           </ModalFooter>
         </form>
       </Modal>
-
-      {/* Delete Confirmation */}
-      <ConfirmModal
-        isOpen={Boolean(deleteTarget)}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleConfirmDelete}
-        title="Remove Damage Report"
-        message={deleteTarget ? `Are you sure you want to remove the damage report for ${deleteTarget.product_name}? This cannot be undone.` : ''}
-        confirmText="Remove"
-        variant="danger"
-        loading={deleting}
-      />
     </div>
   )
 }
