@@ -1,8 +1,6 @@
-<div style="display: flex;">
-    <img src="logo/voltraak-logo.png" width="50px">
-    <br>
-    <h1>Voltraak — Inventory Management System</h1>
-</div>
+<img src="logo/voltraak-logo.png" width="50" align="left">
+
+# Voltraak — Inventory Management System
 
 
 
