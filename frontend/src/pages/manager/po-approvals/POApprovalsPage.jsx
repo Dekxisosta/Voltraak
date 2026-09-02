@@ -4,12 +4,13 @@
  */
 
 import { useState, useEffect } from 'react'
-import { ShoppingCart, CheckCircle, XCircle } from 'lucide-react'
+import { ShoppingCart, CheckCircle, XCircle, Printer } from 'lucide-react'
 import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner, ConfirmModal } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { createResourceDataSource } from '@/shared/services/dataSource'
+import { printPOAsPdf } from './poPrintService'
 // TODO: pass { api: procurementApi } once the endpoint exists
 const poApprovalsSource = createResourceDataSource('manager/po-approvals')
 
@@ -22,6 +23,7 @@ export default function POApprovalsPage() {
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejecting, setRejecting] = useState(false)
   const [approvingId, setApprovingId] = useState(null)
+  const [printingId, setPrintingId] = useState(null)
 
   useEffect(() => {
     loadPurchaseOrders()
@@ -81,6 +83,18 @@ export default function POApprovalsPage() {
     poApprovalsSource.update(po.id, { status: newStatus }).then(loadPurchaseOrders)
   }
 
+  const handlePrint = (po) => {
+    setPrintingId(po.id)
+    try {
+      printPOAsPdf(po)
+      addNotification({ type: 'success', title: 'PDF Downloaded', message: `${po.po_number} printout saved as PDF` })
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Print Failed', message: `Could not generate PDF for ${po.po_number}` })
+    } finally {
+      setPrintingId(null)
+    }
+  }
+
   const getStatusBadge = (status) => {
     const map = {
       pending: { variant: 'warning', label: 'Pending Approval' },
@@ -110,12 +124,22 @@ export default function POApprovalsPage() {
     { key: 'requested_by', label: 'Requested By' },
     { key: 'requested_at', label: 'Date', render: (val) => new Date(val).toLocaleDateString() },
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
-    { key: 'actions', label: 'Actions', render: (_, row) => row.status === 'pending' ? (
-      <div className="flex space-x-2">
-        <Button size="sm" variant="primary" icon={CheckCircle} loading={approvingId === row.id} disabled={approvingId === row.id || rejecting} onClick={() => handleApprove(row)}>Approve</Button>
-        <Button size="sm" variant="danger" icon={XCircle} disabled={approvingId === row.id || rejecting} onClick={() => setRejectTarget(row)}>Reject</Button>
-      </div>
-    ) : null },
+    { key: 'actions', label: 'Actions', render: (_, row) => {
+      if (row.status === 'pending') {
+        return (
+          <div className="flex space-x-2">
+            <Button size="sm" variant="primary" icon={CheckCircle} loading={approvingId === row.id} disabled={approvingId === row.id || rejecting} onClick={() => handleApprove(row)}>Approve</Button>
+            <Button size="sm" variant="danger" icon={XCircle} disabled={approvingId === row.id || rejecting} onClick={() => setRejectTarget(row)}>Reject</Button>
+          </div>
+        )
+      }
+      if (row.status === 'approved') {
+        return (
+          <Button size="sm" variant="secondary" icon={Printer} loading={printingId === row.id} disabled={printingId === row.id} onClick={() => handlePrint(row)}>Print PDF</Button>
+        )
+      }
+      return null
+    }},
   ]
 
   const filteredOrders = data.orders
