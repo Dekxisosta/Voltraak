@@ -237,8 +237,23 @@ export default function AuthLayout({ children }) {
       `}</style>
 
       {/* Form column */}
-      <div className="w-full lg:w-[50%] xl:w-[50%] flex flex-col items-center lg:items-end min-h-screen lg:h-full lg:overflow-y-auto voltraak-no-scrollbar px-6 sm:px-12 lg:px-24 py-24">
-        <div className="w-full max-w-sm">
+      <div className="w-full lg:w-[50%] xl:w-[50%] flex flex-col items-center lg:items-end min-h-screen lg:h-full lg:overflow-y-auto voltraak-no-scrollbar px-6 sm:px-12 lg:px-24 py-24 relative overflow-hidden">
+
+        {/* Subtle diagonal line-grid — same vibe as the right panel but quieter */}
+        <svg className="pointer-events-none absolute inset-0 w-full h-full" aria-hidden="true">
+          <defs>
+            <pattern id="form-line-grid" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="32" stroke="currentColor" strokeWidth="0.5" strokeOpacity="0.045" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#form-line-grid)" />
+        </svg>
+
+        {/* Warm glow — top-right corner, stays out of the way of the form */}
+        <div className="pointer-events-none absolute -top-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-amber-400 opacity-[0.055] blur-[100px]" />
+        {/* Cool accent glow — bottom-left, very faint */}
+        <div className="pointer-events-none absolute -bottom-32 -left-20 w-[22rem] h-[22rem] rounded-full bg-indigo-500 opacity-[0.045] blur-[90px]" />
+        <div className="w-full max-w-sm relative z-10">
           {/* Logo */}
           <div className="flex items-center gap-3">
             <img
