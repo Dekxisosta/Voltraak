@@ -134,11 +134,7 @@ export default function PreferencesModal({ isOpen, onClose }) {
     setResetting(true)
     try {
       resetAllCollections()
-      addNotification({
-        type: 'success',
-        title: 'Demo data reset',
-        message: 'All mock records have been restored to their seed values.',
-      })
+      window.location.reload()
     } finally {
       setResetting(false)
     }

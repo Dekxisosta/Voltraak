@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { TrendingUp, ArrowUp, ArrowDown, ArrowRight, AlertTriangle, ShoppingCart } from 'lucide-react'
+import { TrendingUp, ArrowUp, ArrowDown, ArrowRight, ShoppingCart } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
@@ -15,8 +15,22 @@ import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { fetchData } from '@/shared/services/dataSource'
-import { mockForecasts, mockDemandTrend } from '@/shared/mocks/manager/forecast'
+import { mockForecasts, getDemandTrend } from '@/shared/mocks/manager/forecast'
 // TODO: import { reportingApi } from '@/api'
+
+/** Derive week count from timeframe string, e.g. '8w' → 8 */
+function weeksFromTimeframe(tf) { return parseInt(tf, 10) }
+
+/**
+ * Scale the 8-week forecast value proportionally to the selected timeframe,
+ * and recalculate the suggested order based on the new demand window.
+ */
+function applyTimeframe(item, tf) {
+  const weeks = weeksFromTimeframe(tf)
+  const forecastDemand = Math.round(item.avg_weekly_demand * weeks)
+  const suggestedOrder = Math.max(0, Math.round(forecastDemand - item.current_stock))
+  return { ...item, forecastDemand, suggestedOrder }
+}
 
 const CATEGORY_COLORS = {
   'Refrigerators': '#3b82f6',
@@ -63,8 +77,8 @@ export default function ForecastPage() {
           () => null // TODO: reportingApi.getForecasts()
         ),
         fetchData(
-          () => mockDemandTrend,
-          () => null // TODO: reportingApi.getDemandTrend()
+          () => getDemandTrend(timeframe),
+          () => null // TODO: reportingApi.getDemandTrend(timeframe)
         ),
       ])
       setData({ forecasts, trend, loading: false })
@@ -80,45 +94,50 @@ export default function ForecastPage() {
     return <span className="text-gray-500 dark:text-gray-400">Stable</span>
   }
 
+  const weeks = weeksFromTimeframe(timeframe)
+  const forecastLabel = `${weeks}-Week Forecast`
+
+  // Apply timeframe scaling to every item
+  const scaledForecasts = data.forecasts.map(f => applyTimeframe(f, timeframe))
+
   const columns = [
     { key: 'product_name', label: 'Product', sortable: true },
     { key: 'current_stock', label: 'Current Stock' },
     { key: 'avg_weekly_demand', label: 'Avg Weekly Demand' },
-    { key: 'forecast_demand_8w', label: '8-Week Forecast' },
+    { key: 'forecastDemand', label: forecastLabel },
     { key: 'reorder_point', label: 'Reorder Point' },
-    { key: 'suggested_order', label: 'Suggested Order', render: (val) => val > 0 ? <span className="font-bold text-gray-600 dark:text-gray-400">{val} units</span> : <span className="text-gray-400 dark:text-gray-500">None needed</span> },
+    { key: 'suggestedOrder', label: 'Suggested Order', render: (val) => val > 0 ? <span className="font-bold text-gray-600 dark:text-gray-400">{val} units</span> : <span className="text-gray-400 dark:text-gray-500">None needed</span> },
     { key: 'trend', label: 'Trend', render: (val) => getTrendIcon(val) },
     { key: 'confidence', label: 'Confidence', render: (val) => <span className={`font-medium ${val >= 90 ? 'text-gray-600 dark:text-gray-400' : val >= 80 ? 'text-gray-600 dark:text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>{val}%</span> },
   ]
 
-  const filteredForecasts = data.forecasts.filter(f =>
+  const filteredForecasts = scaledForecasts.filter(f =>
     f.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     f.sku.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   // Forecast demand aggregated by category, for the breakdown widget.
   const categoryDemand = Object.values(
-    data.forecasts.reduce((acc, f) => {
+    scaledForecasts.reduce((acc, f) => {
       const key = f.category || 'Others'
       if (!acc[key]) acc[key] = { category: key, demand: 0, color: CATEGORY_COLORS[key] || CATEGORY_COLORS.Others }
-      acc[key].demand += f.forecast_demand_8w
+      acc[key].demand += f.forecastDemand
       return acc
     }, {})
   ).sort((a, b) => b.demand - a.demand)
   const maxCategoryDemand = Math.max(...categoryDemand.map(c => c.demand), 1)
 
-  // Items that need reordering, ranked by suggested order size, with an
-  // estimated cost and a weeks-of-stock-left urgency read.
-  const reorderQueue = data.forecasts
-    .filter(f => f.suggested_order > 0)
+  // Items that need reordering, ranked by suggested order size.
+  const reorderQueue = scaledForecasts
+    .filter(f => f.suggestedOrder > 0)
     .map(f => ({
       ...f,
-      estimatedCost: f.suggested_order * (f.unit_cost || 0),
+      estimatedCost: f.suggestedOrder * (f.unit_cost || 0),
       weeksOfStock: f.avg_weekly_demand > 0 ? f.current_stock / f.avg_weekly_demand : Infinity,
     }))
-    .sort((a, b) => b.suggested_order - a.suggested_order)
+    .sort((a, b) => b.suggestedOrder - a.suggestedOrder)
   const totalReorderCost = reorderQueue.reduce((sum, f) => sum + f.estimatedCost, 0)
-  const totalReorderUnits = reorderQueue.reduce((sum, f) => sum + f.suggested_order, 0)
+  const totalReorderUnits = reorderQueue.reduce((sum, f) => sum + f.suggestedOrder, 0)
 
   if (data.loading) {
     return <div className="flex items-center justify-center min-h-96"><LoadingSpinner size="lg" message="Generating forecasts..." /></div>
@@ -129,10 +148,10 @@ export default function ForecastPage() {
       <PageHeader title="Demand Forecasts" subtitle="AI-powered demand prediction and reorder suggestions" icon={TrendingUp} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.forecasts.filter(f => f.suggested_order > 0).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Items Need Reorder</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.forecasts.filter(f => f.trend === 'up').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Trending Up</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{Math.round(data.forecasts.reduce((s, f) => s + f.confidence, 0) / data.forecasts.length)}%</p><p className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.forecasts.reduce((s, f) => s + f.forecast_demand_8w, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total 8-Week Demand</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{scaledForecasts.filter(f => f.suggestedOrder > 0).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Items Need Reorder</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{scaledForecasts.filter(f => f.trend === 'up').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Trending Up</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{Math.round(scaledForecasts.reduce((s, f) => s + f.confidence, 0) / (scaledForecasts.length || 1))}%</p><p className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{scaledForecasts.reduce((s, f) => s + f.forecastDemand, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total {forecastLabel}</p></div></Card.Body></Card>
       </div>
 
       {/* Demand Trend + Category Breakdown */}
@@ -190,7 +209,7 @@ export default function ForecastPage() {
               </AreaChart>
             </ResponsiveContainer>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Solid line: last 8 weeks actual demand. Dashed line: next 8 weeks forecasted demand, combined across all SKUs.
+              Solid line: last 8 weeks actual demand. Dashed line: next {weeks} weeks forecasted demand, combined across all SKUs.
             </p>
           </Card.Body>
         </Card>
@@ -219,7 +238,7 @@ export default function ForecastPage() {
                 </div>
               ))}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">8-week forecasted demand, grouped by product category.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">{weeks}-week forecasted demand, grouped by product category.</p>
           </Card.Body>
         </Card>
       </div>
@@ -255,7 +274,7 @@ export default function ForecastPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{item.suggested_order} units</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{item.suggestedOrder} units</span>
                     <span className="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">₱{(item.estimatedCost / 1000).toFixed(0)}K</span>
                     <StatusBadge variant={isCritical ? 'critical' : 'warning'} label={isCritical ? 'Urgent' : 'Plan ahead'} size="sm" />
                   </div>

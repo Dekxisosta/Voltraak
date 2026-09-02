@@ -410,7 +410,7 @@ export default function DiscrepanciesPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.discrepancies.filter(disc => disc.status === 'open').length}
+                  {filteredDiscrepancies.filter(disc => disc.status === 'open').length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Open Reports</p>
               </div>
@@ -426,7 +426,7 @@ export default function DiscrepanciesPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.discrepancies.filter(disc => disc.status === 'investigating').length}
+                  {filteredDiscrepancies.filter(disc => disc.status === 'investigating').length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Under Investigation</p>
               </div>
@@ -442,7 +442,7 @@ export default function DiscrepanciesPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.discrepancies.filter(disc => disc.status === 'resolved').length}
+                  {filteredDiscrepancies.filter(disc => disc.status === 'resolved').length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Resolved</p>
               </div>
@@ -458,7 +458,7 @@ export default function DiscrepanciesPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.discrepancies.filter(disc => disc.priority === 'high').length}
+                  {filteredDiscrepancies.filter(disc => disc.priority === 'high').length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">High Priority</p>
               </div>

@@ -186,9 +186,9 @@ export default function StockLevelsPage() {
     return matchesSearch && matchesStatus && matchesCategory
   })
 
-  const totalValue = data.stockLevels.reduce((sum, item) => sum + item.total_value, 0)
-  const lowStockItems = data.stockLevels.filter(item => item.status === 'critical' || item.status === 'warning').length
-  const outOfStockItems = data.stockLevels.filter(item => item.status === 'out_of_stock').length
+  const totalValue = filteredStockLevels.reduce((sum, item) => sum + item.total_value, 0)
+  const lowStockItems = filteredStockLevels.filter(item => item.status === 'critical' || item.status === 'warning').length
+  const outOfStockItems = filteredStockLevels.filter(item => item.status === 'out_of_stock').length
 
   if (data.loading) {
     return (
@@ -216,7 +216,7 @@ export default function StockLevelsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.stockLevels.length}
+                  {filteredStockLevels.length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total SKUs</p>
               </div>
@@ -325,7 +325,7 @@ export default function StockLevelsPage() {
       </Card>
 
       {/* Critical Stock Alerts */}
-      {data.stockLevels.some(item => item.status === 'critical' || item.status === 'out_of_stock') && (
+      {filteredStockLevels.some(item => item.status === 'critical' || item.status === 'out_of_stock') && (
         <Card>
           <Card.Header>
             <div className="flex items-center">
@@ -335,7 +335,7 @@ export default function StockLevelsPage() {
           </Card.Header>
           <Card.Body>
             <div className="space-y-3">
-              {data.stockLevels
+              {filteredStockLevels
                 .filter(item => item.status === 'critical' || item.status === 'out_of_stock')
                 .map(item => (
                   <div key={item.id} className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">

@@ -400,10 +400,10 @@ export default function StockInOutPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.transactions.filter(txn => txn.type === 'stock_in').reduce((sum, txn) => sum + txn.quantity, 0)}
+                  {filteredTransactions.filter(txn => txn.type === 'stock_in').reduce((sum, txn) => sum + txn.quantity, 0)}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Stock In Today ({data.transactions.filter(txn => txn.type === 'stock_in').length} transactions)
+                  Stock In Today ({filteredTransactions.filter(txn => txn.type === 'stock_in').length} transactions)
                 </p>
               </div>
             </div>
@@ -418,10 +418,10 @@ export default function StockInOutPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.transactions.filter(txn => txn.type === 'stock_out').reduce((sum, txn) => sum + txn.quantity, 0)}
+                  {filteredTransactions.filter(txn => txn.type === 'stock_out').reduce((sum, txn) => sum + txn.quantity, 0)}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Stock Out Today ({data.transactions.filter(txn => txn.type === 'stock_out').length} transactions)
+                  Stock Out Today ({filteredTransactions.filter(txn => txn.type === 'stock_out').length} transactions)
                 </p>
               </div>
             </div>
@@ -436,7 +436,7 @@ export default function StockInOutPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.transactions.length}
+                  {filteredTransactions.length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Transactions Today</p>
               </div>

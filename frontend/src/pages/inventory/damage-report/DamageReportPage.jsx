@@ -159,7 +159,7 @@ export default function DamageReportPage() {
             <div className="flex items-center">
               <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><AlertCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.reports.filter(r => r.status === 'pending_review').length}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{filteredReports.filter(r => r.status === 'pending_review').length}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Pending Review</p>
               </div>
             </div>
@@ -170,7 +170,7 @@ export default function DamageReportPage() {
             <div className="flex items-center">
               <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><FileText className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.reports.filter(r => r.status === 'under_investigation').length}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{filteredReports.filter(r => r.status === 'under_investigation').length}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Under Investigation</p>
               </div>
             </div>
@@ -181,7 +181,7 @@ export default function DamageReportPage() {
             <div className="flex items-center">
               <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Camera className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.reports.reduce((sum, r) => sum + r.quantity_affected, 0)}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{filteredReports.reduce((sum, r) => sum + r.quantity_affected, 0)}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Items Affected</p>
               </div>
             </div>

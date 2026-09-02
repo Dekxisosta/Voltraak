@@ -16,12 +16,13 @@ export const mockForecasts = [
 validateMockData('manager/forecast', mockForecasts)
 
 /**
- * Combined weekly demand across all forecasted SKUs: 8 weeks of actual
- * history plus the 8-week forward forecast. The two series share the
- * boundary point (W-1) so the chart line reads as one continuous trend
- * rather than a break between "actual" and "forecast".
+ * Combined weekly demand across all forecasted SKUs.
+ * 8 weeks of actual history is always shown; the forward forecast window
+ * depends on the selected timeframe (4 / 8 / 12 weeks).
+ * The two series share the boundary point (W-1) so the chart line reads
+ * as one continuous trend rather than a break between "actual" and "forecast".
  */
-export const mockDemandTrend = [
+const demandTrendBase = [
   { period: 'W-8', actual: 11 },
   { period: 'W-7', actual: 12 },
   { period: 'W-6', actual: 12 },
@@ -30,14 +31,30 @@ export const mockDemandTrend = [
   { period: 'W-3', actual: 13 },
   { period: 'W-2', actual: 15 },
   { period: 'W-1', actual: 16, forecast: 16 },
-  { period: 'W+1', forecast: 14 },
-  { period: 'W+2', forecast: 15 },
-  { period: 'W+3', forecast: 16 },
-  { period: 'W+4', forecast: 17 },
-  { period: 'W+5', forecast: 18 },
-  { period: 'W+6', forecast: 17 },
-  { period: 'W+7', forecast: 17 },
-  { period: 'W+8', forecast: 17 },
+  { period: 'W+1',  forecast: 14 },
+  { period: 'W+2',  forecast: 15 },
+  { period: 'W+3',  forecast: 16 },
+  { period: 'W+4',  forecast: 17 },
+  { period: 'W+5',  forecast: 18 },
+  { period: 'W+6',  forecast: 17 },
+  { period: 'W+7',  forecast: 17 },
+  { period: 'W+8',  forecast: 17 },
+  { period: 'W+9',  forecast: 16 },
+  { period: 'W+10', forecast: 16 },
+  { period: 'W+11', forecast: 15 },
+  { period: 'W+12', forecast: 15 },
 ]
+
+/** Returns the trend series trimmed to the requested forward window. */
+export function getDemandTrend(timeframe = '8w') {
+  const weeks = parseInt(timeframe, 10) // 4, 8, or 12
+  // Keep all 8 actual history points plus the boundary (W-1) plus `weeks` forecast points
+  const actualRows = demandTrendBase.filter(r => r.actual != null)
+  const forecastRows = demandTrendBase.filter(r => r.actual == null).slice(0, weeks)
+  return [...actualRows, ...forecastRows]
+}
+
+// Default export kept for backwards compatibility
+export const mockDemandTrend = getDemandTrend('8w')
 
 validateMockData('manager/forecast-trend', mockDemandTrend)
