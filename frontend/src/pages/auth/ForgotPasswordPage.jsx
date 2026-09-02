@@ -55,26 +55,26 @@ export default function ForgotPasswordPage() {
 
   if (isSubmitted) {
     return (
-      <div className="text-center space-y-6">
-        <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-          <Mail className="h-8 w-8 text-gray-600 dark:text-gray-400" />
+      <div className="space-y-6">
+        <div className="w-14 h-14 rounded-2xl bg-[var(--color-accent-soft)] flex items-center justify-center">
+          <Mail className="h-6 w-6 text-[var(--color-text-primary)]" />
         </div>
 
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h2 className="font-heading text-2xl font-semibold text-[var(--color-text-primary)]">
             Check your email
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-1.5 text-sm text-[var(--color-text-tertiary)]">
             We've sent a password reset link to{' '}
-            <span className="font-medium">{email}</span>
+            <span className="font-medium text-[var(--color-text-secondary)]">{email}</span>
           </p>
         </div>
 
-        <div className="text-sm text-gray-500 dark:text-gray-400 space-y-2">
+        <div className="text-sm text-[var(--color-text-tertiary)] space-y-2">
           <p>Didn't receive the email? Check your spam folder.</p>
           <button
             onClick={() => setIsSubmitted(false)}
-            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 font-medium"
+            className="font-medium text-[var(--color-text-primary)] hover:text-[var(--color-accent-hover)]"
           >
             Try a different email address
           </button>
@@ -82,7 +82,7 @@ export default function ForgotPasswordPage() {
 
         <Link
           to="/auth/login"
-          className="btn btn-secondary inline-flex items-center gap-2"
+          className="btn btn-secondary rounded-xl inline-flex items-center gap-2"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to login
@@ -92,42 +92,45 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+      <div>
+        <h2 className="font-heading text-2xl font-semibold text-[var(--color-text-primary)]">
           Reset your password
         </h2>
-        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Enter your email address and we'll send you a link to reset your password
+        <p className="mt-1.5 text-sm text-[var(--color-text-tertiary)]">
+          Enter your email and we'll send you a link to get back in.
         </p>
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
           <label htmlFor="email" className="form-label">
             Email address
           </label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value)
-              if (errors.email) {
-                setErrors(prev => ({ ...prev, email: '' }))
-              }
-            }}
-            className={cn(
-              'form-input',
-              errors.email ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : ''
-            )}
-            placeholder="Enter your email address"
-          />
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--color-text-muted)]" />
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (errors.email) {
+                  setErrors(prev => ({ ...prev, email: '' }))
+                }
+              }}
+              className={cn(
+                'form-input rounded-xl pl-10',
+                errors.email ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500' : ''
+              )}
+              placeholder="you@company.com"
+            />
+          </div>
           {errors.email && (
             <p className="form-error">{errors.email}</p>
           )}
@@ -137,7 +140,7 @@ export default function ForgotPasswordPage() {
           type="submit"
           disabled={isSubmitting}
           className={cn(
-            'w-full btn btn-primary btn-lg',
+            'w-full btn btn-primary btn-lg rounded-xl',
             isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
           )}
         >
@@ -156,12 +159,12 @@ export default function ForgotPasswordPage() {
       </form>
 
       {/* Back to login */}
-      <div className="text-center">
+      <div>
         <Link
           to="/auth/login"
-          className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 inline-flex items-center gap-1"
+          className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] inline-flex items-center gap-1.5"
         >
-          <ArrowLeft className="h-3 w-3" />
+          <ArrowLeft className="h-3.5 w-3.5" />
           Back to login
         </Link>
       </div>
