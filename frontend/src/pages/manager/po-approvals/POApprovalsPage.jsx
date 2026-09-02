@@ -87,9 +87,9 @@ export default function POApprovalsPage() {
     setPrintingId(po.id)
     try {
       printPOAsPdf(po)
-      addNotification({ type: 'success', title: 'PDF Downloaded', message: `${po.po_number} printout saved as PDF` })
+      addNotification({ type: 'success', title: 'Print Opened', message: `Print dialog opened for ${po.po_number}` })
     } catch (error) {
-      addNotification({ type: 'error', title: 'Print Failed', message: `Could not generate PDF for ${po.po_number}` })
+      addNotification({ type: 'error', title: 'Print Failed', message: error.message || `Could not open print dialog for ${po.po_number}` })
     } finally {
       setPrintingId(null)
     }

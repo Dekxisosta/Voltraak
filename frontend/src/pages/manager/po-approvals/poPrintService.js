@@ -1,277 +1,385 @@
 /**
  * PO Print Service
- * Generates a formatted PDF printout for an approved purchase order.
+ * Opens a styled print window for an approved purchase order.
+ * Uses window.print() — no third-party PDF library required.
  */
 
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmt(amount) {
+  return `PHP ${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('en-PH', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  })
+}
+
+function capitalize(str = '') {
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
+// ── HTML template ─────────────────────────────────────────────────────────────
+
+function buildPrintHTML(po) {
+  const printedAt = new Date().toLocaleString('en-PH', {
+    dateStyle: 'long', timeStyle: 'short',
+  })
+  const avgUnit = fmt(po.total_amount / po.items_count)
+  const total   = fmt(po.total_amount)
+
+  return /* html */`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${po.po_number} – Purchase Order</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 11px;
+      color: #111;
+      background: #fff;
+      padding: 36px 44px;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-top: 2px solid #111;
+      border-bottom: 1px solid #111;
+      padding: 12px 0;
+      margin-bottom: 18px;
+    }
+    .header-left .company {
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      line-height: 1;
+    }
+    .header-left .tagline {
+      font-size: 9px;
+      color: #555;
+      margin-top: 3px;
+    }
+    .header-right {
+      text-align: right;
+    }
+    .header-right .doc-type {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .header-right .po-number {
+      font-size: 11px;
+      color: #555;
+      margin-top: 2px;
+    }
+
+    /* ── Meta row (badge + print date) ─────────────────────── */
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .badge-approved {
+      display: inline-block;
+      border: 1.5px solid #111;
+      padding: 3px 14px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .print-date {
+      font-size: 9px;
+      color: #555;
+    }
+
+    /* ── Section titles ─────────────────────────────────────── */
+    .section-title {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      border-bottom: 1px solid #111;
+      padding-bottom: 3px;
+      margin-bottom: 10px;
+    }
+
+    /* ── Two-column details grid ────────────────────────────── */
+    .details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 24px;
+      margin-bottom: 20px;
+    }
+    .detail-item .label {
+      font-size: 8px;
+      color: #666;
+      margin-bottom: 2px;
+    }
+    .detail-item .value {
+      font-size: 11px;
+      font-weight: 500;
+      color: #111;
+    }
+    .detail-item .value.bold {
+      font-weight: 700;
+    }
+
+    /* ── Notes box ──────────────────────────────────────────── */
+    .notes-box {
+      border: 1px solid #ccc;
+      padding: 8px 10px;
+      font-size: 10px;
+      color: #111;
+      margin-bottom: 20px;
+      min-height: 32px;
+    }
+
+    /* ── Summary table ──────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+      font-size: 10px;
+    }
+    thead tr {
+      background: #111;
+      color: #fff;
+    }
+    thead th {
+      padding: 7px 10px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 9.5px;
+    }
+    tbody tr:nth-child(even) {
+      background: #f5f5f5;
+    }
+    tbody td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #ddd;
+    }
+    .total-row td {
+      font-weight: 700;
+      font-size: 11px;
+      border-top: 1.5px solid #111;
+    }
+    .td-label {
+      font-weight: 600;
+      width: 52%;
+    }
+
+    /* ── Signatures ─────────────────────────────────────────── */
+    .sig-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .sig-box {
+      border: 1px solid #111;
+      padding: 10px 12px 8px;
+      min-height: 72px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .sig-box .sig-role {
+      font-size: 7.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #555;
+    }
+    .sig-box .sig-name {
+      font-size: 11px;
+      font-weight: 500;
+      margin-top: 6px;
+    }
+    .sig-line {
+      border-top: 1px solid #aaa;
+      margin-top: auto;
+      padding-top: 4px;
+      font-size: 7.5px;
+      color: #aaa;
+    }
+
+    /* ── Footer ─────────────────────────────────────────────── */
+    .footer {
+      border-top: 1px solid #111;
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .footer .footer-label {
+      font-size: 8px;
+      color: #888;
+      font-style: italic;
+    }
+    .footer .footer-po {
+      font-size: 8px;
+      color: #555;
+      font-weight: 600;
+    }
+
+    @media print {
+      body { padding: 20px 28px; }
+      @page { margin: 0; size: A4 portrait; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="company">VOLTRAAK</div>
+      <div class="tagline">Inventory Management System</div>
+    </div>
+    <div class="header-right">
+      <div class="doc-type">PURCHASE ORDER</div>
+      <div class="po-number">${po.po_number}</div>
+    </div>
+  </div>
+
+  <!-- Meta row -->
+  <div class="meta-row">
+    <span class="badge-approved">Approved</span>
+    <span class="print-date">Printed: ${printedAt}</span>
+  </div>
+
+  <!-- PO Details -->
+  <div class="section-title">Purchase Order Details</div>
+  <div class="details-grid">
+    <div class="detail-item">
+      <div class="label">PO Number</div>
+      <div class="value">${po.po_number}</div>
+    </div>
+    <div class="detail-item">
+      <div class="label">Status</div>
+      <div class="value">Approved</div>
+    </div>
+    <div class="detail-item">
+      <div class="label">Supplier</div>
+      <div class="value">${po.supplier}</div>
+    </div>
+    <div class="detail-item">
+      <div class="label">Priority</div>
+      <div class="value">${capitalize(po.priority)}</div>
+    </div>
+    <div class="detail-item">
+      <div class="label">Requested By</div>
+      <div class="value">${po.requested_by}</div>
+    </div>
+    <div class="detail-item">
+      <div class="label">Total Items</div>
+      <div class="value">${po.items_count} item${po.items_count !== 1 ? 's' : ''}</div>
+    </div>
+    <div class="detail-item">
+      <div class="label">Date Requested</div>
+      <div class="value">${fmtDate(po.requested_at)}</div>
+    </div>
+    <div class="detail-item">
+      <div class="label">Total Amount</div>
+      <div class="value bold">${total}</div>
+    </div>
+  </div>
+
+  ${po.notes ? /* html */`
+  <!-- Notes -->
+  <div class="section-title">Notes</div>
+  <div class="notes-box">${po.notes}</div>
+  ` : ''}
+
+  <!-- Order Summary -->
+  <div class="section-title">Order Summary</div>
+  <table>
+    <thead>
+      <tr>
+        <th class="td-label">Description</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="td-label">PO Number</td>
+        <td>${po.po_number}</td>
+      </tr>
+      <tr>
+        <td class="td-label">Supplier</td>
+        <td>${po.supplier}</td>
+      </tr>
+      <tr>
+        <td class="td-label">Total Items</td>
+        <td>${po.items_count} item${po.items_count !== 1 ? 's' : ''}</td>
+      </tr>
+      <tr>
+        <td class="td-label">Avg. Unit Price</td>
+        <td>${avgUnit}</td>
+      </tr>
+      <tr class="total-row">
+        <td class="td-label">Total Amount</td>
+        <td>${total}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Signatures -->
+  <div class="section-title">Authorisation &amp; Signatures</div>
+  <div class="sig-row">
+    <div class="sig-box">
+      <div class="sig-role">Requested By</div>
+      <div class="sig-name">${po.requested_by}</div>
+      <div class="sig-line">Signature / Date</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-role">Approved By (Manager)</div>
+      <div class="sig-name">&nbsp;</div>
+      <div class="sig-line">Signature / Date</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span class="footer-label">System-generated document — Voltraak IMS</span>
+    <span class="footer-po">${po.po_number}</span>
+  </div>
+
+</body>
+</html>`
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
 
 /**
- * Builds and downloads a PDF for an approved purchase order.
- * @param {Object} po - Purchase order record from the data source
+ * Opens a dedicated print window for the given purchase order and triggers
+ * the browser's print dialog. Falls back gracefully if the popup is blocked.
+ *
+ * @param {Object} po - Purchase order object from the PO Approvals data source
  */
 export function printPOAsPdf(po) {
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const win = window.open('', '_blank', 'width=850,height=1100')
 
-  const pageW = doc.internal.pageSize.getWidth()
-  const margin = 20
-
-  // ── Header bar ────────────────────────────────────────────────────────────
-  doc.setFillColor(30, 30, 30)
-  doc.rect(0, 0, pageW, 28, 'F')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
-  doc.setTextColor(255, 255, 255)
-  doc.text('VOLTRAAK', margin, 17)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(200, 200, 200)
-  doc.text('Inventory Management System', margin, 23)
-
-  // PO title (right-aligned in header)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(13)
-  doc.setTextColor(255, 255, 255)
-  doc.text('PURCHASE ORDER', pageW - margin, 17, { align: 'right' })
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(10)
-  doc.setTextColor(200, 200, 200)
-  doc.text(po.po_number, pageW - margin, 23, { align: 'right' })
-
-  // ── Approved stamp ────────────────────────────────────────────────────────
-  const stampY = 35
-  doc.setFillColor(220, 252, 231)      // light green bg
-  doc.setDrawColor(34, 197, 94)        // green border
-  doc.setLineWidth(0.5)
-  doc.roundedRect(margin, stampY, 55, 10, 2, 2, 'FD')
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  doc.setTextColor(21, 128, 61)
-  doc.text('✓  APPROVED', margin + 4, stampY + 6.5)
-
-  // Print date (right side of stamp row)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(100, 100, 100)
-  doc.text(`Printed: ${new Date().toLocaleString()}`, pageW - margin, stampY + 6.5, { align: 'right' })
-
-  // ── Section: PO Details ───────────────────────────────────────────────────
-  const detailsY = 55
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(30, 30, 30)
-  doc.text('Purchase Order Details', margin, detailsY)
-
-  // Divider line under section title
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.line(margin, detailsY + 2, pageW - margin, detailsY + 2)
-
-  // Two-column info grid
-  const col1X = margin
-  const col2X = pageW / 2 + 5
-  const rowH = 7
-  let infoY = detailsY + 9
-
-  const leftFields = [
-    ['PO Number', po.po_number],
-    ['Supplier', po.supplier],
-    ['Requested By', po.requested_by],
-    ['Date Requested', new Date(po.requested_at).toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' })],
-  ]
-
-  const rightFields = [
-    ['Status', 'Approved'],
-    ['Priority', po.priority.charAt(0).toUpperCase() + po.priority.slice(1)],
-    ['Total Items', `${po.items_count} item${po.items_count !== 1 ? 's' : ''}`],
-    ['Total Amount', `₱${po.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-  ]
-
-  leftFields.forEach(([label, value], i) => {
-    const y = infoY + i * rowH
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(120, 120, 120)
-    doc.text(label, col1X, y)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(30, 30, 30)
-    doc.text(String(value), col1X, y + 4)
-  })
-
-  rightFields.forEach(([label, value], i) => {
-    const y = infoY + i * rowH
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(120, 120, 120)
-    doc.text(label, col2X, y)
-
-    // Highlight Total Amount value
-    if (label === 'Total Amount') {
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(10)
-      doc.setTextColor(30, 30, 30)
-    } else {
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(9)
-      doc.setTextColor(30, 30, 30)
-    }
-    doc.text(String(value), col2X, y + 4)
-  })
-
-  // ── Notes section ─────────────────────────────────────────────────────────
-  const notesY = infoY + leftFields.length * rowH + 6
-
-  if (po.notes) {
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(10)
-    doc.setTextColor(30, 30, 30)
-    doc.text('Notes', margin, notesY)
-
-    doc.setDrawColor(200, 200, 200)
-    doc.setLineWidth(0.3)
-    doc.line(margin, notesY + 2, pageW - margin, notesY + 2)
-
-    doc.setFillColor(248, 249, 250)
-    doc.roundedRect(margin, notesY + 4, pageW - margin * 2, 12, 2, 2, 'F')
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(60, 60, 60)
-    doc.text(po.notes, margin + 4, notesY + 11, {
-      maxWidth: pageW - margin * 2 - 8,
-    })
+  if (!win) {
+    throw new Error('Print window was blocked. Please allow pop-ups for this site and try again.')
   }
 
-  // ── Items summary table ───────────────────────────────────────────────────
-  const tableStartY = po.notes ? notesY + 22 : notesY
+  win.document.write(buildPrintHTML(po))
+  win.document.close()
 
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(30, 30, 30)
-  doc.text('Order Summary', margin, tableStartY)
-
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.line(margin, tableStartY + 2, pageW - margin, tableStartY + 2)
-
-  // Summary table row
-  autoTable(doc, {
-    startY: tableStartY + 6,
-    margin: { left: margin, right: margin },
-    head: [['Field', 'Value']],
-    body: [
-      ['PO Number', po.po_number],
-      ['Supplier', po.supplier],
-      ['Total Items', `${po.items_count} item${po.items_count !== 1 ? 's' : ''}`],
-      ['Unit Price (avg)', `₱${(po.total_amount / po.items_count).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-      ['Total Amount', `₱${po.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-    ],
-    headStyles: {
-      fillColor: [30, 30, 30],
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 9,
-    },
-    bodyStyles: {
-      fontSize: 9,
-      textColor: [40, 40, 40],
-    },
-    alternateRowStyles: {
-      fillColor: [248, 249, 250],
-    },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 60 },
-      1: { cellWidth: 'auto' },
-    },
-    // Bold the total row
-    didParseCell(data) {
-      if (data.row.index === 4 && data.section === 'body') {
-        data.cell.styles.fontStyle = 'bold'
-        data.cell.styles.fontSize = 10
-      }
-    },
-  })
-
-  // ── Approval signatures section ───────────────────────────────────────────
-  const sigY = doc.lastAutoTable.finalY + 16
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(30, 30, 30)
-  doc.text('Approvals & Signatures', margin, sigY)
-
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.line(margin, sigY + 2, pageW - margin, sigY + 2)
-
-  const sigBoxW = (pageW - margin * 2 - 10) / 2
-  const sigBoxH = 24
-  const sigBoxY = sigY + 8
-
-  // Left box: Requested By
-  doc.setDrawColor(180, 180, 180)
-  doc.setLineWidth(0.3)
-  doc.rect(margin, sigBoxY, sigBoxW, sigBoxH)
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(100, 100, 100)
-  doc.text('Requested By', margin + 4, sigBoxY + 5)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(30, 30, 30)
-  doc.text(po.requested_by, margin + 4, sigBoxY + 13)
-
-  doc.setDrawColor(150, 150, 150)
-  doc.setLineWidth(0.3)
-  doc.line(margin + 4, sigBoxY + sigBoxH - 4, margin + sigBoxW - 4, sigBoxY + sigBoxH - 4)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(130, 130, 130)
-  doc.text('Signature / Date', margin + 4, sigBoxY + sigBoxH - 1)
-
-  // Right box: Approved By
-  const rightBoxX = margin + sigBoxW + 10
-  doc.setDrawColor(34, 197, 94)
-  doc.setLineWidth(0.5)
-  doc.rect(rightBoxX, sigBoxY, sigBoxW, sigBoxH)
-
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(21, 128, 61)
-  doc.text('Approved By (Manager)', rightBoxX + 4, sigBoxY + 5)
-
-  doc.setDrawColor(150, 150, 150)
-  doc.setLineWidth(0.3)
-  doc.line(rightBoxX + 4, sigBoxY + sigBoxH - 4, rightBoxX + sigBoxW - 4, sigBoxY + sigBoxH - 4)
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7)
-  doc.setTextColor(130, 130, 130)
-  doc.text('Signature / Date', rightBoxX + 4, sigBoxY + sigBoxH - 1)
-
-  // ── Footer ────────────────────────────────────────────────────────────────
-  const footerY = doc.internal.pageSize.getHeight() - 12
-
-  doc.setDrawColor(200, 200, 200)
-  doc.setLineWidth(0.3)
-  doc.line(margin, footerY - 3, pageW - margin, footerY - 3)
-
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(130, 130, 130)
-  doc.text('This is a system-generated purchase order printout from Voltraak IMS.', margin, footerY)
-  doc.text(`Page 1 of 1  ·  ${po.po_number}`, pageW - margin, footerY, { align: 'right' })
-
-  // ── Save ──────────────────────────────────────────────────────────────────
-  doc.save(`${po.po_number}-approved.pdf`)
+  // Wait for resources (fonts, etc.) to load before triggering print
+  win.onload = () => {
+    win.focus()
+    win.print()
+    // Close the helper window after the user dismisses the print dialog
+    win.onafterprint = () => win.close()
+  }
 }
