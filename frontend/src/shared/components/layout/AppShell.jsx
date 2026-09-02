@@ -104,13 +104,37 @@ export default function AppShell({ children }) {
             )}
 
             {/* Top half — Alerts */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-4 border-b border-[var(--color-glass-border)]">
-              <AlertsPanel />
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden border-b border-[var(--color-glass-border)]">
+              {/* Sticky header */}
+              <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--color-glass-border)]"
+                style={{ background: 'var(--color-glass-panel)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
+                    Alerts
+                  </span>
+                </div>
+              </div>
+              {/* Scrollable list */}
+              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-4">
+                <AlertsPanel hideHeader />
+              </div>
             </div>
 
             {/* Bottom half — Recent Activity */}
-            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-4">
-              <RecentActivity compact />
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {/* Sticky header */}
+              <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-[var(--color-glass-border)]"
+                style={{ background: 'var(--color-glass-panel)' }}
+              >
+                <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
+                  Recent Activity
+                </span>
+              </div>
+              {/* Scrollable list */}
+              <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-4">
+                <RecentActivity compact hideHeader />
+              </div>
             </div>
           </aside>
 

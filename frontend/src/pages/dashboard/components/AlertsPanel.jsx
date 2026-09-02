@@ -355,7 +355,7 @@ const ALERT_BUILDERS = {
   admin: buildAdminAlerts,
 }
 
-export default function AlertsPanel() {
+export default function AlertsPanel({ hideHeader = false }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const role = user?.role
@@ -386,25 +386,27 @@ export default function AlertsPanel() {
 
   return (
     <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between px-0.5">
-        <div className="flex items-center gap-2">
-          <BellRing className="h-4 w-4 text-[var(--color-text-secondary)]" />
-          <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
-            Alerts
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {criticalCount > 0 && (
-            <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">
-              {criticalCount}
+      {/* Header — hidden when parent renders its own sticky header */}
+      {!hideHeader && (
+        <div className="flex items-center justify-between px-0.5">
+          <div className="flex items-center gap-2">
+            <BellRing className="h-4 w-4 text-[var(--color-text-secondary)]" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
+              Alerts
             </span>
-          )}
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {alerts.length} active
-          </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {criticalCount > 0 && (
+              <span className="inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold bg-red-500 text-white leading-none">
+                {criticalCount}
+              </span>
+            )}
+            <span className="text-[11px] text-[var(--color-text-muted)]">
+              {alerts.length} active
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Alert list */}
       {alerts.length > 0 ? (

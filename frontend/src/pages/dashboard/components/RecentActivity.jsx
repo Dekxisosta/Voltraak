@@ -82,22 +82,24 @@ const colorClasses = {
   },
 }
 
-export default function RecentActivity({ compact = false }) {
+export default function RecentActivity({ compact = false, hideHeader = false }) {
   if (compact) {
     return (
       <div className="space-y-3">
-        {/* Header — matches AlertsPanel style */}
-        <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-[var(--color-text-secondary)]" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
-              Recent Activity
+        {/* Header — hidden when parent renders its own sticky header */}
+        {!hideHeader && (
+          <div className="flex items-center justify-between px-0.5">
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-[var(--color-text-secondary)]" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
+                Recent Activity
+              </span>
+            </div>
+            <span className="text-[11px] text-[var(--color-text-muted)]">
+              {mockActivity.length} events
             </span>
           </div>
-          <span className="text-[11px] text-[var(--color-text-muted)]">
-            {mockActivity.length} events
-          </span>
-        </div>
+        )}
 
         {/* Compact list */}
         <div className="space-y-1.5">
