@@ -2,6 +2,19 @@
 
 **WalangBrownout Appliances**
 
+![Status](https://img.shields.io/badge/status-in%20development-orange?style=flat-square)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
+![Vite](https://img.shields.io/badge/Vite-5-646CFF?style=flat-square&logo=vite&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/Tailwind%20CSS-3-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![React Router](https://img.shields.io/badge/React%20Router-v6-CA4245?style=flat-square&logo=reactrouter&logoColor=white)
+![Recharts](https://img.shields.io/badge/Recharts-2-22B5BF?style=flat-square)
+![Lucide](https://img.shields.io/badge/Lucide%20React-0.294-F56565?style=flat-square)
+![Laravel](https://img.shields.io/badge/Laravel-PHP-FF2D20?style=flat-square&logo=laravel&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-1-6E9F18?style=flat-square&logo=vitest&logoColor=white)
+![ESLint](https://img.shields.io/badge/ESLint-8-4B32C3?style=flat-square&logo=eslint&logoColor=white)
+
 Real-time inventory management, stock reconciliation, and FEFO-enforced batch tracking — built to replace a manually maintained spreadsheet that could no longer support a 35% year-over-year sales growth curve.
 
 ---
