@@ -21,6 +21,7 @@ export default function POApprovalsPage() {
   const highlightRowId = useHighlightParam()
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejecting, setRejecting] = useState(false)
+  const [approvingId, setApprovingId] = useState(null)
 
   useEffect(() => {
     loadPurchaseOrders()
@@ -38,12 +39,15 @@ export default function POApprovalsPage() {
   }
 
   const handleApprove = async (po) => {
+    setApprovingId(po.id)
     try {
       await poApprovalsSource.update(po.id, { status: 'approved' })
       addNotification({ type: 'success', title: 'PO Approved', message: `${po.po_number} approved - ₱${po.total_amount.toLocaleString()} to ${po.supplier}` })
       loadPurchaseOrders()
     } catch (error) {
       addNotification({ type: 'error', title: 'Error', message: `Failed to approve ${po.po_number}` })
+    } finally {
+      setApprovingId(null)
     }
   }
 
@@ -108,8 +112,8 @@ export default function POApprovalsPage() {
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'actions', label: 'Actions', render: (_, row) => row.status === 'pending' ? (
       <div className="flex space-x-2">
-        <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => handleApprove(row)}>Approve</Button>
-        <Button size="sm" variant="danger" icon={XCircle} onClick={() => setRejectTarget(row)}>Reject</Button>
+        <Button size="sm" variant="primary" icon={CheckCircle} loading={approvingId === row.id} disabled={approvingId === row.id || rejecting} onClick={() => handleApprove(row)}>Approve</Button>
+        <Button size="sm" variant="danger" icon={XCircle} disabled={approvingId === row.id || rejecting} onClick={() => setRejectTarget(row)}>Reject</Button>
       </div>
     ) : null },
   ]

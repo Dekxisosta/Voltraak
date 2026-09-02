@@ -27,6 +27,7 @@ export default function AdjustmentApprovalsPage() {
   const highlightRowId = useHighlightParam()
   const [rejectTarget, setRejectTarget] = useState(null)
   const [rejecting, setRejecting] = useState(false)
+  const [approvingId, setApprovingId] = useState(null)
 
   useEffect(() => {
     loadDiscrepancies()
@@ -47,6 +48,7 @@ export default function AdjustmentApprovalsPage() {
   }
 
   const handleApprove = async (disc) => {
+    setApprovingId(disc.id)
     try {
       await discrepanciesSource.update(disc.id, {
         approval_status: 'approved',
@@ -57,6 +59,8 @@ export default function AdjustmentApprovalsPage() {
       loadDiscrepancies()
     } catch (error) {
       addNotification({ type: 'error', title: 'Error', message: `Failed to approve ${disc.report_number}` })
+    } finally {
+      setApprovingId(null)
     }
   }
 
@@ -128,8 +132,8 @@ export default function AdjustmentApprovalsPage() {
       label: 'Actions',
       render: (_, row) => row.approval_status === 'pending' ? (
         <div className="flex space-x-2">
-          <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => handleApprove(row)}>Approve</Button>
-          <Button size="sm" variant="danger" icon={XCircle} onClick={() => setRejectTarget(row)}>Reject</Button>
+          <Button size="sm" variant="primary" icon={CheckCircle} loading={approvingId === row.id} disabled={approvingId === row.id || rejecting} onClick={() => handleApprove(row)}>Approve</Button>
+          <Button size="sm" variant="danger" icon={XCircle} disabled={approvingId === row.id || rejecting} onClick={() => setRejectTarget(row)}>Reject</Button>
         </div>
       ) : null
     },

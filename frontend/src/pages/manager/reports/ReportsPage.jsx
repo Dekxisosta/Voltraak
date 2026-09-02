@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { BarChart3, Download, DollarSign, Package, TrendingUp } from 'lucide-react'
-import { Card, LoadingSpinner } from '@/shared/components/common'
+import { Card, LoadingSpinner, Button } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { fetchData } from '@/shared/services/dataSource'

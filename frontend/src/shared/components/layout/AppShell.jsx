@@ -5,8 +5,6 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
-import NotificationContainer from '../common/NotificationContainer'
-
 export default function AppShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -48,8 +46,6 @@ export default function AppShell({ children }) {
         </main>
       </div>
 
-      {/* Notification container */}
-      <NotificationContainer />
     </div>
   )
 }

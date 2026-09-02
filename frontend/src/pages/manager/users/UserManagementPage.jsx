@@ -41,6 +41,9 @@ export default function UserManagementPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  // Per-row toggle active/inactive pending state
+  const [togglingId, setTogglingId] = useState(null)
+
   useEffect(() => {
     loadUsers()
   }, [])
@@ -59,13 +62,18 @@ export default function UserManagementPage() {
     }
   }
 
-  const handleToggleActive = (user) => {
-    const action = user.is_active ? 'deactivated' : 'activated'
-    setData(prev => ({
-      ...prev,
-      users: prev.users.map(u => u.id === user.id ? { ...u, is_active: !u.is_active } : u)
-    }))
-    addNotification({ type: 'success', title: `User ${action}`, message: `${user.name} has been ${action}` })
+  const handleToggleActive = async (user) => {
+    setTogglingId(user.id)
+    try {
+      const action = user.is_active ? 'deactivated' : 'activated'
+      setData(prev => ({
+        ...prev,
+        users: prev.users.map(u => u.id === user.id ? { ...u, is_active: !u.is_active } : u)
+      }))
+      addNotification({ type: 'success', title: `User ${action}`, message: `${user.name} has been ${action}` })
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   const openAddModal = () => {
@@ -171,11 +179,11 @@ export default function UserManagementPage() {
     { key: 'last_login', label: 'Last Login', render: (val) => val ? new Date(val).toLocaleString() : 'Never' },
     { key: 'actions', label: 'Actions', render: (_, row) => (
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="secondary" icon={Edit} onClick={() => openEditModal(row)}>Edit</Button>
-        <Button size="sm" variant={row.is_active ? 'danger' : 'primary'} icon={row.is_active ? UserX : UserCheck} onClick={() => handleToggleActive(row)}>
+        <Button size="sm" variant="secondary" icon={Edit} disabled={togglingId === row.id || deleting} onClick={() => openEditModal(row)}>Edit</Button>
+        <Button size="sm" variant={row.is_active ? 'danger' : 'primary'} icon={row.is_active ? UserX : UserCheck} loading={togglingId === row.id} disabled={togglingId === row.id || deleting} onClick={() => handleToggleActive(row)}>
           {row.is_active ? 'Deactivate' : 'Activate'}
         </Button>
-        <Button size="sm" variant="danger" icon={Trash2} onClick={() => setDeleteTarget(row)}>Delete</Button>
+        <Button size="sm" variant="danger" icon={Trash2} disabled={togglingId === row.id || deleting} onClick={() => setDeleteTarget(row)}>Delete</Button>
       </div>
     )},
   ]
