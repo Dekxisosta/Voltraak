@@ -61,6 +61,19 @@ const ROLE_SOURCES = {
     poApprovals: poApprovalsSource,
     discrepancies: discrepanciesSource,
   },
+  // Admin can reach every section, so its alerts are the union of all
+  // three role's sources above.
+  admin: {
+    fefo: fefoSource,
+    picking: pickingSource,
+    stockLevels: stockLevelsSource,
+    expiryBatches: expiryBatchesSource,
+    damageReports: damageReportsSource,
+    reservations: reservationsSource,
+    discrepancies: discrepanciesSource,
+    lowStock: lowStockSource,
+    poApprovals: poApprovalsSource,
+  },
 }
 
 const alertTypeStyles = {
@@ -331,10 +344,24 @@ function buildManagerAlerts({ lowStock = [], poApprovals = [], discrepancies = [
   return alerts
 }
 
+/**
+ * Admin sees the union of every role's alerts, since admin can reach
+ * every section — this is what makes the app's alerting "showcase all
+ * features" for that role.
+ */
+function buildAdminAlerts(data) {
+  return [
+    ...buildWarehouseAlerts(data),
+    ...buildInventoryAlerts(data),
+    ...buildManagerAlerts(data),
+  ]
+}
+
 const ALERT_BUILDERS = {
   warehouse: buildWarehouseAlerts,
   inventory_staff: buildInventoryAlerts,
   manager: buildManagerAlerts,
+  admin: buildAdminAlerts,
 }
 
 export default function AlertsPanel() {

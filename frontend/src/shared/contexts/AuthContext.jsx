@@ -146,6 +146,8 @@ export function AuthProvider({ children }) {
         return '/inventory?tab=stock-in-out'
       case 'manager':
         return '/manager?tab=kpi'
+      case 'admin':
+        return '/dashboard'
       default:
         return '/dashboard'
     }

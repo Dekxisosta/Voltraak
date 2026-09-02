@@ -1,19 +1,24 @@
 /**
- * Manager dashboard
- * Business-level KPIs plus quick redirects into manager-exclusive tabs
- * (KPI, forecast, reports, low stock, PO approvals, users). Manager is
- * scoped to these manager-only tabs — see AdminDashboard for a dashboard
- * that also oversees the warehouse/inventory sections.
+ * Admin dashboard
+ * Admin has access to every route in the app (manager + inventory +
+ * warehouse), so this dashboard surfaces business KPIs plus quick
+ * redirects into all three sections at once, to showcase every feature.
  */
 
 import { useEffect, useState } from 'react'
 import {
+  ShieldCheck,
   TrendingUp,
   FileBarChart,
   BarChart3,
   AlertCircle,
   ShoppingCart,
   Users,
+  ClipboardCheck,
+  Truck,
+  Package,
+  Calendar,
+  ArrowUpDown,
 } from 'lucide-react'
 import { formatCompactCurrency, formatCompactNumber } from '@/shared/utils'
 import { createResourceDataSource } from '@/shared/services/dataSource'
@@ -21,20 +26,20 @@ import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
 import AlertsPanel from './components/AlertsPanel'
 
-// Same source POApprovalsPage.jsx reads/writes — subscribing here means an
-// approve/reject on that page updates this card immediately, without a
-// dashboard reload.
+// Same sources the manager/warehouse/inventory dashboards subscribe to —
+// keeps this overview live with mutations made anywhere in the app.
 const poApprovalsSource = createResourceDataSource('manager/po-approvals')
+const discrepanciesSource = createResourceDataSource('inventory/discrepancies')
 
-function buildStats(poOrders) {
+function buildStats(poOrders, discrepancies) {
   const pending = poOrders.filter((o) => o.status === 'pending')
-  const highValuePending = pending.filter((o) => o.total_amount > 50000)
+  const openDiscrepancies = discrepancies.filter((d) => d.status === 'open' || d.status === 'investigating')
 
   return [
     {
       title: 'Pending PO Approvals',
       value: formatCompactNumber(pending.length),
-      change: `${highValuePending.length} over ₱50,000`,
+      change: 'across all suppliers',
       changeType: 'neutral',
       icon: ShoppingCart,
       color: 'purple',
@@ -48,20 +53,20 @@ function buildStats(poOrders) {
       color: 'green',
     },
     {
-      title: 'Cost Savings',
-      value: formatCompactCurrency(8250),
-      change: 'from reorder optimization',
-      changeType: 'increase',
-      icon: FileBarChart,
-      color: 'blue',
-    },
-    {
-      title: 'Low Stock Items',
-      value: formatCompactNumber(23),
-      change: 'across all warehouses',
+      title: 'Open Discrepancies',
+      value: formatCompactNumber(openDiscrepancies.length),
+      change: 'inventory + warehouse',
       changeType: 'decrease',
       icon: AlertCircle,
       color: 'red',
+    },
+    {
+      title: 'Active Picks',
+      value: formatCompactNumber(12),
+      change: '4 ready to pack',
+      changeType: 'neutral',
+      icon: Package,
+      color: 'blue',
     },
   ]
 }
@@ -108,12 +113,82 @@ const managerRedirectItems = [
     color: 'amber',
   },
   {
+    label: 'Adjustment Approvals',
+    description: 'Review stock adjustment requests',
+    basePath: '/manager',
+    tab: 'adjustment-approvals',
+    icon: ClipboardCheck,
+    color: 'purple',
+  },
+  {
     label: 'User Management',
     description: 'Manage staff accounts and roles',
     basePath: '/manager',
     tab: 'users',
     icon: Users,
     color: 'blue',
+  },
+]
+
+const inventoryRedirectItems = [
+  {
+    label: 'Stock In/Out',
+    description: 'Record inventory movement',
+    basePath: '/inventory',
+    tab: 'stock-in-out',
+    icon: ArrowUpDown,
+    color: 'blue',
+  },
+  {
+    label: 'Stock Levels',
+    description: 'Check current on-hand quantities',
+    basePath: '/inventory',
+    tab: 'stock-levels',
+    icon: BarChart3,
+    color: 'green',
+  },
+  {
+    label: 'Item Updates',
+    description: 'Edit product details and attributes',
+    basePath: '/inventory',
+    tab: 'item-update',
+    icon: Package,
+    color: 'purple',
+  },
+  {
+    label: 'Discrepancies',
+    description: 'Investigate and resolve count mismatches',
+    basePath: '/inventory',
+    tab: 'discrepancies',
+    icon: AlertCircle,
+    color: 'red',
+  },
+]
+
+const warehouseRedirectItems = [
+  {
+    label: 'Receiving',
+    description: 'Log incoming shipments',
+    basePath: '/warehouse',
+    tab: 'receiving',
+    icon: Truck,
+    color: 'blue',
+  },
+  {
+    label: 'Picking Lists',
+    description: 'Fulfill outbound orders',
+    basePath: '/warehouse',
+    tab: 'picking',
+    icon: Package,
+    color: 'green',
+  },
+  {
+    label: 'FEFO Management',
+    description: 'Prioritize soon-to-expire batches',
+    basePath: '/warehouse',
+    tab: 'fefo',
+    icon: Calendar,
+    color: 'yellow',
   },
 ]
 
@@ -125,18 +200,30 @@ const colorClasses = {
   purple: { bg: 'bg-gray-100 dark:bg-gray-800', icon: 'text-gray-600 dark:text-gray-400', border: 'border-gray-200 dark:border-gray-700' },
 }
 
-export default function ManagerDashboard() {
+export default function AdminDashboard() {
   const [poOrders, setPoOrders] = useState([])
+  const [discrepancies, setDiscrepancies] = useState([])
 
   useEffect(() => {
-    return poApprovalsSource.subscribe(setPoOrders)
+    const unsubscribers = [
+      poApprovalsSource.subscribe(setPoOrders),
+      discrepanciesSource.subscribe(setDiscrepancies),
+    ]
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
   }, [])
 
-  const stats = buildStats(poOrders)
+  const stats = buildStats(poOrders, discrepancies)
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       <div className="lg:col-span-8 space-y-6">
+        <div className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
+          <ShieldCheck className="h-5 w-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            You're signed in as an administrator — every section of Voltraak is available below.
+          </p>
+        </div>
+
         <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map((stat) => (
             <StatCard key={stat.title} stat={stat} />
@@ -144,6 +231,8 @@ export default function ManagerDashboard() {
         </div>
 
         <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
+        <QuickRedirects title="Inventory Tabs" items={inventoryRedirectItems} />
+        <QuickRedirects title="Warehouse Tabs" items={warehouseRedirectItems} />
 
         <RecentActivity />
       </div>

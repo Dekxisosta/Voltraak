@@ -83,6 +83,7 @@ export function RoleSelect({
     { label: 'Warehouse Staff', value: 'warehouse' },
     { label: 'Inventory Staff', value: 'inventory_staff' },
     { label: 'Manager', value: 'manager' },
+    { label: 'Administrator', value: 'admin' },
   ]
 
   return <Select options={options} {...props} />

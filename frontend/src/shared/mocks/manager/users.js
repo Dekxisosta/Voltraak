@@ -5,7 +5,7 @@
 import { validateMockData } from '../validate'
 
 export const mockUsers = [
-  { id: 1, name: 'System Administrator', email: 'admin@voltraak.com', role: 'manager', role_display: 'Manager', is_active: true, last_login: '2024-08-14T10:30:00Z', created_at: '2024-01-01' },
+  { id: 1, name: 'System Administrator', email: 'admin@voltraak.com', role: 'admin', role_display: 'Administrator', is_active: true, last_login: '2024-08-14T10:30:00Z', created_at: '2024-01-01' },
   { id: 2, name: 'Store Manager', email: 'manager@voltraak.com', role: 'manager', role_display: 'Manager', is_active: true, last_login: '2024-08-14T09:15:00Z', created_at: '2024-01-01' },
   { id: 3, name: 'Inventory Staff', email: 'inventory@voltraak.com', role: 'inventory_staff', role_display: 'Inventory Staff', is_active: true, last_login: '2024-08-14T08:00:00Z', created_at: '2024-02-15' },
   { id: 4, name: 'Warehouse Staff', email: 'warehouse@voltraak.com', role: 'warehouse', role_display: 'Warehouse Staff', is_active: true, last_login: '2024-08-14T07:30:00Z', created_at: '2024-02-15' },

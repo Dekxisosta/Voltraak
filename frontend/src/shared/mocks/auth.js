@@ -13,8 +13,8 @@
  *     mock.<userId>.<issuedAtMs>.<random>
  *
  * Demo credentials (all use the same password so they're easy to remember):
- *   admin@voltraak.com     / password123   (manager)
- *   manager@voltraak.com   / password123   (manager)
+ *   admin@voltraak.com     / password123   (admin — full access, every section)
+ *   manager@voltraak.com   / password123   (manager — manager-only tabs)
  *   inventory@voltraak.com / password123   (inventory_staff)
  *   warehouse@voltraak.com / password123   (warehouse)
  */
@@ -60,11 +60,11 @@ function writeProfileOverrides(overrides) {
 const mockAccounts = [
   {
     id: 1,
-    name: 'System Administrator',
-    email: 'admin@voltraak.com',
+    name: 'Himmel - Administrator',
+    email: 'himmel@voltraak.com',
     password: DEMO_PASSWORD,
-    role: 'manager',
-    role_display: 'Manager',
+    role: 'admin',
+    role_display: 'Administrator',
     permissions: ['*'],
     is_active: true,
     last_login: '2024-08-14T10:30:00Z',
@@ -72,8 +72,8 @@ const mockAccounts = [
   },
   {
     id: 2,
-    name: 'Store Manager',
-    email: 'manager@voltraak.com',
+    name: 'Fern - Manager',
+    email: 'fern@voltraak.com',
     password: DEMO_PASSWORD,
     role: 'manager',
     role_display: 'Manager',
@@ -84,8 +84,8 @@ const mockAccounts = [
   },
   {
     id: 3,
-    name: 'Inventory Staff',
-    email: 'inventory@voltraak.com',
+    name: 'Stark - Inventory Staff',
+    email: 'stark@voltraak.com',
     password: DEMO_PASSWORD,
     role: 'inventory_staff',
     role_display: 'Inventory Staff',
@@ -96,8 +96,8 @@ const mockAccounts = [
   },
   {
     id: 4,
-    name: 'Warehouse Staff',
-    email: 'warehouse@voltraak.com',
+    name: 'Übel - Warehouse Staff',
+    email: 'ubel@voltraak.com',
     password: DEMO_PASSWORD,
     role: 'warehouse',
     role_display: 'Warehouse Staff',

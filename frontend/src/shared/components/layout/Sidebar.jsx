@@ -27,6 +27,148 @@ import PreferencesModal from '../common/PreferencesModal'
 
 
 // Role-based navigation configuration
+//
+// Roles:
+//   warehouse        - warehouse tabs only
+//   inventory_staff   - inventory tabs only
+//   manager           - manager-exclusive tabs only (KPI, forecast, reports,
+//                       low-stock, approvals, users) — no operational tabs
+//   admin             - every tab in the app, to showcase all features
+const warehouseNavItems = [
+  {
+    label: 'Receiving',
+    basePath: '/warehouse',
+    tab: 'receiving',
+    icon: Truck,
+    roles: ['warehouse', 'admin'],
+  },
+  {
+    label: 'Picking Lists',
+    basePath: '/warehouse',
+    tab: 'picking',
+    icon: Package,
+    roles: ['warehouse', 'admin'],
+  },
+  {
+    label: 'FEFO Management',
+    basePath: '/warehouse',
+    tab: 'fefo',
+    icon: Calendar,
+    roles: ['warehouse', 'admin'],
+  },
+  {
+    label: 'Report Discrepancy',
+    basePath: '/warehouse',
+    tab: 'report-discrepancy',
+    icon: AlertCircle,
+    roles: ['warehouse', 'admin'],
+  },
+]
+
+const inventoryNavItems = [
+  {
+    label: 'Stock In/Out',
+    basePath: '/inventory',
+    tab: 'stock-in-out',
+    icon: ArrowUpDown,
+    roles: ['inventory_staff', 'admin'],
+  },
+  {
+    label: 'Stock Levels',
+    basePath: '/inventory',
+    tab: 'stock-levels',
+    icon: BarChart3,
+    roles: ['inventory_staff', 'admin'],
+  },
+  {
+    label: 'Damage Reports',
+    basePath: '/inventory',
+    tab: 'damage-report',
+    icon: AlertCircle,
+    roles: ['inventory_staff', 'admin'],
+  },
+  {
+    label: 'Item Updates',
+    basePath: '/inventory',
+    tab: 'item-update',
+    icon: Package,
+    roles: ['inventory_staff', 'admin'],
+  },
+  {
+    label: 'Reservations',
+    basePath: '/inventory',
+    tab: 'reservations',
+    icon: Package,
+    roles: ['inventory_staff', 'admin'],
+  },
+  {
+    label: 'Expiry Alerts',
+    basePath: '/inventory',
+    tab: 'expiry-alerts',
+    icon: Calendar,
+    roles: ['inventory_staff', 'admin'],
+  },
+  {
+    label: 'Discrepancies',
+    basePath: '/inventory',
+    tab: 'discrepancies',
+    icon: AlertCircle,
+    roles: ['inventory_staff', 'admin'],
+  },
+]
+
+const managerNavItems = [
+  {
+    label: 'KPI Dashboard',
+    basePath: '/manager',
+    tab: 'kpi',
+    icon: TrendingUp,
+    roles: ['manager', 'admin'],
+  },
+  {
+    label: 'Forecast Reports',
+    basePath: '/manager',
+    tab: 'forecast',
+    icon: FileBarChart,
+    roles: ['manager', 'admin'],
+  },
+  {
+    label: 'Inventory Reports',
+    basePath: '/manager',
+    tab: 'reports',
+    icon: BarChart3,
+    roles: ['manager', 'admin'],
+  },
+  {
+    label: 'Low Stock Alerts',
+    basePath: '/manager',
+    tab: 'low-stock',
+    icon: AlertCircle,
+    roles: ['manager', 'admin'],
+  },
+  {
+    label: 'PO Approvals',
+    basePath: '/manager',
+    tab: 'po-approvals',
+    icon: ShoppingCart,
+    roles: ['manager', 'admin'],
+  },
+  {
+    label: 'Adjustment Approvals',
+    basePath: '/manager',
+    tab: 'adjustment-approvals',
+    icon: ClipboardCheck,
+    roles: ['manager', 'admin'],
+  },
+  {
+    label: 'User Management',
+    basePath: '/manager',
+    tab: 'users',
+    icon: Users,
+    roles: ['manager', 'admin'],
+  },
+]
+
 const getNavigationByRole = (role) => {
   const baseNavigation = [
     {
@@ -37,227 +179,21 @@ const getNavigationByRole = (role) => {
   ]
 
   if (role === 'warehouse') {
-    return [
-      ...baseNavigation,
-      {
-        label: 'Receiving',
-        basePath: '/warehouse',
-        tab: 'receiving',
-        icon: Truck,
-        roles: ['warehouse', 'manager'],
-      },
-      {
-        label: 'Picking Lists',
-        basePath: '/warehouse',
-        tab: 'picking',
-        icon: Package,
-        roles: ['warehouse', 'manager'],
-      },
-      {
-        label: 'FEFO Management',
-        basePath: '/warehouse',
-        tab: 'fefo',
-        icon: Calendar,
-        roles: ['warehouse', 'manager'],
-      },
-      {
-        label: 'Report Discrepancy',
-        basePath: '/warehouse',
-        tab: 'report-discrepancy',
-        icon: AlertCircle,
-        roles: ['warehouse', 'manager'],
-      },
-    ]
+    return [...baseNavigation, ...warehouseNavItems]
   }
 
   if (role === 'inventory_staff') {
-    return [
-      ...baseNavigation,
-      {
-        label: 'Stock In/Out',
-        basePath: '/inventory',
-        tab: 'stock-in-out',
-        icon: ArrowUpDown,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Stock Levels',
-        basePath: '/inventory',
-        tab: 'stock-levels',
-        icon: BarChart3,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Damage Reports',
-        basePath: '/inventory',
-        tab: 'damage-report',
-        icon: AlertCircle,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Item Updates',
-        basePath: '/inventory',
-        tab: 'item-update',
-        icon: Package,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Reservations',
-        basePath: '/inventory',
-        tab: 'reservations',
-        icon: Package,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Expiry Alerts',
-        basePath: '/inventory',
-        tab: 'expiry-alerts',
-        icon: Calendar,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Discrepancies',
-        basePath: '/inventory',
-        tab: 'discrepancies',
-        icon: AlertCircle,
-        roles: ['inventory_staff', 'manager'],
-      },
-    ]
+    return [...baseNavigation, ...inventoryNavItems]
   }
 
   if (role === 'manager') {
-    return [
-      ...baseNavigation,
-      // Manager-exclusive tabs come first
-      {
-        label: 'KPI Dashboard',
-        basePath: '/manager',
-        tab: 'kpi',
-        icon: TrendingUp,
-        roles: ['manager'],
-      },
-      {
-        label: 'Forecast Reports',
-        basePath: '/manager',
-        tab: 'forecast',
-        icon: FileBarChart,
-        roles: ['manager'],
-      },
-      {
-        label: 'Inventory Reports',
-        basePath: '/manager',
-        tab: 'reports',
-        icon: BarChart3,
-        roles: ['manager'],
-      },
-      {
-        label: 'Low Stock Alerts',
-        basePath: '/manager',
-        tab: 'low-stock',
-        icon: AlertCircle,
-        roles: ['manager'],
-      },
-      {
-        label: 'PO Approvals',
-        basePath: '/manager',
-        tab: 'po-approvals',
-        icon: ShoppingCart,
-        roles: ['manager'],
-      },
-      {
-        label: 'Adjustment Approvals',
-        basePath: '/manager',
-        tab: 'adjustment-approvals',
-        icon: ClipboardCheck,
-        roles: ['manager'],
-      },
-      {
-        label: 'User Management',
-        basePath: '/manager',
-        tab: 'users',
-        icon: Users,
-        roles: ['manager'],
-      },
-      // Inventory staff tabs
-      {
-        label: 'Stock In/Out',
-        basePath: '/inventory',
-        tab: 'stock-in-out',
-        icon: ArrowUpDown,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Stock Levels',
-        basePath: '/inventory',
-        tab: 'stock-levels',
-        icon: BarChart3,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Damage Reports',
-        basePath: '/inventory',
-        tab: 'damage-report',
-        icon: AlertCircle,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Item Updates',
-        basePath: '/inventory',
-        tab: 'item-update',
-        icon: Package,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Reservations',
-        basePath: '/inventory',
-        tab: 'reservations',
-        icon: Package,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Expiry Alerts',
-        basePath: '/inventory',
-        tab: 'expiry-alerts',
-        icon: Calendar,
-        roles: ['inventory_staff', 'manager'],
-      },
-      {
-        label: 'Discrepancies',
-        basePath: '/inventory',
-        tab: 'discrepancies',
-        icon: AlertCircle,
-        roles: ['inventory_staff', 'manager'],
-      },
-      // Warehouse staff tabs
-      {
-        label: 'Receiving',
-        basePath: '/warehouse',
-        tab: 'receiving',
-        icon: Truck,
-        roles: ['warehouse', 'manager'],
-      },
-      {
-        label: 'Picking Lists',
-        basePath: '/warehouse',
-        tab: 'picking',
-        icon: Package,
-        roles: ['warehouse', 'manager'],
-      },
-      {
-        label: 'FEFO Management',
-        basePath: '/warehouse',
-        tab: 'fefo',
-        icon: Calendar,
-        roles: ['warehouse', 'manager'],
-      },
-      {
-        label: 'Report Discrepancy',
-        basePath: '/warehouse',
-        tab: 'report-discrepancy',
-        icon: AlertCircle,
-        roles: ['warehouse', 'manager'],
-      },
-    ]
+    // Manager is scoped to manager-only tabs — no warehouse/inventory tabs.
+    return [...baseNavigation, ...managerNavItems]
+  }
+
+  if (role === 'admin') {
+    // Admin sees every tab in the app, to showcase all features.
+    return [...baseNavigation, ...managerNavItems, ...inventoryNavItems, ...warehouseNavItems]
   }
 
   return baseNavigation

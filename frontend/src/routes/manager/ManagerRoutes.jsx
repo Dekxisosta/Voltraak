@@ -8,7 +8,9 @@
 
 import ManagerSection from '@/pages/manager/ManagerSection'
 
-const ROLES = ['manager']
+// Admin is the "sees everything" role, used to showcase every section
+// of the app — it's included alongside manager on every route group.
+const ROLES = ['manager', 'admin']
 
 export const managerRoutes = [
   { path: '/manager', element: <ManagerSection />, roles: ROLES },

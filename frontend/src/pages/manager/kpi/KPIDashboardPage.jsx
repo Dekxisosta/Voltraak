@@ -4,10 +4,15 @@
  */
 
 import { useState, useEffect } from 'react'
-import { BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, Users } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import {
+  BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, Users,
+  ClipboardCheck, ArrowRight,
+} from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, LabelList,
+  RadialBarChart, RadialBar,
 } from 'recharts'
 import { Card, LoadingSpinner, StatusBadge } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
@@ -42,6 +47,54 @@ function CategoryTooltip({ active, payload }) {
       </div>
       <p className="mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{entry.value}%</p>
     </div>
+  )
+}
+
+function TopMoversTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null
+  const entry = payload[0].payload
+  return (
+    <div className="rounded-md border border-[var(--color-border-primary)] bg-[var(--color-surface-popover)] px-3 py-2 shadow-lg">
+      <p className="text-sm font-medium text-[var(--color-text-primary)]">{entry.name}</p>
+      <p className="text-sm font-semibold text-[var(--color-text-primary)]">₱{(entry.revenue / 1000).toFixed(0)}K revenue</p>
+      <p className="text-xs text-[var(--color-text-tertiary)]">{entry.unitsSold} units sold</p>
+    </div>
+  )
+}
+
+function MovementTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-md border border-[var(--color-border-primary)] bg-[var(--color-surface-popover)] px-3 py-2 shadow-lg">
+      <p className="text-xs font-medium text-[var(--color-text-tertiary)]">{label}</p>
+      <p className="text-sm font-semibold text-[var(--color-text-primary)]">{payload[0].value} units</p>
+    </div>
+  )
+}
+
+// Small circular gauge used on the Performance Metrics cards. Wraps a
+// single-series RadialBarChart so each metric gets a compact ring instead
+// of a flat progress bar.
+function MetricGauge({ percent, color = 'var(--color-accent)' }) {
+  const gaugeData = [{ value: Math.min(Math.max(percent, 0), 100) }]
+  return (
+    <ResponsiveContainer width={64} height={64}>
+      <RadialBarChart
+        innerRadius="70%"
+        outerRadius="100%"
+        data={gaugeData}
+        startAngle={90}
+        endAngle={-270}
+        barSize={8}
+      >
+        <RadialBar
+          dataKey="value"
+          cornerRadius={6}
+          fill={color}
+          background={{ fill: 'var(--color-border-primary)' }}
+        />
+      </RadialBarChart>
+    </ResponsiveContainer>
   )
 }
 
@@ -234,18 +287,13 @@ export default function KPIDashboardPage() {
         {/* Inventory Accuracy */}
         <Card>
           <Card.Body>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inventory Accuracy</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.inventoryAccuracy}%</p>
+                <StatusBadge variant={getMetricStatus(data.metrics.inventoryAccuracy, 95)} label="" size="sm" className="mt-1" />
               </div>
-              <StatusBadge variant={getMetricStatus(data.metrics.inventoryAccuracy, 95)} label="" size="sm" />
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
-                style={{ width: `${data.metrics.inventoryAccuracy}%` }}
-              />
+              <MetricGauge percent={data.metrics.inventoryAccuracy} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 95%+</p>
           </Card.Body>
@@ -254,18 +302,13 @@ export default function KPIDashboardPage() {
         {/* Turnover Rate */}
         <Card>
           <Card.Body>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Turnover Rate</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.turnoverRate}x</p>
+                <StatusBadge variant={getMetricStatus(data.metrics.turnoverRate, 3)} label="" size="sm" className="mt-1" />
               </div>
-              <StatusBadge variant={getMetricStatus(data.metrics.turnoverRate, 3)} label="" size="sm" />
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
-                style={{ width: `${Math.min((data.metrics.turnoverRate / 6) * 100, 100)}%` }}
-              />
+              <MetricGauge percent={(data.metrics.turnoverRate / 6) * 100} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 3x+</p>
           </Card.Body>
@@ -274,18 +317,13 @@ export default function KPIDashboardPage() {
         {/* Service Level */}
         <Card>
           <Card.Body>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Service Level</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.serviceLevel}%</p>
+                <StatusBadge variant={getMetricStatus(data.metrics.serviceLevel, 90)} label="" size="sm" className="mt-1" />
               </div>
-              <StatusBadge variant={getMetricStatus(data.metrics.serviceLevel, 90)} label="" size="sm" />
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
-                style={{ width: `${data.metrics.serviceLevel}%` }}
-              />
+              <MetricGauge percent={data.metrics.serviceLevel} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 90%+</p>
           </Card.Body>
@@ -294,18 +332,13 @@ export default function KPIDashboardPage() {
         {/* FEFO Compliances*/}
         <Card>
           <Card.Body>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">FEFO Compliance</p>
                 <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.fefoCompliance}%</p>
+                <StatusBadge variant={getMetricStatus(data.metrics.fefoCompliance, 85)} label="" size="sm" className="mt-1" />
               </div>
-              <StatusBadge variant={getMetricStatus(data.metrics.fefoCompliance, 85)} label="" size="sm" />
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div
-                className="bg-gray-800 dark:bg-gray-300 h-2 rounded-full"
-                style={{ width: `${data.metrics.fefoCompliance}%` }}
-              />
+              <MetricGauge percent={data.metrics.fefoCompliance} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 85%+</p>
           </Card.Body>
@@ -397,6 +430,176 @@ export default function KPIDashboardPage() {
                 ))}
               </div>
             </div>
+          </Card.Body>
+        </Card>
+      </div>
+
+      {/* Operations Snapshot */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Pending Approvals */}
+        <Card>
+          <Card.Header>
+            <div className="flex items-center">
+              <ClipboardCheck className="h-5 w-5 text-gray-600 dark:text-gray-400 mr-2" />
+              <h3 className="text-lg font-medium">Pending Approvals</h3>
+            </div>
+          </Card.Header>
+          <Card.Body>
+            <div className="flex items-baseline justify-between mb-4">
+              <div>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.pendingApprovals.count}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Purchase orders awaiting review</p>
+              </div>
+              <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                ₱{(data.pendingApprovals.totalValue / 1000).toFixed(0)}K total
+              </p>
+            </div>
+            <div className="space-y-2">
+              {data.pendingApprovals.items.map((po) => (
+                <div key={po.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{po.poNumber}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{po.supplier}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">₱{(po.amount / 1000).toFixed(0)}K</span>
+                    <StatusBadge variant={po.priority === 'high' ? 'critical' : 'warning'} label={po.priority === 'high' ? 'High' : 'Medium'} size="sm" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Link
+              to="/manager?tab=po-approvals"
+              className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              Review approvals <ArrowRight className="h-4 w-4 ml-1" />
+            </Link>
+          </Card.Body>
+        </Card>
+
+        {/* Stock Movement Summary */}
+        <Card>
+          <Card.Header>
+            <h3 className="text-lg font-medium">Stock Movement (30d)</h3>
+          </Card.Header>
+          <Card.Body>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart
+                data={[
+                  { name: 'Stock In', units: data.movementSummary.stockIn, fill: '#22c55e' },
+                  { name: 'Stock Out', units: data.movementSummary.stockOut, fill: '#ef4444' },
+                  { name: 'Adjustments', units: data.movementSummary.adjustments, fill: '#94a3b8' },
+                ]}
+                margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: 'var(--color-text-tertiary)', fontSize: 12 }}
+                  axisLine={{ stroke: 'var(--color-border-primary)' }}
+                  tickLine={false}
+                />
+                <YAxis tick={{ fill: 'var(--color-text-tertiary)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<MovementTooltip />} cursor={{ fill: 'var(--color-surface-hover, transparent)' }} />
+                <Bar dataKey="units" radius={[4, 4, 0, 0]}>
+                  {['#22c55e', '#ef4444', '#94a3b8'].map((color, idx) => (
+                    <Cell key={idx} fill={color} />
+                  ))}
+                  <LabelList dataKey="units" position="top" style={{ fill: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 600 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-900 dark:bg-gray-100 mt-2">
+              <span className="text-sm font-medium text-gray-100 dark:text-gray-900">Net Change</span>
+              <span className="text-lg font-bold text-gray-100 dark:text-gray-900">+{data.movementSummary.netChange} units</span>
+            </div>
+            <Link
+              to="/manager?tab=reports"
+              className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              View full report <ArrowRight className="h-4 w-4 ml-1" />
+            </Link>
+          </Card.Body>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Movers */}
+        <Card>
+          <Card.Header>
+            <h3 className="text-lg font-medium">Top Movers</h3>
+          </Card.Header>
+          <Card.Body>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={[...data.topMovers].sort((a, b) => b.revenue - a.revenue)}
+                layout="vertical"
+                margin={{ top: 4, right: 30, left: 4, bottom: 0 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-primary)" horizontal={false} />
+                <XAxis
+                  type="number"
+                  tickFormatter={(value) => `₱${(value / 1000).toFixed(0)}K`}
+                  tick={{ fill: 'var(--color-text-tertiary)', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={130}
+                  tick={{ fill: 'var(--color-text-secondary)', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip content={<TopMoversTooltip />} cursor={{ fill: 'var(--color-surface-hover, transparent)' }} />
+                <Bar dataKey="revenue" fill="var(--color-accent)" radius={[0, 4, 4, 0]} barSize={16} />
+              </BarChart>
+            </ResponsiveContainer>
+            <Link
+              to="/manager?tab=reports"
+              className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              View full report <ArrowRight className="h-4 w-4 ml-1" />
+            </Link>
+          </Card.Body>
+        </Card>
+
+        {/* Critical Stock Watchlist */}
+        <Card>
+          <Card.Header>
+            <div className="flex items-center">
+              <AlertTriangle className="h-5 w-5 text-gray-600 dark:text-gray-400 mr-2" />
+              <h3 className="text-lg font-medium">Critical Stock Watchlist</h3>
+            </div>
+          </Card.Header>
+          <Card.Body>
+            <div className="space-y-2">
+              {data.criticalStock.map((item) => (
+                <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.productName}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{item.sku}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {item.status === 'out_of_stock' ? 'Out of stock' : `${item.daysUntilStockout}d to stockout`}
+                    </span>
+                    <StatusBadge
+                      variant={item.status === 'out_of_stock' ? 'critical' : 'warning'}
+                      label={item.status === 'out_of_stock' ? 'Out' : 'Critical'}
+                      size="sm"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Link
+              to="/manager?tab=low-stock"
+              className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
+            >
+              View all low stock <ArrowRight className="h-4 w-4 ml-1" />
+            </Link>
           </Card.Body>
         </Card>
       </div>

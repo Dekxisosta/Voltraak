@@ -62,15 +62,22 @@ export const MOCK_SCHEMAS = {
   },
   'manager/kpi': {
     type: 'object',
-    fields: ['metrics', 'trends', 'categoryBreakdown', 'alerts'],
+    fields: [
+      'metrics', 'trends', 'categoryBreakdown', 'alerts',
+      'pendingApprovals', 'movementSummary', 'topMovers', 'criticalStock',
+    ],
   },
   'manager/forecast': {
     type: 'array',
     fields: [
-      'id', 'product_name', 'sku', 'current_stock', 'avg_weekly_demand',
-      'forecast_demand_8w', 'reorder_point', 'suggested_order', 'trend',
+      'id', 'product_name', 'sku', 'category', 'current_stock', 'avg_weekly_demand',
+      'forecast_demand_8w', 'reorder_point', 'suggested_order', 'unit_cost', 'trend',
       'confidence',
     ],
+  },
+  'manager/forecast-trend': {
+    type: 'array',
+    fields: ['period'],
   },
   'manager/low-stock': {
     type: 'array',

@@ -14,6 +14,7 @@ import { mockUsers } from '@/shared/mocks/manager/users'
 // TODO: import { usersApi } from '@/api'
 
 const ROLE_OPTIONS = [
+  { value: 'admin', label: 'Administrator' },
   { value: 'manager', label: 'Manager' },
   { value: 'inventory_staff', label: 'Inventory Staff' },
   { value: 'warehouse', label: 'Warehouse Staff' },
@@ -153,7 +154,8 @@ export default function UserManagementPage() {
 
   const getRoleBadge = (role) => {
     const map = {
-      manager: { variant: 'critical', label: 'Manager' },
+      admin: { variant: 'critical', label: 'Admin' },
+      manager: { variant: 'neutral', label: 'Manager' },
       inventory_staff: { variant: 'warning', label: 'Inventory' },
       warehouse: { variant: 'ok', label: 'Warehouse' },
     }
@@ -203,7 +205,7 @@ export default function UserManagementPage() {
             <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search by name or email..." className="w-full sm:max-w-md" />
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex flex-wrap gap-2">
-                {['all', 'manager', 'inventory_staff', 'warehouse'].map(r => (
+                {['all', 'admin', 'manager', 'inventory_staff', 'warehouse'].map(r => (
                   <button key={r} onClick={() => setRoleFilter(r)} className={`px-3 py-1 text-sm rounded-full ${roleFilter === r ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
                     {r === 'all' ? 'All' : r === 'inventory_staff' ? 'Inventory' : r.charAt(0).toUpperCase() + r.slice(1)}
                   </button>

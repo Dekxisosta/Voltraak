@@ -9,6 +9,7 @@ import { HeroBanner } from '@/components/layout'
 import WarehouseDashboard from './WarehouseDashboard'
 import InventoryDashboard from './InventoryDashboard'
 import ManagerDashboard from './ManagerDashboard'
+import AdminDashboard from './AdminDashboard'
 import DashboardStats from './components/DashboardStats'
 import RecentActivity from './components/RecentActivity'
 import QuickActions from './components/QuickActions'
@@ -18,6 +19,7 @@ const ROLE_DASHBOARDS = {
   warehouse: WarehouseDashboard,
   inventory_staff: InventoryDashboard,
   manager: ManagerDashboard,
+  admin: AdminDashboard,
 }
 
 export default function DashboardPage() {

@@ -8,7 +8,9 @@
 
 import WarehouseSection from '@/pages/warehouse/WarehouseSection'
 
-const ROLES = ['warehouse', 'manager']
+// Manager is scoped to manager-only routes now — admin is the "sees
+// everything" role, used to showcase every section of the app.
+const ROLES = ['warehouse', 'admin']
 
 export const warehouseRoutes = [
   { path: '/warehouse', element: <WarehouseSection />, roles: ROLES },

@@ -19,7 +19,7 @@ export default function QuickActions() {
       description: 'Record new inventory',
       icon: Plus,
       onClick: () => console.log('Navigate to stock in'),
-      roles: ['warehouse', 'inventory_staff', 'manager'],
+      roles: ['warehouse', 'inventory_staff', 'manager', 'admin'],
       color: 'blue',
     },
     {
@@ -34,7 +34,7 @@ export default function QuickActions() {
       description: 'Create inventory reports',
       icon: FileText,
       onClick: () => console.log('Navigate to reports'),
-      roles: ['inventory_staff', 'manager'],
+      roles: ['inventory_staff', 'manager', 'admin'],
       color: 'purple',
     },
     {
@@ -42,7 +42,7 @@ export default function QuickActions() {
       description: 'User administration',
       icon: Users,
       onClick: () => console.log('Navigate to user management'),
-      roles: ['manager'],
+      roles: ['manager', 'admin'],
       color: 'orange',
     },
   ]

@@ -9,7 +9,9 @@
 
 import InventorySection from '@/pages/inventory/InventorySection'
 
-const ROLES = ['inventory_staff', 'manager']
+// Manager is scoped to manager-only routes now — admin is the "sees
+// everything" role, used to showcase every section of the app.
+const ROLES = ['inventory_staff', 'admin']
 
 export const inventoryRoutes = [
   { path: '/inventory', element: <InventorySection />, roles: ROLES },

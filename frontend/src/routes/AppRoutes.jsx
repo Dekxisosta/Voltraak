@@ -49,6 +49,10 @@ function RootRedirect() {
       return <Navigate to="/inventory?tab=stock-in-out" replace />
     case 'manager':
       return <Navigate to="/manager?tab=kpi" replace />
+    case 'admin':
+      // Admin isn't scoped to one section — land on the dashboard, which
+      // surfaces redirects into every section to showcase the whole app.
+      return <Navigate to="/dashboard" replace />
     default:
       return <Navigate to="/dashboard" replace />
   }

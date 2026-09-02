@@ -20,8 +20,9 @@ import { listRecords } from './mockStore'
 //   key          - collection key used by mockStore/listRecords
 //   basePath/tab - where the record's page lives, e.g. /inventory?tab=stock-levels
 //   roles        - which roles can reach that tab (mirrors Sidebar.jsx / route ROLES).
-//                  'manager' can always see everything, so it's implied and
-//                  doesn't need to be listed explicitly.
+//                  'admin' can always see everything, so it's implied and
+//                  doesn't need to be listed explicitly. 'manager' is now
+//                  scoped to manager/* sources only, listed explicitly below.
 //   type         - short label shown next to each result
 //   title/subtitle - functions that build display text from a record
 //   searchText   - function that builds the haystack a query is matched against
@@ -141,7 +142,7 @@ const SEARCH_SOURCES = [
     icon: 'FileBarChart',
     basePath: '/manager',
     tab: 'forecast',
-    roles: [],
+    roles: ['manager'],
     type: 'Forecast',
     title: (r) => r.product_name,
     subtitle: (r) => r.sku,
@@ -152,7 +153,7 @@ const SEARCH_SOURCES = [
     icon: 'AlertCircle',
     basePath: '/manager',
     tab: 'low-stock',
-    roles: [],
+    roles: ['manager'],
     type: 'Low Stock Alert',
     title: (r) => r.product_name,
     subtitle: (r) => r.sku,
@@ -163,7 +164,7 @@ const SEARCH_SOURCES = [
     icon: 'ShoppingCart',
     basePath: '/manager',
     tab: 'po-approvals',
-    roles: [],
+    roles: ['manager'],
     type: 'PO Approval',
     title: (r) => r.po_number,
     subtitle: (r) => r.supplier,
@@ -174,7 +175,7 @@ const SEARCH_SOURCES = [
     icon: 'Users',
     basePath: '/manager',
     tab: 'users',
-    roles: [],
+    roles: ['manager'],
     type: 'User',
     title: (r) => r.name,
     subtitle: (r) => r.email,
@@ -183,7 +184,7 @@ const SEARCH_SOURCES = [
 ]
 
 function sourcesForRole(role) {
-  if (role === 'manager') return SEARCH_SOURCES
+  if (role === 'admin') return SEARCH_SOURCES
   return SEARCH_SOURCES.filter((source) => source.roles.includes(role))
 }
 
