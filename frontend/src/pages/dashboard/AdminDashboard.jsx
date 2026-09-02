@@ -24,6 +24,8 @@ import { formatCompactCurrency, formatCompactNumber } from '@/shared/utils'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
+import WhatsNew from './components/WhatsNew'
+import RelatedLinks from './components/RelatedLinks'
 
 // Same sources the manager/warehouse/inventory dashboards subscribe to —
 // keeps this overview live with mutations made anywhere in the app.
@@ -231,10 +233,18 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      <WhatsNew />
+
+      <RelatedLinks />
+
       <QuickRedirects title="Admin" items={adminRedirectItems} />
       <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
       <QuickRedirects title="Inventory Tabs" items={inventoryRedirectItems} />
       <QuickRedirects title="Warehouse Tabs" items={warehouseRedirectItems} />
+
+      <WhatsNew />
+
+      <RelatedLinks />
 
       <RecentActivity />
     </div>

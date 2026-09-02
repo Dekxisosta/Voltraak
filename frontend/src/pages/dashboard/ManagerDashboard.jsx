@@ -19,6 +19,8 @@ import { formatCompactCurrency, formatCompactNumber } from '@/shared/utils'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
+import WhatsNew from './components/WhatsNew'
+import RelatedLinks from './components/RelatedLinks'
 
 // Same source POApprovalsPage.jsx reads/writes — subscribing here means an
 // approve/reject on that page updates this card immediately, without a
@@ -140,6 +142,10 @@ export default function ManagerDashboard() {
           <StatCard key={stat.title} stat={stat} />
         ))}
       </div>
+
+      <WhatsNew />
+
+      <RelatedLinks />
 
       <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
 

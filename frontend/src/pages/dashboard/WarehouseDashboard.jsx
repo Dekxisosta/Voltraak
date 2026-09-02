@@ -12,6 +12,8 @@ import { createResourceDataSource } from '@/shared/services/dataSource'
 import { formatCompactNumber } from '@/shared/utils'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
+import WhatsNew from './components/WhatsNew'
+import RelatedLinks from './components/RelatedLinks'
 
 // Same resource Inventory's DiscrepanciesPage reads/writes — subscribing
 // here means a status change there updates this card immediately, without
@@ -116,6 +118,10 @@ export default function WarehouseDashboard() {
           <StatCard key={stat.title} stat={stat} />
         ))}
       </div>
+
+      <WhatsNew />
+
+      <RelatedLinks />
 
       <QuickRedirects title="Warehouse Tabs" items={quickRedirectItems} />
 

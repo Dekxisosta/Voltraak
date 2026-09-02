@@ -10,6 +10,8 @@ import { formatNumber } from '@/shared/utils'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
+import WhatsNew from './components/WhatsNew'
+import RelatedLinks from './components/RelatedLinks'
 
 // Same sources ItemUpdatePage / StockLevelsPage / ReservationsPage /
 // ExpiryAlertsPage / DiscrepanciesPage read and write — subscribing here
@@ -169,6 +171,10 @@ export default function InventoryDashboard() {
           <StatCard key={stat.title} stat={stat} />
         ))}
       </div>
+
+      <WhatsNew />
+
+      <RelatedLinks />
 
       <QuickRedirects title="Inventory Tabs" items={quickRedirectItems} />
 

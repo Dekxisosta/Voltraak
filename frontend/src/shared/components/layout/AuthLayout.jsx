@@ -9,7 +9,7 @@
  * breakpoint; on mobile a compact brand strip stands in for it instead.
  */
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { Mail, Github, UserCog, PackageSearch, Boxes } from 'lucide-react'
 import { CONTACT } from '@/shared/constants/contact'
 import { SOCIAL } from '@/shared/constants/social'
@@ -210,28 +210,67 @@ function MobileBrandStrip() {
 }
 
 export default function AuthLayout({ children }) {
+  // Refs to the two dot/line grid SVGs so we can drive them without React state
+  const dotGridRef  = useRef(null)   // right panel dots
+  const lineGridRef = useRef(null)   // left panel lines
+
+  useEffect(() => {
+    // Current lerped offset
+    let cx = 0, cy = 0
+    // Target offset (updated on mousemove)
+    let tx = 0, ty = 0
+    let rafId = null
+
+    // Max parallax shift in px — dots move more than lines for depth layering
+    const DOT_STRENGTH  = 22
+    const LINE_STRENGTH = 10
+
+    const onMove = (e) => {
+      // Normalise cursor to [-1, 1] across the full viewport
+      tx = (e.clientX / window.innerWidth  - 0.5) * 2
+      ty = (e.clientY / window.innerHeight - 0.5) * 2
+    }
+
+    const tick = () => {
+      // Smooth lerp — 6% per frame ≈ ~200ms settle at 60fps
+      cx += (tx - cx) * 0.06
+      cy += (ty - cy) * 0.06
+
+      const dx = cx * DOT_STRENGTH
+      const dy = cy * DOT_STRENGTH
+      const lx = cx * LINE_STRENGTH
+      const ly = cy * LINE_STRENGTH
+
+      if (dotGridRef.current) {
+        dotGridRef.current.style.transform = `translate(${dx}px, ${dy}px)`
+      }
+      if (lineGridRef.current) {
+        lineGridRef.current.style.transform = `translate(${lx}px, ${ly}px)`
+      }
+
+      rafId = requestAnimationFrame(tick)
+    }
+
+    window.addEventListener('mousemove', onMove, { passive: true })
+    rafId = requestAnimationFrame(tick)
+
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      cancelAnimationFrame(rafId)
+    }
+  }, [])
+
   return (
     <div className="min-h-screen lg:h-screen flex overflow-x-hidden bg-[var(--color-bg-primary)]">
-      {/* Local keyframes + reduced-motion guard for float motion (brand panel + mobile strip) */}
+      {/* Local keyframes + reduced-motion guard */}
       <style>{`
         @keyframes voltraak-float {
           0%   { transform: translateY(0px); }
           50%  { transform: translateY(-7px); }
           100% { transform: translateY(0px); }
         }
-        @keyframes voltraak-dot-drift {
-          0%   { transform: translate(0px, 0px); }
-          25%  { transform: translate(10px, 6px); }
-          50%  { transform: translate(18px, 14px); }
-          75%  { transform: translate(8px, 20px); }
-          100% { transform: translate(0px, 0px); }
-        }
-        .voltraak-dot-drift {
-          animation: voltraak-dot-drift 40s ease-in-out infinite;
-        }
         @media (prefers-reduced-motion: reduce) {
           .voltraak-float { animation: none !important; transition: none !important; }
-          .voltraak-dot-drift { animation: none !important; }
         }
         @media (max-height: 800px) {
           .voltraak-float { animation: none; }
@@ -243,20 +282,26 @@ export default function AuthLayout({ children }) {
       {/* Form column */}
       <div className="w-full lg:w-[50%] xl:w-[50%] flex flex-col items-center lg:items-end min-h-screen lg:h-full lg:overflow-y-auto voltraak-no-scrollbar px-6 sm:px-12 lg:px-24 py-24 relative overflow-hidden">
 
-        {/* Subtle diagonal line-grid — same vibe as the right panel but quieter */}
-        <svg className="pointer-events-none absolute inset-0 w-full h-full" aria-hidden="true">
+        {/* Diagonal line-grid — parallax-driven via lineGridRef */}
+        <svg
+          ref={lineGridRef}
+          className="pointer-events-none absolute inset-0 w-full h-full"
+          aria-hidden="true"
+          style={{ willChange: 'transform' }}
+        >
           <defs>
             <pattern id="form-line-grid" width="32" height="32" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
               <line x1="0" y1="0" x2="0" y2="32" stroke="currentColor" strokeWidth="0.5" strokeOpacity="0.045" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#form-line-grid)" />
+          <rect width="200%" height="200%" x="-50%" y="-50%" fill="url(#form-line-grid)" />
         </svg>
 
-        {/* Warm glow — top-right corner, stays out of the way of the form */}
+        {/* Warm glow — top-right corner */}
         <div className="pointer-events-none absolute -top-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-amber-400 opacity-[0.055] blur-[100px]" />
-        {/* Cool accent glow — bottom-left, very faint */}
+        {/* Cool accent glow — bottom-left */}
         <div className="pointer-events-none absolute -bottom-32 -left-20 w-[22rem] h-[22rem] rounded-full bg-indigo-500 opacity-[0.045] blur-[90px]" />
+
         <div className="w-full max-w-sm relative z-10">
           {/* Logo */}
           <div className="flex items-center gap-3">
@@ -281,7 +326,7 @@ export default function AuthLayout({ children }) {
 
           {/* Footer */}
           <div className="mt-16 pt-10 space-y-3">
-            {/* Partnership credit — who this was built for and through */}
+            {/* Partnership credit */}
             <div className="flex items-center gap-2 text-xs text-[var(--color-text-tertiary)] flex-wrap">
               <span>In partnership with</span>
               <span className="font-medium text-[var(--color-text-secondary)]">WalangBrownout Appliances</span>
@@ -339,8 +384,13 @@ export default function AuthLayout({ children }) {
 
       {/* Brand panel */}
       <div className="hidden lg:flex lg:w-[50%] xl:w-[50%] lg:h-full relative overflow-hidden bg-[#0b1220]">
-        {/* Fine dot-grid texture — drifts slowly via voltraak-dot-drift */}
-        <svg className="absolute inset-0 w-full h-full voltraak-dot-drift" aria-hidden="true">
+        {/* Dot-grid — parallax-driven via dotGridRef */}
+        <svg
+          ref={dotGridRef}
+          className="absolute inset-0 w-full h-full"
+          aria-hidden="true"
+          style={{ willChange: 'transform' }}
+        >
           <defs>
             <pattern id="auth-dot-grid" width="28" height="28" patternUnits="userSpaceOnUse">
               <circle cx="1.5" cy="1.5" r="1.5" fill="#ffffff" fillOpacity="0.16" />
@@ -349,7 +399,7 @@ export default function AuthLayout({ children }) {
           <rect width="200%" height="200%" x="-50%" y="-50%" fill="url(#auth-dot-grid)" />
         </svg>
 
-        {/* Ambient glow, echoes the "power" in Voltraak without being literal */}
+        {/* Ambient glow */}
         <div className="pointer-events-none absolute -top-32 -right-20 w-[32rem] h-[32rem] rounded-full bg-amber-400 opacity-[0.16] blur-[120px]" />
         <div className="pointer-events-none absolute -bottom-24 -left-16 w-[24rem] h-[24rem] rounded-full bg-blue-600 opacity-[0.12] blur-[110px]" />
 
@@ -358,9 +408,6 @@ export default function AuthLayout({ children }) {
           style={{ perspective: '1400px' }}
         >
           <div className="max-w-md">
-            {/* Role card sits in normal flow, right-aligned above the
-                headline — can't overlap text since it isn't absolutely
-                positioned. */}
             <div className="flex justify-end">
               <RoleGroupCard floatDelay="0.3s" floatDuration="7.5s" />
             </div>
@@ -375,98 +422,93 @@ export default function AuthLayout({ children }) {
 
             {/* Dashboard cluster */}
             <div className="mt-8 max-w-md">
-            {/* Stock health card — the hero mockup */}
-            <TiltCard floatDelay="0s" floatDuration="7s" maxTilt={9} depth={24} className="block">
-              <div className="relative rounded-2xl bg-white/[0.06] border border-white/10 backdrop-blur-sm p-5 shadow-2xl cursor-default">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs text-slate-400">Stock health this week</p>
-                    <p className="font-heading text-lg text-white mt-0.5">Main Warehouse</p>
+              {/* Stock health card */}
+              <TiltCard floatDelay="0s" floatDuration="7s" maxTilt={9} depth={24} className="block">
+                <div className="relative rounded-2xl bg-white/[0.06] border border-white/10 backdrop-blur-sm p-5 shadow-2xl cursor-default">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-slate-400">Stock health this week</p>
+                      <p className="font-heading text-lg text-white mt-0.5">Main Warehouse</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300 bg-emerald-400/10 rounded-full px-2.5 py-1 whitespace-nowrap">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      On track
+                    </span>
                   </div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-300 bg-emerald-400/10 rounded-full px-2.5 py-1 whitespace-nowrap">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                    On track
-                  </span>
-                </div>
 
-                {/* Sparkline bars — animated via AnimatedBars component */}
-                <AnimatedBars />
-                <div className="mt-2 flex justify-between text-[11px] text-slate-500 font-mono">
-                  <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-                </div>
+                  <AnimatedBars />
+                  <div className="mt-2 flex justify-between text-[11px] text-slate-500 font-mono">
+                    <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                  </div>
 
-                {/* Floating fill-rate ring, overlapping the card like a status badge.
-                    translateZ lifts it above the card's own tilt plane for a layered feel. */}
-                <div
-                  className="absolute -bottom-7 -right-7 w-28 h-28 rounded-full bg-[#111827] border border-white/10 shadow-2xl flex items-center justify-center"
-                  style={{ transform: 'translateZ(14px)' }}
-                >
                   <div
-                    className="w-full h-full rounded-full flex items-center justify-center"
-                    style={{ background: 'conic-gradient(#f59e0b 0deg 346deg, rgba(255,255,255,0.08) 346deg 360deg)' }}
+                    className="absolute -bottom-7 -right-7 w-28 h-28 rounded-full bg-[#111827] border border-white/10 shadow-2xl flex items-center justify-center"
+                    style={{ transform: 'translateZ(14px)' }}
                   >
-                    <div className="w-[80%] h-[80%] rounded-full bg-[#0b1220] flex flex-col items-center justify-center">
-                      <span className="font-heading text-lg text-white">96%</span>
-                      <span className="text-[10px] text-slate-400 -mt-0.5">fill rate</span>
+                    <div
+                      className="w-full h-full rounded-full flex items-center justify-center"
+                      style={{ background: 'conic-gradient(#f59e0b 0deg 346deg, rgba(255,255,255,0.08) 346deg 360deg)' }}
+                    >
+                      <div className="w-[80%] h-[80%] rounded-full bg-[#0b1220] flex flex-col items-center justify-center">
+                        <span className="font-heading text-lg text-white">96%</span>
+                        <span className="text-[10px] text-slate-400 -mt-0.5">fill rate</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </TiltCard>
+
+              {/* Second row */}
+              <div className="mt-7 grid grid-cols-2 gap-4">
+                <TiltCard floatDelay="0.6s" floatDuration="8s" maxTilt={12} depth={16}>
+                  <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4 cursor-default">
+                    <p className="text-xs text-slate-400">Expiring soon</p>
+                    <ul className="mt-3 space-y-3">
+                      {[
+                        { name: 'Dry Cell Batteries AA', days: '3 days', urgent: true },
+                        { name: 'Aircon Filter Foam', days: '9 days', urgent: false },
+                        { name: 'Adhesive Sealant 300ml', days: '14 days', urgent: false },
+                      ].map((item, i, arr) => (
+                        <li key={item.name} className="relative pl-4">
+                          {i < arr.length - 1 && (
+                            <span className="absolute left-[3px] top-3 bottom-[-12px] w-px bg-white/10" />
+                          )}
+                          <span
+                            className={`absolute left-0 top-1.5 w-[7px] h-[7px] rounded-full ${
+                              item.urgent ? 'bg-rose-400' : 'bg-slate-500'
+                            }`}
+                          />
+                          <p className="text-[13px] text-slate-200 leading-tight">{item.name}</p>
+                          <p className={`text-[11px] mt-0.5 ${item.urgent ? 'text-rose-300' : 'text-slate-500'}`}>
+                            {item.days} left
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </TiltCard>
+
+                <TiltCard floatDelay="1.2s" floatDuration="7.5s" maxTilt={12} depth={16}>
+                  <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4 cursor-default">
+                    <p className="text-xs text-slate-400">Reorder alerts</p>
+                    <ul className="mt-3 space-y-2.5">
+                      {[
+                        { name: 'Inverter AC Compressor', qty: '2 left' },
+                        { name: 'Ceiling Fan Capacitor', qty: '5 left' },
+                        { name: 'LED Bulb 9W (Warm)', qty: '8 left' },
+                      ].map((item) => (
+                        <li key={item.name} className="flex items-center justify-between gap-2">
+                          <p className="text-[13px] text-slate-200 leading-tight truncate">{item.name}</p>
+                          <span className="text-[11px] text-amber-300 bg-amber-400/10 rounded-full px-2 py-0.5 whitespace-nowrap shrink-0">
+                            {item.qty}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </TiltCard>
               </div>
-            </TiltCard>
-
-            {/* Second row: expiring batches + reorder alerts, side by side */}
-            <div className="mt-7 grid grid-cols-2 gap-4">
-              {/* Expiring soon — a real sequence, so a connecting rail is meaningful */}
-              <TiltCard floatDelay="0.6s" floatDuration="8s" maxTilt={12} depth={16}>
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4 cursor-default">
-                  <p className="text-xs text-slate-400">Expiring soon</p>
-                  <ul className="mt-3 space-y-3">
-                    {[
-                      { name: 'Dry Cell Batteries AA', days: '3 days', urgent: true },
-                      { name: 'Aircon Filter Foam', days: '9 days', urgent: false },
-                      { name: 'Adhesive Sealant 300ml', days: '14 days', urgent: false },
-                    ].map((item, i, arr) => (
-                      <li key={item.name} className="relative pl-4">
-                        {i < arr.length - 1 && (
-                          <span className="absolute left-[3px] top-3 bottom-[-12px] w-px bg-white/10" />
-                        )}
-                        <span
-                          className={`absolute left-0 top-1.5 w-[7px] h-[7px] rounded-full ${
-                            item.urgent ? 'bg-rose-400' : 'bg-slate-500'
-                          }`}
-                        />
-                        <p className="text-[13px] text-slate-200 leading-tight">{item.name}</p>
-                        <p className={`text-[11px] mt-0.5 ${item.urgent ? 'text-rose-300' : 'text-slate-500'}`}>
-                          {item.days} left
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </TiltCard>
-
-              {/* Reorder alerts — items below threshold */}
-              <TiltCard floatDelay="1.2s" floatDuration="7.5s" maxTilt={12} depth={16}>
-                <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-4 cursor-default">
-                  <p className="text-xs text-slate-400">Reorder alerts</p>
-                  <ul className="mt-3 space-y-2.5">
-                    {[
-                      { name: 'Inverter AC Compressor', qty: '2 left' },
-                      { name: 'Ceiling Fan Capacitor', qty: '5 left' },
-                      { name: 'LED Bulb 9W (Warm)', qty: '8 left' },
-                    ].map((item) => (
-                      <li key={item.name} className="flex items-center justify-between gap-2">
-                        <p className="text-[13px] text-slate-200 leading-tight truncate">{item.name}</p>
-                        <span className="text-[11px] text-amber-300 bg-amber-400/10 rounded-full px-2 py-0.5 whitespace-nowrap shrink-0">
-                          {item.qty}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </TiltCard>
             </div>
-          </div>
           </div>
 
           <p className="mt-6 text-xs text-slate-500 max-w-sm">
