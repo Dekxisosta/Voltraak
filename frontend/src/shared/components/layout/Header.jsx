@@ -6,8 +6,9 @@
  */
 
 import { useState } from 'react'
-import { Menu, Search, User, LogOut, Settings } from 'lucide-react'
+import { Menu, Search, User, LogOut, Settings, Sun, Moon } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/shared/contexts/ThemeContext'
 import { ProfileModal, PreferencesModal, GlobalSearchBar } from '@/components/common'
 import LiveClock from './LiveClock'
 import WeatherBadge from './WeatherBadge'
@@ -16,6 +17,7 @@ import WeatherBadge from './WeatherBadge'
 
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth()
+  const { isDark, toggleTheme } = useTheme()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
@@ -77,6 +79,17 @@ export default function Header({ onMenuClick }) {
           {/* Weather + live clock */}
           <WeatherBadge />
           <LiveClock />
+
+          {/* Theme toggle */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 rounded transition-colors"
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
 
           {/* User menu */}
           <div className="relative">
