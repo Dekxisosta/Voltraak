@@ -138,9 +138,9 @@ All project documentation lives in [`docs/`](docs/). Suggested read order:
 
 | GitHub | Role |
 |---|---|
-| [Dekxisosta](https://github.com/Dekxisosta) | Project Lead |
-| [brtbrt123](https://github.com/brtbrt123) | Full-stack Lead |
-| [SHUBARUUU](https://github.com/SHUBARUUU) | Backend Lead |
+| [Dekxisosta](https://github.com/Dekxisosta) | Project Lead & Frontend Lead |
+| [brtbrt123](https://github.com/brtbrt123) | Full-stack Lead & QA Engineer |
+| [SHUBARUUU](https://github.com/SHUBARUUU) | Backend Lead  |
 | [LiaKyutie](https://github.com/LiaKyutie) | Frontend Developer |
 | [RylineAzurin](https://github.com/RylineAzurin) | Support Developer |
 
