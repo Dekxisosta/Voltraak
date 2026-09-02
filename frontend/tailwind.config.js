@@ -87,7 +87,15 @@ export default {
         // top-right), with a snappier ease-out on the way in and a quick
         // ease-in on the way out so it feels responsive rather than laggy.
         'toast-in': 'toastIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-        'toast-out': 'toastOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards'
+        'toast-out': 'toastOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards',
+        // Loading spinner rings
+        'spin-slow': 'spin 2s linear infinite',
+        'spin-medium': 'spin 1.4s linear infinite',
+        'spin-fast': 'spin 0.9s linear infinite',
+        'spin-ccw-slow': 'spinCcw 2.4s linear infinite',
+        'spin-ccw-fast': 'spinCcw 1.1s linear infinite',
+        'bolt-pulse': 'boltPulse 1.4s ease-in-out infinite',
+        'ring-ripple': 'ringRipple 1.4s ease-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -110,7 +118,19 @@ export default {
           '0%': { transform: 'translateX(0) scale(1)', opacity: '1', maxHeight: '200px', marginBottom: '0.5rem' },
           '60%': { transform: 'translateX(110%) scale(0.95)', opacity: '0', maxHeight: '200px', marginBottom: '0.5rem' },
           '100%': { transform: 'translateX(110%) scale(0.95)', opacity: '0', maxHeight: '0px', marginBottom: '0px' }
-        }
+        },
+        boltPulse: {
+          '0%, 100%': { opacity: '1', transform: 'scale(1)' },
+          '50%': { opacity: '0.5', transform: 'scale(0.85)' },
+        },
+        ringRipple: {
+          '0%': { transform: 'scale(1)', opacity: '0.6' },
+          '100%': { transform: 'scale(1.5)', opacity: '0' },
+        },
+        spinCcw: {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(-360deg)' },
+        },
       }
     },
   },
