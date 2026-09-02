@@ -20,6 +20,14 @@ For the full problem statement, success metrics, and release plan, see [`docs/PR
 
 ---
 
+## Design
+
+![login](screenshots/login.png)
+
+![dashboard](screenshots/dashboard.png)
+
+---
+
 ## Architecture
 
 The system is a **modular monolith**: a single deployable Laravel backend partitioned internally by business domain, paired with a React SPA.
