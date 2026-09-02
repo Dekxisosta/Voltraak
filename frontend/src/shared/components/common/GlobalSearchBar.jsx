@@ -40,7 +40,12 @@ const ICONS = {
   Users,
 }
 
-export default function GlobalSearchBar({ className, placeholder = 'Search products, batches...' }) {
+/**
+ * dark — when true, renders the input with styles suited for a dark
+ * background (e.g. the top navbar). Falls back to the standard form-input
+ * appearance when false (default).
+ */
+export default function GlobalSearchBar({ className, placeholder = 'Search products, batches...', dark = false }) {
   const { user } = useAuth()
   const navigate = useNavigate()
 
@@ -133,7 +138,7 @@ export default function GlobalSearchBar({ className, placeholder = 'Search produ
     <div className={cn('relative', className)} ref={containerRef}>
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+          <Search className={cn('h-4 w-4', dark ? 'text-gray-400' : 'text-gray-400 dark:text-gray-500')} />
         </div>
 
         <input
@@ -143,7 +148,12 @@ export default function GlobalSearchBar({ className, placeholder = 'Search produ
           onFocus={() => setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className={cn('form-input pl-10', query && 'pr-10')}
+          className={cn(
+            dark
+              ? 'block w-full rounded-md pl-10 pr-3 py-1.5 text-sm bg-white/10 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-colors'
+              : 'form-input pl-10',
+            query && 'pr-10'
+          )}
         />
 
         {query && (

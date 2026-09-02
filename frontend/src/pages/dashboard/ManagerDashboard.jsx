@@ -19,7 +19,6 @@ import { formatCompactCurrency, formatCompactNumber } from '@/shared/utils'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
-import AlertsPanel from './components/AlertsPanel'
 
 // Same source POApprovalsPage.jsx reads/writes — subscribing here means an
 // approve/reject on that page updates this card immediately, without a
@@ -135,22 +134,16 @@ export default function ManagerDashboard() {
   const stats = buildStats(poOrders)
 
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
-      <div className="lg:col-span-8 space-y-6">
-        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((stat) => (
-            <StatCard key={stat.title} stat={stat} />
-          ))}
-        </div>
-
-        <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
-
-        <RecentActivity />
+    <div className="space-y-6">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map((stat) => (
+          <StatCard key={stat.title} stat={stat} />
+        ))}
       </div>
 
-      <div className="lg:col-span-4 space-y-6">
-        <AlertsPanel />
-      </div>
+      <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
+
+      <RecentActivity />
     </div>
   )
 }

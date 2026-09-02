@@ -12,7 +12,6 @@ import { createResourceDataSource } from '@/shared/services/dataSource'
 import { formatCompactNumber } from '@/shared/utils'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
-import AlertsPanel from './components/AlertsPanel'
 
 // Same resource Inventory's DiscrepanciesPage reads/writes — subscribing
 // here means a status change there updates this card immediately, without
@@ -111,22 +110,16 @@ export default function WarehouseDashboard() {
   const stats = buildStats(discrepancies)
 
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
-      <div className="lg:col-span-8 space-y-6">
-        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((stat) => (
-            <StatCard key={stat.title} stat={stat} />
-          ))}
-        </div>
-
-        <QuickRedirects title="Warehouse Tabs" items={quickRedirectItems} />
-
-        <RecentActivity />
+    <div className="space-y-6">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map((stat) => (
+          <StatCard key={stat.title} stat={stat} />
+        ))}
       </div>
 
-      <div className="lg:col-span-4 space-y-6">
-        <AlertsPanel />
-      </div>
+      <QuickRedirects title="Warehouse Tabs" items={quickRedirectItems} />
+
+      <RecentActivity />
     </div>
   )
 }

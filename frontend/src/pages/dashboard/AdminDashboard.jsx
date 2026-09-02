@@ -24,7 +24,6 @@ import { formatCompactCurrency, formatCompactNumber } from '@/shared/utils'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
-import AlertsPanel from './components/AlertsPanel'
 
 // Same sources the manager/warehouse/inventory dashboards subscribe to —
 // keeps this overview live with mutations made anywhere in the app.
@@ -218,32 +217,26 @@ export default function AdminDashboard() {
   const stats = buildStats(poOrders, discrepancies)
 
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
-      <div className="lg:col-span-8 space-y-6">
-        <div className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
-          <ShieldCheck className="h-5 w-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            You're signed in as an administrator — every section of Voltraak is available below.
-          </p>
-        </div>
-
-        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map((stat) => (
-            <StatCard key={stat.title} stat={stat} />
-          ))}
-        </div>
-
-        <QuickRedirects title="Admin" items={adminRedirectItems} />
-        <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
-        <QuickRedirects title="Inventory Tabs" items={inventoryRedirectItems} />
-        <QuickRedirects title="Warehouse Tabs" items={warehouseRedirectItems} />
-
-        <RecentActivity />
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3">
+        <ShieldCheck className="h-5 w-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          You're signed in as an administrator — every section of Voltraak is available below.
+        </p>
       </div>
 
-      <div className="lg:col-span-4 space-y-6">
-        <AlertsPanel />
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map((stat) => (
+          <StatCard key={stat.title} stat={stat} />
+        ))}
       </div>
+
+      <QuickRedirects title="Admin" items={adminRedirectItems} />
+      <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
+      <QuickRedirects title="Inventory Tabs" items={inventoryRedirectItems} />
+      <QuickRedirects title="Warehouse Tabs" items={warehouseRedirectItems} />
+
+      <RecentActivity />
     </div>
   )
 }

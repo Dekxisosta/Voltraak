@@ -1,51 +1,86 @@
 /**
- * Main application shell with sidebar navigation and header
+ * Main application shell — NetSuite-style 3-column layout.
+ *
+ * ┌──────────────────────────────────────────────────────────────────┐
+ * │  Header (full-width sticky topbar, dark bg, logo + search + user)│
+ * ├───────────────┬────────────────────────────┬─────────────────────┤
+ * │  Left panel   │   Main content (scrollable) │   Right panel       │
+ * │  220px fixed  │   flex-1                    │   260px fixed       │
+ * │  Nav links    │   page children             │   Alerts / KPI      │
+ * └───────────────┴────────────────────────────┴─────────────────────┘
+ *
+ * The left and right panels are sticky inside the body row so they stay
+ * in view as the centre column scrolls. On tablet (< lg) the right panel
+ * collapses below the main content; on mobile the left panel is a drawer.
+ *
+ * Pages that need to inject content into the right panel can use the
+ * AppShellContext — pass `rightPanel` from their page component.
+ * If no page provides rightPanel content, the shell renders nothing in
+ * the right column (it collapses to zero width).
  */
 
-import { useState } from 'react'
+import { createContext, useContext, useState } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
+
+// Context lets pages push content into the right panel slot
+export const AppShellContext = createContext({
+  setRightPanel: () => {},
+})
+export const useAppShell = () => useContext(AppShellContext)
+
 export default function AppShell({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [rightPanel, setRightPanel] = useState(null)
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-secondary)]">
-      {/* Sidebar for desktop */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <Sidebar />
-      </div>
+    <AppShellContext.Provider value={{ setRightPanel }}>
+      {/* Full-height flex column */}
+      <div className="flex flex-col h-screen overflow-hidden bg-[var(--color-bg-secondary)]">
 
-      {/* Mobile sidebar */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Sidebar backdrop */}
-          <div
-            className="fixed inset-0 bg-[var(--color-overlay)]"
-            onClick={() => setSidebarOpen(false)}
-          />
-          
-          {/* Sidebar panel */}
-          <div className="fixed inset-y-0 left-0 w-64 bg-sidebar-bg">
-            <Sidebar onClose={() => setSidebarOpen(false)} />
-          </div>
-        </div>
-      )}
-
-      {/* Main content area */}
-      <div className="lg:pl-64 flex flex-col min-h-screen">
-        {/* Header */}
+        {/* ── Topbar ──────────────────────────────────────────────── */}
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        
-        {/* Page content */}
-        <main className="flex-1">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* ── Body row ────────────────────────────────────────────── */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+
+          {/* ── Left panel — desktop ──────────────────────────────── */}
+          {/* Sticky inside the body row; scrolls independently */}
+          <aside className="hidden lg:flex flex-col w-[220px] shrink-0 overflow-y-auto bg-[var(--color-surface-sidebar)] border-r border-white/10">
+            <Sidebar />
+          </aside>
+
+          {/* ── Mobile sidebar drawer ─────────────────────────────── */}
+          {sidebarOpen && (
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div
+                className="fixed inset-0 bg-[var(--color-overlay)]"
+                onClick={() => setSidebarOpen(false)}
+              />
+              <div className="fixed inset-y-0 left-0 w-[220px] bg-[var(--color-surface-sidebar)] overflow-y-auto">
+                <Sidebar onClose={() => setSidebarOpen(false)} />
+              </div>
+            </div>
+          )}
+
+          {/* ── Centre — main scrollable content ─────────────────── */}
+          <main className="flex-1 min-w-0 overflow-y-auto">
+            <div className="py-5 px-4 sm:px-6 lg:px-8 min-h-full">
               {children}
             </div>
-          </div>
-        </main>
-      </div>
+          </main>
 
-    </div>
+          {/* ── Right panel — collapses when empty ────────────────── */}
+          {rightPanel && (
+            <aside className="hidden xl:flex flex-col w-[260px] shrink-0 overflow-y-auto border-l border-[var(--color-border-primary)] bg-[var(--color-bg-primary)]">
+              <div className="p-4 space-y-4">
+                {rightPanel}
+              </div>
+            </aside>
+          )}
+
+        </div>
+      </div>
+    </AppShellContext.Provider>
   )
 }
