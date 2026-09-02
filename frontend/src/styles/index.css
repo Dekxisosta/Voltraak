@@ -300,6 +300,8 @@
     backdrop-filter: blur(14px) saturate(160%);
     -webkit-backdrop-filter: blur(14px) saturate(160%);
     @apply rounded-xl;
+    min-width: 0;
+    overflow: hidden;
     transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   }
 

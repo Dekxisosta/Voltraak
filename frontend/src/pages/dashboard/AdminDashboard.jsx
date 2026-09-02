@@ -242,10 +242,6 @@ export default function AdminDashboard() {
       <QuickRedirects title="Inventory Tabs" items={inventoryRedirectItems} />
       <QuickRedirects title="Warehouse Tabs" items={warehouseRedirectItems} />
 
-      <WhatsNew />
-
-      <RelatedLinks />
-
       <RecentActivity />
     </div>
   )

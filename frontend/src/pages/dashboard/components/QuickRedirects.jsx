@@ -44,20 +44,20 @@ function RedirectTile({ item }) {
   return (
     <Link
       to={to}
-      className="group flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-3 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+      className="group flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 p-3 transition-colors hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 min-w-0 overflow-hidden"
     >
-      <div className="flex items-center space-x-3 min-w-0">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         <div className={`flex-shrink-0 rounded-md border p-2 transition-colors ${colors}`}>
           <item.icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.label}</p>
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 break-words">{item.label}</p>
           {item.description && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.description}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 break-words">{item.description}</p>
           )}
         </div>
       </div>
-      <ArrowRight className="h-4 w-4 flex-shrink-0 text-gray-300 dark:text-gray-600 group-hover:text-gray-500 transition-colors" />
+      <ArrowRight className="h-4 w-4 flex-shrink-0 ml-2 text-gray-300 dark:text-gray-600 group-hover:text-gray-500 transition-colors" />
     </Link>
   )
 }
