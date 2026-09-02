@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { Calendar, Trash2, Flag, Check } from 'lucide-react'
-import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner, ConfirmModal } from '@/shared/components/common'
 import Modal, { ModalBody, ModalFooter } from '@/shared/components/common/Modal'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
@@ -18,8 +18,15 @@ export default function ExpiryAlertsPage() {
   const [data, setData] = useState({ batches: [], loading: true })
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+
+  // Write-off modal state
   const [writeOffTarget, setWriteOffTarget] = useState(null)
   const [writeOffLoading, setWriteOffLoading] = useState(false)
+
+  // Prioritize confirm modal state
+  const [prioritizeTarget, setPrioritizeTarget] = useState(null)
+  const [prioritizeLoading, setPrioritizeLoading] = useState(false)
+
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
 
@@ -43,9 +50,18 @@ export default function ExpiryAlertsPage() {
     setWriteOffLoading(true)
     try {
       await expirySource.update(batch.id, { status: 'written_off' })
-      addNotification({ type: 'success', title: 'Batch Written Off', message: `${batch.batch_number} (${batch.quantity} units) has been written off` })
+      setData(prev => ({
+        ...prev,
+        batches: prev.batches.map(b =>
+          b.id === batch.id ? { ...b, status: 'written_off' } : b
+        )
+      }))
+      addNotification({
+        type: 'success',
+        title: 'Batch Written Off',
+        message: `${batch.batch_number} (${batch.quantity} units) has been written off`
+      })
       setWriteOffTarget(null)
-      loadExpiryData()
     } catch (error) {
       addNotification({ type: 'error', title: 'Error', message: `Failed to write off ${batch.batch_number}` })
     } finally {
@@ -53,13 +69,27 @@ export default function ExpiryAlertsPage() {
     }
   }
 
-  const handlePrioritize = async (batch) => {
+  const handleConfirmPrioritize = async () => {
+    const batch = prioritizeTarget
+    setPrioritizeLoading(true)
     try {
       await expirySource.update(batch.id, { prioritized: true })
-      addNotification({ type: 'success', title: 'Batch Prioritized', message: `${batch.batch_number} flagged for priority FEFO picking` })
-      loadExpiryData()
+      setData(prev => ({
+        ...prev,
+        batches: prev.batches.map(b =>
+          b.id === batch.id ? { ...b, prioritized: true } : b
+        )
+      }))
+      addNotification({
+        type: 'success',
+        title: 'Batch Prioritized',
+        message: `${batch.batch_number} flagged for priority FEFO picking`
+      })
+      setPrioritizeTarget(null)
     } catch (error) {
       addNotification({ type: 'error', title: 'Error', message: `Failed to prioritize ${batch.batch_number}` })
+    } finally {
+      setPrioritizeLoading(false)
     }
   }
 
@@ -76,25 +106,56 @@ export default function ExpiryAlertsPage() {
     { key: 'batch_number', label: 'Batch #' },
     { key: 'quantity', label: 'Qty Available' },
     { key: 'expiry_date', label: 'Expiry Date', sortable: true },
-    { key: 'days_to_expiry', label: 'Days Remaining', render: (val, row) => getExpiryBadge(row.status, val) },
-    { key: 'actions', label: 'Actions', render: (_, row) => {
-      if (row.status === 'written_off') return <span className="text-xs text-gray-400 dark:text-gray-500">No action</span>
-      if (row.status === 'expired') return <Button size="sm" variant="danger" icon={Trash2} onClick={() => setWriteOffTarget(row)}>Write Off</Button>
-      if (row.status === 'warning') {
-        return row.prioritized
-          ? <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400"><Check className="h-3.5 w-3.5" /> Prioritized</span>
-          : <Button size="sm" variant="warning" icon={Flag} onClick={() => handlePrioritize(row)}>Prioritize</Button>
+    {
+      key: 'days_to_expiry',
+      label: 'Days Remaining',
+      render: (val, row) => getExpiryBadge(row.status, val)
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => {
+        if (row.status === 'written_off') {
+          return <span className="text-xs text-gray-400 dark:text-gray-500">No action</span>
+        }
+        if (row.status === 'expired') {
+          return (
+            <Button size="sm" variant="danger" icon={Trash2} onClick={() => setWriteOffTarget(row)}>
+              Write Off
+            </Button>
+          )
+        }
+        if (row.status === 'warning') {
+          return row.prioritized
+            ? (
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <Check className="h-3.5 w-3.5" /> Prioritized
+              </span>
+            )
+            : (
+              <Button size="sm" variant="warning" icon={Flag} onClick={() => setPrioritizeTarget(row)}>
+                Prioritize
+              </Button>
+            )
+        }
+        return null
       }
-      return null
-    } },
+    },
   ]
 
   const filteredBatches = data.batches
     .filter(b => filterStatus === 'all' || b.status === filterStatus)
-    .filter(b => b.product_name.toLowerCase().includes(searchTerm.toLowerCase()) || b.batch_number.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(b =>
+      b.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.batch_number.toLowerCase().includes(searchTerm.toLowerCase())
+    )
 
   if (data.loading) {
-    return <div className="flex items-center justify-center min-h-96"><LoadingSpinner size="lg" message="Loading expiry data..." /></div>
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <LoadingSpinner size="lg" message="Loading expiry data..." />
+      </div>
+    )
   }
 
   return (
@@ -111,19 +172,38 @@ export default function ExpiryAlertsPage() {
       <Card>
         <Card.Body>
           <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search products or batches..." className="w-full sm:max-w-md" />
+            <SearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search products or batches..."
+              className="w-full sm:max-w-md"
+            />
             <div className="flex flex-wrap gap-2">
               {['all', 'expired', 'warning', 'safe'].map(s => (
-                <button key={s} onClick={() => setFilterStatus(s)} className={`px-3 py-1 text-sm rounded-full ${filterStatus === s ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1 text-sm rounded-full ${
+                    filterStatus === s
+                      ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
                   {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
               ))}
             </div>
           </div>
-          <Table data={filteredBatches} columns={columns} emptyMessage="No batches match your filters" highlightRowId={highlightRowId} />
+          <Table
+            data={filteredBatches}
+            columns={columns}
+            emptyMessage="No batches match your filters"
+            highlightRowId={highlightRowId}
+          />
         </Card.Body>
       </Card>
 
+      {/* Write-Off Confirm Modal */}
       <Modal
         isOpen={!!writeOffTarget}
         onClose={() => { if (!writeOffLoading) setWriteOffTarget(null) }}
@@ -139,11 +219,43 @@ export default function ExpiryAlertsPage() {
         </ModalBody>
         <ModalFooter>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-            <Button type="button" variant="secondary" onClick={() => setWriteOffTarget(null)} disabled={writeOffLoading} className="w-full sm:w-auto">Cancel</Button>
-            <Button type="button" variant="danger" icon={Trash2} loading={writeOffLoading} onClick={handleWriteOff} className="w-full sm:w-auto">Write Off</Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setWriteOffTarget(null)}
+              disabled={writeOffLoading}
+              className="w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              icon={Trash2}
+              loading={writeOffLoading}
+              onClick={handleWriteOff}
+              className="w-full sm:w-auto"
+            >
+              Write Off
+            </Button>
           </div>
         </ModalFooter>
       </Modal>
+
+      {/* Prioritize Confirm Modal */}
+      <ConfirmModal
+        isOpen={Boolean(prioritizeTarget)}
+        onClose={() => { if (!prioritizeLoading) setPrioritizeTarget(null) }}
+        onConfirm={handleConfirmPrioritize}
+        title="Prioritize Batch for FEFO"
+        message={prioritizeTarget
+          ? `Flag ${prioritizeTarget.batch_number} (${prioritizeTarget.product_name}) for priority FEFO picking? This ensures pickers pull this batch first before newer stock.`
+          : ''}
+        confirmText="Prioritize"
+        cancelText="Cancel"
+        variant="primary"
+        loading={prioritizeLoading}
+      />
     </div>
   )
 }

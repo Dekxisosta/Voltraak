@@ -18,8 +18,14 @@ export default function ReservationsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
+
+  // Cancel modal state
   const [cancelTarget, setCancelTarget] = useState(null)
   const [cancelling, setCancelling] = useState(false)
+
+  // Fulfill modal state
+  const [fulfillTarget, setFulfillTarget] = useState(null)
+  const [fulfilling, setFulfilling] = useState(false)
 
   useEffect(() => {
     loadReservations()
@@ -39,12 +45,25 @@ export default function ReservationsPage() {
     }
   }
 
-  const handleFulfill = (id) => {
-    setData(prev => ({
-      ...prev,
-      reservations: prev.reservations.map(r => r.id === id ? { ...r, status: 'fulfilled' } : r)
-    }))
-    addNotification({ type: 'success', title: 'Fulfilled', message: `Reservation #${id} marked as fulfilled` })
+  const handleConfirmFulfill = async () => {
+    if (!fulfillTarget) return
+    setFulfilling(true)
+    try {
+      setData(prev => ({
+        ...prev,
+        reservations: prev.reservations.map(r =>
+          r.id === fulfillTarget.id ? { ...r, status: 'fulfilled' } : r
+        )
+      }))
+      addNotification({
+        type: 'success',
+        title: 'Fulfilled',
+        message: `Reservation ${fulfillTarget.order_number} marked as fulfilled`
+      })
+      setFulfillTarget(null)
+    } finally {
+      setFulfilling(false)
+    }
   }
 
   const handleConfirmCancel = async () => {
@@ -53,9 +72,15 @@ export default function ReservationsPage() {
     try {
       setData(prev => ({
         ...prev,
-        reservations: prev.reservations.map(r => r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r)
+        reservations: prev.reservations.map(r =>
+          r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r
+        )
       }))
-      addNotification({ type: 'warning', title: 'Cancelled', message: `Reservation #${cancelTarget.id} cancelled, stock released` })
+      addNotification({
+        type: 'warning',
+        title: 'Cancelled',
+        message: `Reservation ${cancelTarget.order_number} cancelled, stock released`
+      })
       setCancelTarget(null)
     } finally {
       setCancelling(false)
@@ -81,12 +106,20 @@ export default function ReservationsPage() {
     { key: 'reserved_at', label: 'Reserved', render: (val) => new Date(val).toLocaleDateString() },
     { key: 'expires_at', label: 'Expires', render: (val) => new Date(val).toLocaleDateString() },
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
-    { key: 'actions', label: 'Actions', render: (_, row) => row.status === 'active' ? (
-      <div className="flex space-x-2">
-        <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => handleFulfill(row.id)}>Fulfill</Button>
-        <Button size="sm" variant="danger" icon={XCircle} onClick={() => setCancelTarget(row)}>Cancel</Button>
-      </div>
-    ) : null },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => row.status === 'active' ? (
+        <div className="flex gap-2">
+          <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => setFulfillTarget(row)}>
+            Fulfill
+          </Button>
+          <Button size="sm" variant="danger" icon={XCircle} onClick={() => setCancelTarget(row)}>
+            Cancel
+          </Button>
+        </div>
+      ) : null
+    },
   ]
 
   const filteredReservations = data.reservations.filter(r =>
@@ -113,18 +146,67 @@ export default function ReservationsPage() {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><CheckCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'active').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Active Reservations</p></div></div></Card.Body></Card>
-        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Package className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'active').reduce((s, r) => s + r.quantity, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Units Reserved</p></div></div></Card.Body></Card>
-        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Clock className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'expired').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Expired</p></div></div></Card.Body></Card>
+        <Card>
+          <Card.Body>
+            <div className="flex items-center">
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><CheckCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
+              <div className="ml-4">
+                <p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'active').length}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Active Reservations</p>
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
+        <Card>
+          <Card.Body>
+            <div className="flex items-center">
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Package className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
+              <div className="ml-4">
+                <p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'active').reduce((s, r) => s + r.quantity, 0)}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Units Reserved</p>
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
+        <Card>
+          <Card.Body>
+            <div className="flex items-center">
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Clock className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
+              <div className="ml-4">
+                <p className="text-2xl font-bold">{data.reservations.filter(r => r.status === 'expired').length}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Expired</p>
+              </div>
+            </div>
+          </Card.Body>
+        </Card>
       </div>
 
+      {/* Fulfill Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(fulfillTarget)}
+        onClose={() => { if (!fulfilling) setFulfillTarget(null) }}
+        onConfirm={handleConfirmFulfill}
+        title="Fulfill Reservation"
+        message={fulfillTarget
+          ? `Mark reservation ${fulfillTarget.order_number} for ${fulfillTarget.customer_name} (${fulfillTarget.quantity}× ${fulfillTarget.product_name}) as fulfilled? This will release it from active stock reservations.`
+          : ''}
+        confirmText="Fulfill"
+        cancelText="Cancel"
+        variant="primary"
+        loading={fulfilling}
+      />
+
+      {/* Cancel Confirmation Modal */}
       <ConfirmModal
         isOpen={Boolean(cancelTarget)}
-        onClose={() => setCancelTarget(null)}
+        onClose={() => { if (!cancelling) setCancelTarget(null) }}
         onConfirm={handleConfirmCancel}
         title="Cancel Reservation"
-        message={cancelTarget ? `Cancel reservation for order ${cancelTarget.order_number} (${cancelTarget.product_name})? The reserved stock will be released.` : ''}
+        message={cancelTarget
+          ? `Cancel reservation ${cancelTarget.order_number} for ${cancelTarget.customer_name} (${cancelTarget.product_name})? The reserved stock will be released back to available inventory.`
+          : ''}
         confirmText="Cancel Reservation"
+        cancelText="Keep"
         variant="danger"
         loading={cancelling}
       />

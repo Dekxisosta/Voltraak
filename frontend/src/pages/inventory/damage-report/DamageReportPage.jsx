@@ -4,8 +4,8 @@
  */
 
 import { useState, useEffect } from 'react'
-import { AlertCircle, Plus, Camera, FileText } from 'lucide-react'
-import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import { AlertCircle, Plus, Camera, FileText, Edit, Trash2 } from 'lucide-react'
+import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner, ConfirmModal } from '@/shared/components/common'
 import Modal, { ModalBody, ModalFooter } from '@/shared/components/common/Modal'
 import Input, { NumberInput } from '@/shared/components/common/Input'
 import Select from '@/shared/components/common/Select'
@@ -30,10 +30,18 @@ const EMPTY_FORM = {
 export default function DamageReportPage() {
   const [data, setData] = useState({ reports: [], loading: true })
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Create / edit modal state
   const [modalOpen, setModalOpen] = useState(false)
+  const [editingReport, setEditingReport] = useState(null) // null = create mode
   const [form, setForm] = useState(EMPTY_FORM)
   const [formErrors, setFormErrors] = useState({})
   const [saving, setSaving] = useState(false)
+
+  // Delete modal state
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
 
@@ -53,7 +61,23 @@ export default function DamageReportPage() {
   }
 
   const openCreateModal = () => {
+    setEditingReport(null)
     setForm(EMPTY_FORM)
+    setFormErrors({})
+    setModalOpen(true)
+  }
+
+  const openEditModal = (report) => {
+    setEditingReport(report)
+    setForm({
+      product_name: report.product_name,
+      sku: report.sku ?? '',
+      batch_number: report.batch_number,
+      damage_type: report.damage_type,
+      severity: report.severity,
+      quantity_affected: report.quantity_affected,
+      notes: report.notes ?? '',
+    })
     setFormErrors({})
     setModalOpen(true)
   }
@@ -67,7 +91,8 @@ export default function DamageReportPage() {
     const errors = {}
     if (!form.product_name.trim()) errors.product_name = 'Product name is required'
     if (!form.batch_number.trim()) errors.batch_number = 'Batch number is required'
-    if (!Number(form.quantity_affected) || Number(form.quantity_affected) < 1) errors.quantity_affected = 'Enter a quantity of at least 1'
+    if (!Number(form.quantity_affected) || Number(form.quantity_affected) < 1)
+      errors.quantity_affected = 'Enter a quantity of at least 1'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -77,25 +102,71 @@ export default function DamageReportPage() {
     if (!validateForm()) return
     setSaving(true)
     try {
-      await damageSource.create({
+      const payload = {
         product_name: form.product_name.trim(),
         sku: form.sku.trim(),
         batch_number: form.batch_number.trim(),
         damage_type: form.damage_type,
         severity: form.severity,
         quantity_affected: Number(form.quantity_affected),
-        status: 'pending_review',
-        reported_by: 'Inventory Staff',
-        reported_at: new Date().toISOString(),
         notes: form.notes.trim(),
-      })
-      addNotification({ type: 'success', title: 'Report Created', message: `Damage report for ${form.product_name} submitted` })
+      }
+
+      if (editingReport) {
+        await damageSource.update(editingReport.id, payload)
+        setData(prev => ({
+          ...prev,
+          reports: prev.reports.map(r =>
+            r.id === editingReport.id ? { ...r, ...payload } : r
+          )
+        }))
+        addNotification({
+          type: 'success',
+          title: 'Report Updated',
+          message: `Damage report for ${payload.product_name} updated`
+        })
+      } else {
+        const newReport = await damageSource.create({
+          ...payload,
+          status: 'pending_review',
+          reported_by: 'Inventory Staff',
+          reported_at: new Date().toISOString(),
+        })
+        setData(prev => ({ ...prev, reports: [newReport, ...prev.reports] }))
+        addNotification({
+          type: 'success',
+          title: 'Report Created',
+          message: `Damage report for ${payload.product_name} submitted`
+        })
+      }
+
       setModalOpen(false)
-      loadDamageReports()
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: 'Failed to create damage report' })
+      addNotification({ type: 'error', title: 'Error', message: `Failed to ${editingReport ? 'update' : 'create'} damage report` })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await damageSource.delete(deleteTarget.id)
+      setData(prev => ({
+        ...prev,
+        reports: prev.reports.filter(r => r.id !== deleteTarget.id)
+      }))
+      addNotification({
+        type: 'success',
+        title: 'Report Deleted',
+        message: `Damage report for ${deleteTarget.product_name} has been removed`
+      })
+      setDeleteTarget(null)
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: 'Failed to delete damage report' })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -128,6 +199,20 @@ export default function DamageReportPage() {
     { key: 'quantity_affected', label: 'Qty Affected' },
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'reported_at', label: 'Reported', render: (val) => new Date(val).toLocaleDateString() },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" icon={Edit} onClick={() => openEditModal(row)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="danger" icon={Trash2} onClick={() => setDeleteTarget(row)}>
+            Delete
+          </Button>
+        </div>
+      )
+    },
   ]
 
   const filteredReports = data.reports.filter(r =>
@@ -136,7 +221,11 @@ export default function DamageReportPage() {
   )
 
   if (data.loading) {
-    return <div className="flex items-center justify-center min-h-96"><LoadingSpinner size="lg" message="Loading damage reports..." /></div>
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <LoadingSpinner size="lg" message="Loading damage reports..." />
+      </div>
+    )
   }
 
   return (
@@ -146,10 +235,22 @@ export default function DamageReportPage() {
       <Card>
         <Card.Body>
           <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between">
-            <SearchBar value={searchTerm} onChange={setSearchTerm} placeholder="Search reports..." className="w-full sm:max-w-md" />
-            <Button variant="primary" icon={Plus} className="w-full sm:w-auto" onClick={openCreateModal}>New Report</Button>
+            <SearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search reports..."
+              className="w-full sm:max-w-md"
+            />
+            <Button variant="primary" icon={Plus} className="w-full sm:w-auto" onClick={openCreateModal}>
+              New Report
+            </Button>
           </div>
-          <Table data={filteredReports} columns={columns} emptyMessage="No damage reports found" highlightRowId={highlightRowId} />
+          <Table
+            data={filteredReports}
+            columns={columns}
+            emptyMessage="No damage reports found"
+            highlightRowId={highlightRowId}
+          />
         </Card.Body>
       </Card>
 
@@ -157,9 +258,13 @@ export default function DamageReportPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><AlertCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+              </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{filteredReports.filter(r => r.status === 'pending_review').length}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {filteredReports.filter(r => r.status === 'pending_review').length}
+                </p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Pending Review</p>
               </div>
             </div>
@@ -168,9 +273,13 @@ export default function DamageReportPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><FileText className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <FileText className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+              </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{filteredReports.filter(r => r.status === 'under_investigation').length}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {filteredReports.filter(r => r.status === 'under_investigation').length}
+                </p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Under Investigation</p>
               </div>
             </div>
@@ -179,9 +288,13 @@ export default function DamageReportPage() {
         <Card>
           <Card.Body>
             <div className="flex items-center">
-              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Camera className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div>
+              <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <Camera className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+              </div>
               <div className="ml-4">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{filteredReports.reduce((sum, r) => sum + r.quantity_affected, 0)}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {filteredReports.reduce((sum, r) => sum + r.quantity_affected, 0)}
+                </p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Items Affected</p>
               </div>
             </div>
@@ -189,7 +302,13 @@ export default function DamageReportPage() {
         </Card>
       </div>
 
-      <Modal isOpen={modalOpen} onClose={closeModal} title="New Damage Report" size="md">
+      {/* Create / Edit Modal */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        title={editingReport ? 'Edit Damage Report' : 'New Damage Report'}
+        size="md"
+      >
         <form onSubmit={handleSave}>
           <ModalBody>
             <div className="space-y-4">
@@ -256,14 +375,43 @@ export default function DamageReportPage() {
           </ModalBody>
           <ModalFooter>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
-              <Button type="button" variant="secondary" onClick={closeModal} disabled={saving} className="w-full sm:w-auto">Cancel</Button>
-              <Button type="submit" variant="primary" loading={saving} icon={Plus} className="w-full sm:w-auto">
-                Submit Report
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={closeModal}
+                disabled={saving}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                loading={saving}
+                icon={editingReport ? Edit : Plus}
+                className="w-full sm:w-auto"
+              >
+                {editingReport ? 'Save Changes' : 'Submit Report'}
               </Button>
             </div>
           </ModalFooter>
         </form>
       </Modal>
+
+      {/* Delete Confirm Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => { if (!deleting) setDeleteTarget(null) }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Damage Report"
+        message={deleteTarget
+          ? `Delete the damage report for ${deleteTarget.product_name} (${deleteTarget.batch_number})? This action cannot be undone.`
+          : ''}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   )
 }

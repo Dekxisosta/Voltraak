@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowUp, ArrowDown, Plus, History, Package } from 'lucide-react'
 import { Card, Table, StatusBadge, Button, Input, Select, SearchBar, LoadingSpinner } from '@/shared/components/common'
+import Modal, { ModalBody, ModalFooter } from '@/shared/components/common/Modal'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
@@ -13,8 +14,33 @@ import { createResourceDataSource } from '@/shared/services/dataSource'
 // TODO: pass { api: inventoryApi } once the endpoint exists
 const stockTransactionsSource = createResourceDataSource('inventory/stock-in-out')
 
+const EMPTY_FORM = {
+  type: 'stock_in',
+  product_id: '',
+  quantity: 1,
+  reference_number: '',
+  reason: '',
+  notes: ''
+}
 
+const stockInReasons = [
+  'Purchase Order Receipt',
+  'Return from Customer',
+  'Production Completion',
+  'Adjustment - Found',
+  'Transfer In',
+  'Other'
+]
 
+const stockOutReasons = [
+  'Customer Order',
+  'Damage Adjustment',
+  'Expiry Disposal',
+  'Transfer Out',
+  'Sample/Demo',
+  'Theft/Loss',
+  'Other'
+]
 
 export default function StockInOutPage() {
   const [data, setData] = useState({
@@ -23,16 +49,13 @@ export default function StockInOutPage() {
   })
   const [searchTerm, setSearchTerm] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
+
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('stock_in')
-  const [transactionForm, setTransactionForm] = useState({
-    type: 'stock_in',
-    product_id: '',
-    quantity: 0,
-    reference_number: '',
-    reason: '',
-    notes: ''
-  })
+  const [transactionForm, setTransactionForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
 
@@ -40,14 +63,9 @@ export default function StockInOutPage() {
     loadTransactions()
   }, [])
 
-  useEffect(() => {
-    setTransactionForm(prev => ({ ...prev, type: activeTab }))
-  }, [activeTab])
-
   const loadTransactions = async () => {
     try {
       setData(prev => ({ ...prev, loading: true }))
-
       const result = await stockTransactionsSource.list()
       setData({ transactions: result, loading: false })
     } catch (error) {
@@ -59,6 +77,22 @@ export default function StockInOutPage() {
       })
       setData(prev => ({ ...prev, loading: false }))
     }
+  }
+
+  const openModal = (type = 'stock_in') => {
+    setActiveTab(type)
+    setTransactionForm({ ...EMPTY_FORM, type })
+    setModalOpen(true)
+  }
+
+  const closeModal = () => {
+    if (submitting) return
+    setModalOpen(false)
+  }
+
+  const handleTabChange = (type) => {
+    setActiveTab(type)
+    setTransactionForm(prev => ({ ...prev, type, reason: '' }))
   }
 
   const handleSubmitTransaction = async (e) => {
@@ -92,14 +126,8 @@ export default function StockInOutPage() {
         message: `${transactionForm.type === 'stock_in' ? 'Stock In' : 'Stock Out'} transaction ${newTransaction.transaction_number} recorded successfully`
       })
 
-      setTransactionForm({
-        type: activeTab,
-        product_id: '',
-        quantity: 0,
-        reference_number: '',
-        reason: '',
-        notes: ''
-      })
+      setModalOpen(false)
+      setTransactionForm(EMPTY_FORM)
     } catch (error) {
       console.error('Error submitting transaction:', error)
       addNotification({
@@ -148,7 +176,7 @@ export default function StockInOutPage() {
       key: 'quantity',
       label: 'Quantity',
       render: (value, row) => (
-        <div className={`font-medium ${row.type === 'stock_in' ? 'text-gray-600 dark:text-gray-400' : 'text-gray-600 dark:text-gray-400'}`}>
+        <div className="font-medium text-gray-600 dark:text-gray-400">
           {row.type === 'stock_in' ? '+' : '-'}{value}
         </div>
       )
@@ -189,25 +217,6 @@ export default function StockInOutPage() {
     return matchesSearch && matchesType
   })
 
-  const stockInReasons = [
-    'Purchase Order Receipt',
-    'Return from Customer',
-    'Production Completion',
-    'Adjustment - Found',
-    'Transfer In',
-    'Other'
-  ]
-
-  const stockOutReasons = [
-    'Customer Order',
-    'Damage Adjustment',
-    'Expiry Disposal',
-    'Transfer Out',
-    'Sample/Demo',
-    'Theft/Loss',
-    'Other'
-  ]
-
   const currentReasons = activeTab === 'stock_in' ? stockInReasons : stockOutReasons
 
   if (data.loading) {
@@ -226,129 +235,6 @@ export default function StockInOutPage() {
         icon={Package}
       />
 
-      {/* Transaction Entry Form */}
-      <Card>
-        <Card.Header>
-          <div className="flex space-x-4">
-            <button
-              type="button"
-              onClick={() => setActiveTab('stock_in')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md font-medium ${
-                activeTab === 'stock_in'
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              <ArrowUp className="h-4 w-4" />
-              <span>Stock In</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('stock_out')}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md font-medium ${
-                activeTab === 'stock_out'
-                  ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              <ArrowDown className="h-4 w-4" />
-              <span>Stock Out</span>
-            </button>
-          </div>
-        </Card.Header>
-        <Card.Body>
-          <form onSubmit={handleSubmitTransaction} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label">Product/SKU</label>
-                <Input
-                  type="text"
-                  value={transactionForm.product_id}
-                  onChange={(e) => setTransactionForm(prev => ({
-                    ...prev,
-                    product_id: e.target.value
-                  }))}
-                  placeholder="Enter product SKU or name"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="form-label">Quantity</label>
-                <Input
-                  type="number"
-                  value={transactionForm.quantity}
-                  onChange={(e) => setTransactionForm(prev => ({
-                    ...prev,
-                    quantity: Number(e.target.value)
-                  }))}
-                  min="1"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label">Reference Number</label>
-                <Input
-                  type="text"
-                  value={transactionForm.reference_number}
-                  onChange={(e) => setTransactionForm(prev => ({
-                    ...prev,
-                    reference_number: e.target.value
-                  }))}
-                  placeholder="PO number, order number, etc."
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="form-label">Reason</label>
-                <Select
-                  value={transactionForm.reason}
-                  onChange={(e) => setTransactionForm(prev => ({
-                    ...prev,
-                    reason: e.target.value
-                  }))}
-                  required
-                >
-                  <option value="">Select reason</option>
-                  {currentReasons.map(reason => (
-                    <option key={reason} value={reason}>{reason}</option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <label className="form-label">Notes (Optional)</label>
-              <textarea
-                value={transactionForm.notes}
-                onChange={(e) => setTransactionForm(prev => ({
-                  ...prev,
-                  notes: e.target.value
-                }))}
-                className="form-input"
-                rows={3}
-                placeholder="Additional details about this transaction..."
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                variant="primary"
-                loading={submitting}
-                icon={Plus}
-              >
-                Record {activeTab === 'stock_in' ? 'Stock In' : 'Stock Out'}
-              </Button>
-            </div>
-          </form>
-        </Card.Body>
-      </Card>
-
       {/* Transaction History */}
       <Card>
         <Card.Header>
@@ -356,6 +242,14 @@ export default function StockInOutPage() {
             <div className="flex items-center">
               <History className="h-5 w-5 text-gray-600 dark:text-gray-400 mr-2" />
               <h3 className="text-lg font-medium">Today's Transactions</h3>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="primary" size="sm" icon={ArrowUp} onClick={() => openModal('stock_in')}>
+                Stock In
+              </Button>
+              <Button variant="warning" size="sm" icon={ArrowDown} onClick={() => openModal('stock_out')}>
+                Stock Out
+              </Button>
             </div>
           </div>
         </Card.Header>
@@ -367,7 +261,6 @@ export default function StockInOutPage() {
               placeholder="Search transactions..."
               className="flex-1 max-w-md"
             />
-            
             <select
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
@@ -444,6 +337,114 @@ export default function StockInOutPage() {
           </Card.Body>
         </Card>
       </div>
+
+      {/* Record Transaction Modal */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={closeModal}
+        title="Record Transaction"
+        size="md"
+      >
+        <form onSubmit={handleSubmitTransaction}>
+          <ModalBody>
+            {/* Stock In / Stock Out tabs */}
+            <div className="flex space-x-2 mb-5 border-b border-[var(--color-glass-border)] pb-4">
+              <button
+                type="button"
+                onClick={() => handleTabChange('stock_in')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                  activeTab === 'stock_in'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <ArrowUp className="h-4 w-4" />
+                Stock In
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabChange('stock_out')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium text-sm transition-colors ${
+                  activeTab === 'stock_out'
+                    ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <ArrowDown className="h-4 w-4" />
+                Stock Out
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Product / SKU"
+                  value={transactionForm.product_id}
+                  onChange={(e) => setTransactionForm(prev => ({ ...prev, product_id: e.target.value }))}
+                  placeholder="Enter product SKU or name"
+                  required
+                />
+                <Input
+                  label="Quantity"
+                  type="number"
+                  min="1"
+                  value={transactionForm.quantity}
+                  onChange={(e) => setTransactionForm(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Reference Number"
+                  value={transactionForm.reference_number}
+                  onChange={(e) => setTransactionForm(prev => ({ ...prev, reference_number: e.target.value }))}
+                  placeholder="PO number, order number, etc."
+                  required
+                />
+                <Select
+                  label="Reason"
+                  value={transactionForm.reason}
+                  onChange={(e) => setTransactionForm(prev => ({ ...prev, reason: e.target.value }))}
+                  required
+                >
+                  <option value="">Select reason</option>
+                  {currentReasons.map(reason => (
+                    <option key={reason} value={reason}>{reason}</option>
+                  ))}
+                </Select>
+              </div>
+
+              <div>
+                <label className="form-label">Notes (Optional)</label>
+                <textarea
+                  value={transactionForm.notes}
+                  onChange={(e) => setTransactionForm(prev => ({ ...prev, notes: e.target.value }))}
+                  className="form-input"
+                  rows={3}
+                  placeholder="Additional details about this transaction..."
+                />
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
+              <Button type="button" variant="secondary" onClick={closeModal} disabled={submitting} className="w-full sm:w-auto">
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant={activeTab === 'stock_in' ? 'primary' : 'warning'}
+                icon={activeTab === 'stock_in' ? ArrowUp : ArrowDown}
+                loading={submitting}
+                className="w-full sm:w-auto"
+              >
+                Record {activeTab === 'stock_in' ? 'Stock In' : 'Stock Out'}
+              </Button>
+            </div>
+          </ModalFooter>
+        </form>
+      </Modal>
     </div>
   )
 }
