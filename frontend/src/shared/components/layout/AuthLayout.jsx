@@ -9,13 +9,11 @@
  * breakpoint; on mobile a compact brand strip stands in for it instead.
  */
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { Mail, Github, UserCog, PackageSearch, Boxes } from 'lucide-react'
-
-// Contact + repo details for the footer. Lifted to the top so they're easy
-// to update in one place if the project or maintainer email changes.
-const CONTACT_EMAIL = 'rroquxii@gmail.com'
-const REPO_URL = 'https://github.com/Dekxisosta/voltraak-mock'
+import { CONTACT } from '@/shared/constants/contact'
+import { SOCIAL } from '@/shared/constants/social'
+import { DEVS } from '@/shared/constants/devs'
 
 // The three roles Voltraak is built around. Shared between the desktop
 // floating badges and the mobile brand strip so the two stay in sync.
@@ -24,6 +22,61 @@ const ROLES = [
   { icon: Boxes, label: 'Warehouse Staff', sub: 'Picks & packs orders', accent: 'bg-blue-400' },
   { icon: PackageSearch, label: 'Inventory Staff', sub: 'Logs stock counts', accent: 'bg-amber-400' },
 ]
+
+// Base bar heights for the sparkline. Each bar animates between its base
+// value and a randomised target so the chart feels live without jarring jumps.
+const BAR_HEIGHTS = [38, 52, 46, 64, 58, 74, 66]
+
+/**
+ * Sparkline bars that animate independently.
+ * Each bar runs on its own randomised interval (2.5 – 4.5 s) so they never
+ * move in sync, giving a live-data feel. The transition uses ease-in-out so
+ * each bar accelerates out of its old height and decelerates into the new one
+ * — no abrupt snapping at either end.
+ */
+function AnimatedBar({ base, initialDelay }) {
+  const [height, setHeight] = useState(base)
+  const intervalRef = useRef(null)
+
+  useEffect(() => {
+    const next = () => Math.min(90, Math.max(16, base + (Math.random() - 0.5) * 32))
+    const period = 2500 + Math.random() * 2000   // 2.5 – 4.5 s per bar
+
+    const timeout = setTimeout(() => {
+      setHeight(next())
+      intervalRef.current = setInterval(() => setHeight(next()), period)
+    }, initialDelay)
+
+    return () => {
+      clearTimeout(timeout)
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [base, initialDelay])
+
+  return (
+    <div
+      className="flex-1 rounded-t-sm bg-gradient-to-t from-amber-400/30 to-amber-300/90"
+      style={{
+        height: `${height}%`,
+        transition: 'height 2.2s ease-in-out',
+      }}
+    />
+  )
+}
+
+function AnimatedBars() {
+  // Fixed stagger delays computed once on mount so re-renders don't reshuffle them
+  const delays = useRef(BAR_HEIGHTS.map((_, i) => 300 + i * 200 + Math.random() * 350))
+
+  return (
+    <div className="mt-6 flex items-end gap-2 h-20">
+      {BAR_HEIGHTS.map((base, i) => (
+        <AnimatedBar key={i} base={base} initialDelay={delays.current[i]} />
+      ))}
+    </div>
+  )
+}
+
 
 /**
  * Wraps a card in a mouse-tracked 3D tilt + idle float.
@@ -118,13 +171,13 @@ function RoleGroupCard({ className = '', floatDelay = '0s', floatDuration = '7s'
 function MobileBrandStrip() {
   return (
     <div className="lg:hidden mt-10 w-full rounded-2xl bg-[#0b1220] border border-white/10 relative overflow-hidden">
-      <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
+      <svg className="absolute inset-0 w-full h-full voltraak-dot-drift" aria-hidden="true">
         <defs>
           <pattern id="auth-dot-grid-mobile" width="24" height="24" patternUnits="userSpaceOnUse">
             <circle cx="1.5" cy="1.5" r="1.5" fill="#ffffff" fillOpacity="0.14" />
           </pattern>
         </defs>
-        <rect width="100%" height="100%" fill="url(#auth-dot-grid-mobile)" />
+        <rect width="200%" height="200%" x="-50%" y="-50%" fill="url(#auth-dot-grid-mobile)" />
       </svg>
       <div className="pointer-events-none absolute -top-16 -right-10 w-52 h-52 rounded-full bg-amber-400 opacity-[0.16] blur-[70px]" />
 
@@ -167,8 +220,19 @@ export default function AuthLayout({ children }) {
           50%  { transform: translateY(-7px); }
           100% { transform: translateY(0px); }
         }
+        @keyframes voltraak-dot-drift {
+          0%   { transform: translate(0px, 0px); }
+          25%  { transform: translate(10px, 6px); }
+          50%  { transform: translate(18px, 14px); }
+          75%  { transform: translate(8px, 20px); }
+          100% { transform: translate(0px, 0px); }
+        }
+        .voltraak-dot-drift {
+          animation: voltraak-dot-drift 40s ease-in-out infinite;
+        }
         @media (prefers-reduced-motion: reduce) {
           .voltraak-float { animation: none !important; transition: none !important; }
+          .voltraak-dot-drift { animation: none !important; }
         }
         @media (max-height: 800px) {
           .voltraak-float { animation: none; }
@@ -214,14 +278,14 @@ export default function AuthLayout({ children }) {
             {/* Contact + repo */}
             <div className="flex items-center gap-4">
               <a
-                href={`mailto:${CONTACT_EMAIL}`}
+                href={`mailto:${CONTACT.devEmail}`}
                 className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
               >
                 <Mail className="h-3.5 w-3.5" />
-                {CONTACT_EMAIL}
+                {CONTACT.devEmail}
               </a>
               <a
-                href={REPO_URL}
+                href={SOCIAL.repo}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
@@ -229,6 +293,27 @@ export default function AuthLayout({ children }) {
                 <Github className="h-3.5 w-3.5" />
                 Source on GitHub
               </a>
+            </div>
+
+            {/* Team avatars */}
+            <div className="flex items-center gap-1.5">
+              {DEVS.map((dev) => (
+                <a
+                  key={dev.username}
+                  href={dev.github}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={dev.username}
+                  className="group relative"
+                >
+                  <img
+                    src={dev.avatar}
+                    alt={dev.username}
+                    className="w-6 h-6 rounded-full ring-1 ring-[var(--color-border-secondary)] object-cover transition-transform group-hover:scale-110 group-hover:ring-[var(--color-accent)]"
+                  />
+                </a>
+              ))}
+              <span className="ml-1 text-xs text-[var(--color-text-muted)]">Built by the team</span>
             </div>
 
             <p className="text-xs text-[var(--color-text-muted)]">
@@ -240,14 +325,14 @@ export default function AuthLayout({ children }) {
 
       {/* Brand panel */}
       <div className="hidden lg:flex lg:w-[50%] xl:w-[50%] lg:h-full relative overflow-hidden bg-[#0b1220]">
-        {/* Fine dot-grid texture */}
-        <svg className="absolute inset-0 w-full h-full" aria-hidden="true">
+        {/* Fine dot-grid texture — drifts slowly via voltraak-dot-drift */}
+        <svg className="absolute inset-0 w-full h-full voltraak-dot-drift" aria-hidden="true">
           <defs>
             <pattern id="auth-dot-grid" width="28" height="28" patternUnits="userSpaceOnUse">
               <circle cx="1.5" cy="1.5" r="1.5" fill="#ffffff" fillOpacity="0.16" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#auth-dot-grid)" />
+          <rect width="200%" height="200%" x="-50%" y="-50%" fill="url(#auth-dot-grid)" />
         </svg>
 
         {/* Ambient glow, echoes the "power" in Voltraak without being literal */}
@@ -290,16 +375,8 @@ export default function AuthLayout({ children }) {
                   </span>
                 </div>
 
-                {/* Sparkline bars */}
-                <div className="mt-6 flex items-end gap-2 h-20">
-                  {[38, 52, 46, 64, 58, 74, 66].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-t-sm bg-gradient-to-t from-amber-400/30 to-amber-300/90"
-                      style={{ height: `${h}%` }}
-                    />
-                  ))}
-                </div>
+                {/* Sparkline bars — animated via AnimatedBars component */}
+                <AnimatedBars />
                 <div className="mt-2 flex justify-between text-[11px] text-slate-500 font-mono">
                   <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
                 </div>

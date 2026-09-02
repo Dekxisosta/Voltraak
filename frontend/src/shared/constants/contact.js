@@ -6,6 +6,9 @@ export const CONTACT = {
   /** General customer / business inquiries */
   email: 'hello@walangbrownout.com',
 
+  /** Project maintainer / dev contact (used in auth layout footer) */
+  devEmail: 'rroquxii@gmail.com',
+
   /** Technical support / IMS helpdesk */
   supportEmail: 'support@walangbrownout.com',
 

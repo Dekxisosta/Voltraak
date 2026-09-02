@@ -11,4 +11,7 @@ export const SOCIAL = {
 
   /** GitHub org — used primarily in internal / developer-facing links */
   github: 'https://github.com/Dekxisosta',
+
+  /** Public source repository for the Voltraak IMS project */
+  repo: 'https://github.com/Dekxisosta/voltraak-mock',
 };
