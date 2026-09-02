@@ -49,9 +49,19 @@
 
     --color-overlay: rgba(24, 24, 27, 0.5);
 
+    /* Frosted glass surfaces — semi-transparent backgrounds for blur layers */
+    --color-glass-card: rgba(255, 255, 255, 0.72);
+    --color-glass-sidebar: rgba(24, 24, 27, 0.82);
+    --color-glass-header: rgba(24, 24, 27, 0.80);
+    --color-glass-modal: rgba(255, 255, 255, 0.78);
+    --color-glass-popover: rgba(255, 255, 255, 0.85);
+    --color-glass-panel: rgba(255, 255, 255, 0.65);
+    --color-glass-border: rgba(255, 255, 255, 0.55);
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+    --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.10), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
   }
 
   /* --- Dark Theme --- */
@@ -92,9 +102,19 @@
 
     --color-overlay: rgba(0, 0, 0, 0.7);
 
+    /* Frosted glass surfaces — semi-transparent backgrounds for blur layers */
+    --color-glass-card: rgba(19, 19, 22, 0.75);
+    --color-glass-sidebar: rgba(10, 10, 11, 0.85);
+    --color-glass-header: rgba(10, 10, 11, 0.82);
+    --color-glass-modal: rgba(24, 24, 27, 0.82);
+    --color-glass-popover: rgba(31, 31, 35, 0.90);
+    --color-glass-panel: rgba(19, 19, 22, 0.70);
+    --color-glass-border: rgba(255, 255, 255, 0.08);
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
   }
 
   /* ============================================
@@ -274,15 +294,17 @@
 
   /* Card styles */
   .card {
-    background-color: var(--color-surface-card);
-    border: 1px solid var(--color-border-primary);
-    box-shadow: var(--shadow-sm);
-    @apply rounded-lg;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
+    background-color: var(--color-glass-card);
+    border: 1px solid var(--color-glass-border);
+    box-shadow: var(--shadow-glass);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    @apply rounded-xl;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .card-header {
-    border-bottom: 1px solid var(--color-border-primary);
+    border-bottom: 1px solid var(--color-glass-border);
     padding: var(--density-card-py) var(--density-card-px);
     transition: padding 0.15s ease;
   }
@@ -293,8 +315,8 @@
   }
 
   .card-footer {
-    border-top: 1px solid var(--color-border-primary);
-    background-color: var(--color-bg-secondary);
+    border-top: 1px solid var(--color-glass-border);
+    background-color: transparent;
     padding: var(--density-card-py) var(--density-card-px);
     transition: padding 0.15s ease;
   }
@@ -307,10 +329,12 @@
   }
 
   .nav-link-active {
-    background-color: var(--color-accent-soft);
-    color: var(--color-text-primary);
-    border-right: 2px solid var(--color-accent);
+    background-color: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border-right: 2px solid rgba(255, 255, 255, 0.8);
     font-weight: 600;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .nav-link-inactive {
@@ -318,7 +342,7 @@
   }
   .nav-link-inactive:hover {
     color: var(--color-text-primary);
-    background-color: var(--color-bg-tertiary);
+    background-color: rgba(255, 255, 255, 0.08);
   }
 
   /* Table styles */
@@ -384,15 +408,18 @@
   /* Modal overlay */
   .modal-overlay {
     @apply fixed inset-0 z-50 flex items-center justify-center;
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(2px);
+    background-color: var(--color-overlay);
+    backdrop-filter: blur(6px) saturate(140%);
+    -webkit-backdrop-filter: blur(6px) saturate(140%);
   }
 
   .modal-content {
-    background-color: var(--color-surface-modal);
-    border: 1px solid var(--color-border-primary);
-    box-shadow: var(--shadow-lg);
-    @apply rounded-xl w-full max-w-md mx-4 animate-fade-in;
+    background-color: var(--color-glass-modal);
+    border: 1px solid var(--color-glass-border);
+    box-shadow: var(--shadow-glass);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    @apply rounded-2xl w-full max-w-md mx-4 animate-fade-in;
   }
 }
 

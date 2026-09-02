@@ -47,14 +47,21 @@ export default function FilterPanel({
 
   return (
     <FilterContext.Provider value={contextValue}>
-      <div className={cn('bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg', className)}>
+      <div
+        className={cn('rounded-xl border border-[var(--color-glass-border)] shadow-[var(--shadow-glass)]', className)}
+        style={{
+          background: 'var(--color-glass-card)',
+          backdropFilter: 'blur(16px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+        }}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">{title}</h3>
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-glass-border)]">
+          <h3 className="text-lg font-medium text-[var(--color-text-primary)]">{title}</h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+            className="text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -66,7 +73,7 @@ export default function FilterPanel({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+        <div className="flex items-center justify-between p-4 border-t border-[var(--color-glass-border)] bg-transparent">
           <Button
             variant="ghost"
             size="sm"
@@ -105,7 +112,7 @@ export function useFilterContext() {
 export function FilterGroup({ title, children, className }) {
   return (
     <div className={className}>
-      <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">{title}</h4>
+      <h4 className="text-sm font-medium text-[var(--color-text-primary)] mb-3">{title}</h4>
       <div className="space-y-3">
         {children}
       </div>
@@ -117,7 +124,7 @@ export function FilterGroup({ title, children, className }) {
 export function FilterField({ label, children, className }) {
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+      <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
         {label}
       </label>
       {children}
@@ -176,9 +183,9 @@ export function StatusFilter({
                   : currentValues.filter((v) => v !== option.value)
                 updateFilter(filterKey, newValues)
               }}
-              className="h-4 w-4 text-gray-900 dark:text-gray-100 focus:ring-gray-400 dark:focus:ring-gray-500 border-gray-300 dark:border-gray-600 rounded"
+              className="h-4 w-4 text-[var(--color-accent)] focus:ring-[var(--color-accent)] border-[var(--color-input-border)] rounded"
             />
-            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">{option.label}</span>
+            <span className="ml-2 text-sm text-[var(--color-text-secondary)]">{option.label}</span>
           </label>
         ))}
       </div>

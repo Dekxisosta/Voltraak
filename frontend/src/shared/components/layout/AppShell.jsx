@@ -46,7 +46,14 @@ export default function AppShell({ children }) {
 
           {/* ── Left panel — desktop ──────────────────────────────── */}
           {/* Sticky inside the body row; scrolls independently */}
-          <aside className="hidden lg:flex flex-col w-[220px] shrink-0 overflow-y-auto bg-[var(--color-surface-sidebar)] border-r border-white/10">
+          <aside
+            className="hidden lg:flex flex-col w-[220px] shrink-0 overflow-y-auto border-r border-[var(--color-glass-border)]"
+            style={{
+              background: 'var(--color-glass-sidebar)',
+              backdropFilter: 'blur(20px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+            }}
+          >
             <Sidebar />
           </aside>
 
@@ -55,9 +62,17 @@ export default function AppShell({ children }) {
             <div className="fixed inset-0 z-50 lg:hidden">
               <div
                 className="fixed inset-0 bg-[var(--color-overlay)]"
+                style={{ backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
                 onClick={() => setSidebarOpen(false)}
               />
-              <div className="fixed inset-y-0 left-0 w-[220px] bg-[var(--color-surface-sidebar)] overflow-y-auto">
+              <div
+                className="fixed inset-y-0 left-0 w-[220px] overflow-y-auto border-r border-[var(--color-glass-border)]"
+                style={{
+                  background: 'var(--color-glass-sidebar)',
+                  backdropFilter: 'blur(20px) saturate(160%)',
+                  WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+                }}
+              >
                 <Sidebar onClose={() => setSidebarOpen(false)} />
               </div>
             </div>
@@ -72,7 +87,14 @@ export default function AppShell({ children }) {
 
           {/* ── Right panel — collapses when empty ────────────────── */}
           {rightPanel && (
-            <aside className="hidden xl:flex flex-col w-[260px] shrink-0 overflow-y-auto border-l border-[var(--color-border-primary)] bg-[var(--color-bg-primary)]">
+            <aside
+              className="hidden xl:flex flex-col w-[260px] shrink-0 overflow-y-auto border-l border-[var(--color-glass-border)]"
+              style={{
+                background: 'var(--color-glass-panel)',
+                backdropFilter: 'blur(16px) saturate(150%)',
+                WebkitBackdropFilter: 'blur(16px) saturate(150%)',
+              }}
+            >
               <div className="p-4 space-y-4">
                 {rightPanel}
               </div>

@@ -27,7 +27,7 @@ export default function Header({ onMenuClick }) {
   }
 
   return (
-    <header className="sticky top-0 z-30 bg-[var(--color-surface-sidebar)] border-b border-[var(--color-border-primary)] shadow-sm">
+    <header className="sticky top-0 z-30 bg-[var(--color-glass-header)] border-b border-[var(--color-glass-border)] shadow-[var(--shadow-glass)] backdrop-blur-xl" style={{ WebkitBackdropFilter: 'blur(20px) saturate(180%)', backdropFilter: 'blur(20px) saturate(180%)' }}>
       <div className="flex items-center h-14 px-4 gap-3">
 
         {/* ── Brand zone ─────────────────────────────────────────────── */}
@@ -103,9 +103,9 @@ export default function Header({ onMenuClick }) {
 
             {/* User dropdown menu */}
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-[var(--color-surface-popover)] rounded-md shadow-lg py-1 z-50 border border-[var(--color-border-primary)]">
+              <div className="absolute right-0 mt-2 w-56 rounded-xl py-1 z-50 border border-[var(--color-glass-border)] shadow-[var(--shadow-glass)]" style={{ background: 'var(--color-glass-popover)', backdropFilter: 'blur(20px) saturate(180%)', WebkitBackdropFilter: 'blur(20px) saturate(180%)' }}>
                 {/* User info */}
-                <div className="px-4 py-3 border-b border-[var(--color-border-primary)] min-w-0">
+                <div className="px-4 py-3 border-b border-[var(--color-glass-border)] min-w-0">
                   <p className="text-sm font-medium text-[var(--color-text-primary)] truncate">
                     {user?.display_name}
                   </p>
@@ -139,7 +139,7 @@ export default function Header({ onMenuClick }) {
                 </button>
                 
                 {/* Logout */}
-                <div className="border-t border-[var(--color-border-primary)] mt-1">
+                <div className="border-t border-[var(--color-glass-border)] mt-1">
                   <button 
                     className="flex items-center space-x-2 w-full text-left px-4 py-2 text-sm text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] focus:outline-none focus:bg-[var(--color-danger-soft)]"
                     onClick={handleLogout}

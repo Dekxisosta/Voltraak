@@ -81,6 +81,7 @@ export default function Modal({
         {/* Backdrop */}
         <div
           className="fixed inset-0 bg-[var(--color-overlay)] transition-opacity"
+          style={{ backdropFilter: 'blur(8px) saturate(140%)', WebkitBackdropFilter: 'blur(8px) saturate(140%)' }}
           aria-hidden="true"
         />
 
@@ -88,10 +89,15 @@ export default function Modal({
         <div
           ref={modalRef}
           className={cn(
-            'relative transform overflow-y-auto max-h-[calc(100vh-4rem)] rounded-lg bg-[var(--color-surface-modal)] text-left shadow-xl transition-all w-full',
+            'relative transform overflow-y-auto max-h-[calc(100vh-4rem)] rounded-2xl text-left shadow-[var(--shadow-glass)] transition-all w-full border border-[var(--color-glass-border)]',
             sizeStyles[size],
             className
           )}
+          style={{
+            background: 'var(--color-glass-modal)',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          }}
           role="dialog"
           aria-modal="true"
         >
@@ -105,7 +111,7 @@ export default function Modal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="rounded-md bg-[var(--color-surface-modal)] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2"
+                  className="rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -128,7 +134,7 @@ export function ModalHeader({
   className,
 }) {
   return (
-    <div className={cn('border-b border-[var(--color-border-primary)] px-6 py-4', className)}>
+    <div className={cn('border-b border-[var(--color-glass-border)] px-6 py-4', className)}>
       <div className="flex items-center justify-between">
         <div>{children}</div>
         {showCloseButton && onClose && (
@@ -155,7 +161,7 @@ export function ModalBody({ children, className }) {
 
 export function ModalFooter({ children, className }) {
   return (
-    <div className={cn('border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-6 py-4', className)}>
+    <div className={cn('border-t border-[var(--color-glass-border)] bg-transparent px-6 py-4', className)}>
       {children}
     </div>
   )
