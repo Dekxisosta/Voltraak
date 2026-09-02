@@ -9,7 +9,7 @@
  * breakpoint; on mobile a compact brand strip stands in for it instead.
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { Mail, Github, UserCog, PackageSearch, Boxes } from 'lucide-react'
 import { CONTACT } from '@/shared/constants/contact'
 import { SOCIAL } from '@/shared/constants/social'
@@ -23,57 +23,52 @@ const ROLES = [
   { icon: PackageSearch, label: 'Inventory Staff', sub: 'Logs stock counts', accent: 'bg-amber-400' },
 ]
 
-// Base bar heights for the sparkline. Each bar animates between its base
-// value and a randomised target so the chart feels live without jarring jumps.
+// Base bar heights for the sparkline.
 const BAR_HEIGHTS = [38, 52, 46, 64, 58, 74, 66]
 
+// Each bar gets its own keyframe that oscillates between two hand-picked
+// heights. Pure CSS — no JS timers, no React state, no re-renders.
+const BAR_KEYFRAMES = BAR_HEIGHTS.map((base, i) => {
+  const lo = Math.max(14, base - 18)
+  const hi = Math.min(92, base + 18)
+  const mid = Math.round((lo + hi) / 2 + (i % 2 === 0 ? 6 : -6))
+  return { lo, hi, mid }
+})
+
 /**
- * Sparkline bars that animate independently.
- * Each bar runs on its own randomised interval (2.5 – 4.5 s) so they never
- * move in sync, giving a live-data feel. The transition uses ease-in-out so
- * each bar accelerates out of its old height and decelerates into the new one
- * — no abrupt snapping at either end.
+ * Sparkline bars animated entirely in CSS.
+ * Each bar has its own @keyframes and a different duration + delay so they
+ * drift in and out of phase naturally, with no JS involvement after mount.
  */
-function AnimatedBar({ base, initialDelay }) {
-  const [height, setHeight] = useState(base)
-  const intervalRef = useRef(null)
-
-  useEffect(() => {
-    const next = () => Math.min(90, Math.max(16, base + (Math.random() - 0.5) * 32))
-    const period = 2500 + Math.random() * 2000   // 2.5 – 4.5 s per bar
-
-    const timeout = setTimeout(() => {
-      setHeight(next())
-      intervalRef.current = setInterval(() => setHeight(next()), period)
-    }, initialDelay)
-
-    return () => {
-      clearTimeout(timeout)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [base, initialDelay])
-
-  return (
-    <div
-      className="flex-1 rounded-t-sm bg-gradient-to-t from-amber-400/30 to-amber-300/90"
-      style={{
-        height: `${height}%`,
-        transition: 'height 2.2s ease-in-out',
-      }}
-    />
-  )
-}
-
 function AnimatedBars() {
-  // Fixed stagger delays computed once on mount so re-renders don't reshuffle them
-  const delays = useRef(BAR_HEIGHTS.map((_, i) => 300 + i * 200 + Math.random() * 350))
+  const keyframeCSS = BAR_KEYFRAMES.map((kf, i) => `
+    @keyframes bar-pulse-${i} {
+      0%   { height: ${kf.lo}%; }
+      40%  { height: ${kf.hi}%; }
+      70%  { height: ${kf.mid}%; }
+      100% { height: ${kf.lo}%; }
+    }
+  `).join('')
 
   return (
-    <div className="mt-6 flex items-end gap-2 h-20">
-      {BAR_HEIGHTS.map((base, i) => (
-        <AnimatedBar key={i} base={base} initialDelay={delays.current[i]} />
-      ))}
-    </div>
+    <>
+      <style>{keyframeCSS}</style>
+      <div className="mt-6 flex items-end gap-2 h-20">
+        {BAR_HEIGHTS.map((_, i) => {
+          const duration = 3.2 + i * 0.37          // 3.2 s – 5.5 s
+          const delay    = -(i * 0.61 + 0.4)       // negative = already mid-cycle on load
+          return (
+            <div
+              key={i}
+              className="flex-1 rounded-t-sm bg-gradient-to-t from-amber-400/30 to-amber-300/90"
+              style={{
+                animation: `bar-pulse-${i} ${duration}s ${delay}s ease-in-out infinite`,
+              }}
+            />
+          )
+        })}
+      </div>
+    </>
   )
 }
 
