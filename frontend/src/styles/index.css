@@ -424,6 +424,15 @@
 }
 
 @layer utilities {
+  /* Hide scrollbar track while keeping scroll behaviour */
+  .scrollbar-hide {
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* IE / Edge legacy */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;                /* Chrome / Safari / Opera */
+  }
+
   /* Text truncation utilities */
   .truncate-2-lines {
     display: -webkit-box;

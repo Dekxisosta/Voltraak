@@ -1,8 +1,9 @@
 /**
- * Recent activity component showing latest transactions and events
+ * Recent activity component showing latest transactions and events.
+ * Supports a `compact` prop for use in narrow panels (e.g. the right sidebar).
  */
 
-import { Package, ArrowUp, ArrowDown, AlertCircle, User } from 'lucide-react'
+import { Package, ArrowUp, ArrowDown, AlertCircle, User, Activity } from 'lucide-react'
 import { formatDateTime } from '@/shared/utils'
 
 
@@ -81,7 +82,33 @@ const colorClasses = {
   },
 }
 
-export default function RecentActivity() {
+export default function RecentActivity({ compact = false }) {
+  if (compact) {
+    return (
+      <div className="space-y-3">
+        {/* Header — matches AlertsPanel style */}
+        <div className="flex items-center justify-between px-0.5">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-[var(--color-text-secondary)]" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-[var(--color-text-muted)] select-none">
+              Recent Activity
+            </span>
+          </div>
+          <span className="text-[11px] text-[var(--color-text-muted)]">
+            {mockActivity.length} events
+          </span>
+        </div>
+
+        {/* Compact list */}
+        <div className="space-y-1.5">
+          {mockActivity.map((item) => (
+            <CompactActivityItem key={item.id} item={item} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="card">
       <div className="card-header">
@@ -96,9 +123,9 @@ export default function RecentActivity() {
         <div className="flow-root">
           <ul className="-mb-8">
             {mockActivity.map((item, index) => (
-              <ActivityItem 
-                key={item.id} 
-                item={item} 
+              <ActivityItem
+                key={item.id}
+                item={item}
                 isLast={index === mockActivity.length - 1}
               />
             ))}
@@ -109,7 +136,32 @@ export default function RecentActivity() {
   )
 }
 
+function CompactActivityItem({ item }) {
+  const colors = colorClasses[item.color]
 
+  return (
+    <div
+      className="flex items-start gap-2.5 rounded-xl px-3 py-2.5"
+      style={{
+        background: 'var(--color-bg-tertiary)',
+        border: '1px solid var(--color-border-primary)',
+      }}
+    >
+      <div className={`mt-0.5 flex-shrink-0 rounded-full p-1.5 ${colors.bg}`}>
+        <item.icon className={`h-3 w-3 ${colors.icon}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-[var(--color-text-primary)] truncate">{item.title}</p>
+        <p className="mt-0.5 text-[11px] text-[var(--color-text-muted)] line-clamp-2 leading-relaxed">
+          {item.description}
+        </p>
+        <p className="mt-1 text-[10px] text-[var(--color-text-muted)]">
+          {formatDateTime(item.timestamp)}
+        </p>
+      </div>
+    </div>
+  )
+}
 
 function ActivityItem({ item, isLast }) {
   const colors = colorClasses[item.color]

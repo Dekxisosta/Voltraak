@@ -23,6 +23,7 @@ import { createContext, useContext, useState } from 'react'
 import Sidebar from './Sidebar'
 import Header from './Header'
 import AlertsPanel from '@/pages/dashboard/components/AlertsPanel'
+import RecentActivity from '@/pages/dashboard/components/RecentActivity'
 
 // Context lets pages push content into the right panel slot
 export const AppShellContext = createContext({
@@ -48,7 +49,7 @@ export default function AppShell({ children }) {
           {/* ── Left panel — desktop ──────────────────────────────── */}
           {/* Sticky inside the body row; scrolls independently */}
           <aside
-            className="hidden lg:flex flex-col w-[220px] shrink-0 overflow-y-auto border-r border-[var(--color-glass-border)]"
+            className="hidden lg:flex flex-col w-[220px] shrink-0 overflow-y-auto scrollbar-hide border-r border-[var(--color-glass-border)]"
             style={{
               background: 'var(--color-glass-sidebar)',
               backdropFilter: 'blur(20px) saturate(160%)',
@@ -67,7 +68,7 @@ export default function AppShell({ children }) {
                 onClick={() => setSidebarOpen(false)}
               />
               <div
-                className="fixed inset-y-0 left-0 w-[220px] overflow-y-auto border-r border-[var(--color-glass-border)]"
+                className="fixed inset-y-0 left-0 w-[220px] overflow-y-auto scrollbar-hide border-r border-[var(--color-glass-border)]"
                 style={{
                   background: 'var(--color-glass-sidebar)',
                   backdropFilter: 'blur(20px) saturate(160%)',
@@ -80,7 +81,7 @@ export default function AppShell({ children }) {
           )}
 
           {/* ── Centre — main scrollable content ─────────────────── */}
-          <main className="flex-1 min-w-0 overflow-y-auto">
+          <main className="flex-1 min-w-0 overflow-y-auto scrollbar-hide">
             <div className="py-5 px-4 sm:px-6 lg:px-8 min-h-full">
               {children}
             </div>
@@ -88,18 +89,28 @@ export default function AppShell({ children }) {
 
           {/* ── Right panel — always visible, alerts persist across all routes ── */}
           <aside
-            className="hidden xl:flex flex-col w-[280px] shrink-0 overflow-y-auto border-l border-[var(--color-glass-border)]"
+            className="hidden xl:flex flex-col w-[280px] shrink-0 border-l border-[var(--color-glass-border)]"
             style={{
               background: 'var(--color-glass-panel)',
               backdropFilter: 'blur(16px) saturate(150%)',
               WebkitBackdropFilter: 'blur(16px) saturate(150%)',
             }}
           >
-            <div className="p-4 space-y-4">
-              {/* Page-specific content injected via setRightPanel() */}
-              {rightPanel}
-              {/* Alerts always rendered beneath any page content */}
+            {/* Page-specific content injected via setRightPanel() */}
+            {rightPanel && (
+              <div className="flex-shrink-0 p-4 border-b border-[var(--color-glass-border)]">
+                {rightPanel}
+              </div>
+            )}
+
+            {/* Top half — Alerts */}
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-4 border-b border-[var(--color-glass-border)]">
               <AlertsPanel />
+            </div>
+
+            {/* Bottom half — Recent Activity */}
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide p-4">
+              <RecentActivity compact />
             </div>
           </aside>
 
