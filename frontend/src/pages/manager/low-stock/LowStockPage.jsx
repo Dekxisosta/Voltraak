@@ -93,7 +93,7 @@ export default function LowStockPage() {
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'suggested_order_qty', label: 'Suggested Order' },
     { key: 'actions', label: 'Actions', render: (_, row) => (
-      <Button size="sm" variant="primary" icon={ShoppingCart} disabled={row.po_created} onClick={() => openCreatePOModal(row)}>
+      <Button size="sm" variant="primary" icon={ShoppingCart} disabled={row.po_created || creatingPO} onClick={() => openCreatePOModal(row)}>
         {row.po_created ? 'PO Created' : 'Create PO'}
       </Button>
     )},

@@ -16,6 +16,7 @@ export default function ReportsPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [reportPeriod, setReportPeriod] = useState('30d')
+  const [exporting, setExporting] = useState(null) // 'pdf' | 'csv' | null
   const { addNotification } = useNotifications()
 
   useEffect(() => {
@@ -37,8 +38,14 @@ export default function ReportsPage() {
     }
   }
 
-  const handleExport = (format) => {
-    addNotification({ type: 'success', title: 'Export Started', message: `Report is being exported as ${format.toUpperCase()}` })
+  const handleExport = async (format) => {
+    setExporting(format)
+    try {
+      await new Promise(resolve => setTimeout(resolve, 800))
+      addNotification({ type: 'success', title: 'Export Started', message: `Report is being exported as ${format.toUpperCase()}` })
+    } finally {
+      setExporting(null)
+    }
   }
 
   if (loading) {
@@ -58,8 +65,8 @@ export default function ReportsPage() {
           ))}
         </div>
         <div className="flex space-x-2">
-          <button onClick={() => handleExport('pdf')} className="btn btn-secondary btn-sm"><Download className="h-4 w-4" /> PDF</button>
-          <button onClick={() => handleExport('csv')} className="btn btn-secondary btn-sm"><Download className="h-4 w-4" /> CSV</button>
+          <Button variant="secondary" size="sm" icon={Download} loading={exporting === 'pdf'} disabled={exporting !== null} onClick={() => handleExport('pdf')}>PDF</Button>
+          <Button variant="secondary" size="sm" icon={Download} loading={exporting === 'csv'} disabled={exporting !== null} onClick={() => handleExport('csv')}>CSV</Button>
         </div>
       </div>
 
