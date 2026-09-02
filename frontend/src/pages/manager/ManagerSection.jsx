@@ -9,7 +9,6 @@ import ForecastPage from './forecast/ForecastPage'
 import ReportsPage from './reports/ReportsPage'
 import LowStockPage from './low-stock/LowStockPage'
 import POApprovalsPage from './po-approvals/POApprovalsPage'
-import UserManagementPage from './users/UserManagementPage'
 import AdjustmentApprovalsPage from './adjustment-approvals/AdjustmentApprovalsPage'
 
 const TABS = {
@@ -19,7 +18,6 @@ const TABS = {
   'low-stock': LowStockPage,
   'po-approvals': POApprovalsPage,
   'adjustment-approvals': AdjustmentApprovalsPage,
-  users: UserManagementPage,
 }
 
 export default function ManagerSection() {

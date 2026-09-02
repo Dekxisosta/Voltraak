@@ -32,8 +32,8 @@ import PreferencesModal from '../common/PreferencesModal'
 //   warehouse        - warehouse tabs only
 //   inventory_staff   - inventory tabs only
 //   manager           - manager-exclusive tabs only (KPI, forecast, reports,
-//                       low-stock, approvals, users) — no operational tabs
-//   admin             - every tab in the app, to showcase all features
+//                       low-stock, approvals) — no operational tabs
+//   admin             - every tab in the app plus admin-only account management
 const warehouseNavItems = [
   {
     label: 'Receiving',
@@ -160,12 +160,16 @@ const managerNavItems = [
     icon: ClipboardCheck,
     roles: ['manager', 'admin'],
   },
+]
+
+// Admin-only — user account management
+const adminNavItems = [
   {
     label: 'User Management',
-    basePath: '/manager',
+    basePath: '/admin',
     tab: 'users',
     icon: Users,
-    roles: ['manager', 'admin'],
+    roles: ['admin'],
   },
 ]
 
@@ -193,7 +197,7 @@ const getNavigationByRole = (role) => {
 
   if (role === 'admin') {
     // Admin sees every tab in the app, to showcase all features.
-    return [...baseNavigation, ...managerNavItems, ...inventoryNavItems, ...warehouseNavItems]
+    return [...baseNavigation, ...adminNavItems, ...managerNavItems, ...inventoryNavItems, ...warehouseNavItems]
   }
 
   return baseNavigation

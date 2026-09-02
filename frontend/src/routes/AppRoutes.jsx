@@ -18,12 +18,14 @@ import DashboardPage from '@/pages/dashboard/DashboardPage'
 import { warehouseRoutes, warehouseLegacyRoutes } from './warehouse/WarehouseRoutes'
 import { inventoryRoutes, inventoryLegacyRoutes } from './inventory/InventoryRoutes'
 import { managerRoutes, managerLegacyRoutes } from './manager/ManagerRoutes'
+import { adminRoutes, adminLegacyRoutes } from './admin/AdminRoutes'
 
 // Combine all protected routes
 const protectedRoutes = [
   ...warehouseRoutes,
   ...inventoryRoutes,
   ...managerRoutes,
+  ...adminRoutes,
 ]
 
 // Old per-page paths (e.g. /warehouse/picking), kept working as redirects
@@ -32,6 +34,7 @@ const legacyRoutes = [
   ...warehouseLegacyRoutes,
   ...inventoryLegacyRoutes,
   ...managerLegacyRoutes,
+  ...adminLegacyRoutes,
 ]
 
 // Root redirect based on role

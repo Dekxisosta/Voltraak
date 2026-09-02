@@ -1,8 +1,8 @@
 /**
  * Admin dashboard
- * Admin has access to every route in the app (manager + inventory +
+ * Admin has access to every route in the app (admin + manager + inventory +
  * warehouse), so this dashboard surfaces business KPIs plus quick
- * redirects into all three sections at once, to showcase every feature.
+ * redirects into all sections at once, to showcase every feature.
  */
 
 import { useEffect, useState } from 'react'
@@ -71,6 +71,17 @@ function buildStats(poOrders, discrepancies) {
   ]
 }
 
+const adminRedirectItems = [
+  {
+    label: 'User Management',
+    description: 'Create, edit, deactivate, and delete system accounts',
+    basePath: '/admin',
+    tab: 'users',
+    icon: Users,
+    color: 'blue',
+  },
+]
+
 const managerRedirectItems = [
   {
     label: 'KPI Dashboard',
@@ -119,14 +130,6 @@ const managerRedirectItems = [
     tab: 'adjustment-approvals',
     icon: ClipboardCheck,
     color: 'purple',
-  },
-  {
-    label: 'User Management',
-    description: 'Manage staff accounts and roles',
-    basePath: '/manager',
-    tab: 'users',
-    icon: Users,
-    color: 'blue',
   },
 ]
 
@@ -230,6 +233,7 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        <QuickRedirects title="Admin" items={adminRedirectItems} />
         <QuickRedirects title="Manager Tabs" items={managerRedirectItems} />
         <QuickRedirects title="Inventory Tabs" items={inventoryRedirectItems} />
         <QuickRedirects title="Warehouse Tabs" items={warehouseRedirectItems} />

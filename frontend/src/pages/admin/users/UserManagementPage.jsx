@@ -1,11 +1,10 @@
 /**
- * User Management Page - Manager
- * View users and edit their details (name, email, role).
- * Deactivation and deletion are admin-only — not available here.
+ * User Management Page - Admin
+ * Full account control: create, edit details, deactivate/activate, and delete users.
  */
 
 import { useState, useEffect } from 'react'
-import { Users, Edit } from 'lucide-react'
+import { Users, Plus, Edit, Trash2, UserCheck, UserX } from 'lucide-react'
 import {
   Card,
   Table,
@@ -18,6 +17,7 @@ import {
   Modal,
   ModalBody,
   ModalFooter,
+  ConfirmModal,
 } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
@@ -33,7 +33,7 @@ const ROLE_OPTIONS = [
   { value: 'warehouse', label: 'Warehouse Staff' },
 ]
 
-const emptyForm = { name: '', email: '', role: 'warehouse' }
+const emptyForm = { name: '', email: '', role: 'warehouse', is_active: true }
 
 export default function UserManagementPage() {
   const [data, setData] = useState({ users: [], loading: true })
@@ -42,11 +42,19 @@ export default function UserManagementPage() {
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
 
+  // Add/Edit modal — editingUser is null when adding
   const [formOpen, setFormOpen] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [formErrors, setFormErrors] = useState({})
   const [saving, setSaving] = useState(false)
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
+  // Per-row toggle active/inactive pending state
+  const [togglingId, setTogglingId] = useState(null)
 
   useEffect(() => {
     loadUsers()
@@ -66,9 +74,32 @@ export default function UserManagementPage() {
     }
   }
 
+  const handleToggleActive = async (user) => {
+    setTogglingId(user.id)
+    try {
+      const action = user.is_active ? 'deactivated' : 'activated'
+      setData(prev => ({
+        ...prev,
+        users: prev.users.map(u =>
+          u.id === user.id ? { ...u, is_active: !u.is_active } : u
+        ),
+      }))
+      addNotification({ type: 'success', title: `User ${action}`, message: `${user.name} has been ${action}` })
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const openAddModal = () => {
+    setEditingUser(null)
+    setForm(emptyForm)
+    setFormErrors({})
+    setFormOpen(true)
+  }
+
   const openEditModal = (user) => {
     setEditingUser(user)
-    setForm({ name: user.name, email: user.email, role: user.role })
+    setForm({ name: user.name, email: user.email, role: user.role, is_active: user.is_active })
     setFormErrors({})
     setFormOpen(true)
   }
@@ -101,18 +132,46 @@ export default function UserManagementPage() {
     setSaving(true)
     try {
       const roleLabel = ROLE_OPTIONS.find(r => r.value === form.role)?.label || form.role
-      setData(prev => ({
-        ...prev,
-        users: prev.users.map(u =>
-          u.id === editingUser.id
-            ? { ...u, name: form.name.trim(), email: form.email.trim(), role: form.role, role_display: roleLabel }
-            : u
-        ),
-      }))
-      addNotification({ type: 'success', title: 'User Updated', message: `${form.name} has been updated` })
+
+      if (editingUser) {
+        setData(prev => ({
+          ...prev,
+          users: prev.users.map(u =>
+            u.id === editingUser.id
+              ? { ...u, name: form.name.trim(), email: form.email.trim(), role: form.role, role_display: roleLabel, is_active: form.is_active }
+              : u
+          ),
+        }))
+        addNotification({ type: 'success', title: 'User Updated', message: `${form.name} has been updated` })
+      } else {
+        const newUser = {
+          id: Math.max(0, ...data.users.map(u => u.id)) + 1,
+          name: form.name.trim(),
+          email: form.email.trim(),
+          role: form.role,
+          role_display: roleLabel,
+          is_active: form.is_active,
+          last_login: null,
+          created_at: new Date().toISOString(),
+        }
+        setData(prev => ({ ...prev, users: [newUser, ...prev.users] }))
+        addNotification({ type: 'success', title: 'User Added', message: `${form.name} has been added as ${roleLabel}` })
+      }
       setFormOpen(false)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== deleteTarget.id) }))
+      addNotification({ type: 'success', title: 'User Removed', message: `${deleteTarget.name} has been removed` })
+      setDeleteTarget(null)
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -145,9 +204,36 @@ export default function UserManagementPage() {
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
-        <Button size="sm" variant="secondary" icon={Edit} onClick={() => openEditModal(row)}>
-          Edit
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={Edit}
+            disabled={togglingId === row.id || deleting}
+            onClick={() => openEditModal(row)}
+          >
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant={row.is_active ? 'danger' : 'primary'}
+            icon={row.is_active ? UserX : UserCheck}
+            loading={togglingId === row.id}
+            disabled={togglingId === row.id || deleting}
+            onClick={() => handleToggleActive(row)}
+          >
+            {row.is_active ? 'Deactivate' : 'Activate'}
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
+            icon={Trash2}
+            disabled={togglingId === row.id || deleting}
+            onClick={() => setDeleteTarget(row)}
+          >
+            Delete
+          </Button>
+        </div>
       ),
     },
   ]
@@ -171,11 +257,11 @@ export default function UserManagementPage() {
     <div className="space-y-6">
       <PageHeader
         title="User Management"
-        subtitle="View and edit user details. Contact an administrator to deactivate or delete accounts."
+        subtitle="Manage system users and access control"
         icon={Users}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <Card.Body>
             <div className="text-center">
@@ -204,6 +290,20 @@ export default function UserManagementPage() {
             </div>
           </Card.Body>
         </Card>
+        <Card>
+          <Card.Body>
+            <div className="text-center">
+              <p className="text-3xl font-bold text-gray-600 dark:text-gray-400">
+                {data.users.filter(u => {
+                  const d = new Date(u.last_login)
+                  const now = new Date()
+                  return now - d < 24 * 60 * 60 * 1000
+                }).length}
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Active Today</p>
+            </div>
+          </Card.Body>
+        </Card>
       </div>
 
       <Card>
@@ -215,20 +315,25 @@ export default function UserManagementPage() {
               placeholder="Search by name or email..."
               className="w-full sm:max-w-md"
             />
-            <div className="flex flex-wrap gap-2">
-              {['all', 'admin', 'manager', 'inventory_staff', 'warehouse'].map(r => (
-                <button
-                  key={r}
-                  onClick={() => setRoleFilter(r)}
-                  className={`px-3 py-1 text-sm rounded-full ${
-                    roleFilter === r
-                      ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  {r === 'all' ? 'All' : r === 'inventory_staff' ? 'Inventory' : r.charAt(0).toUpperCase() + r.slice(1)}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap gap-2">
+                {['all', 'admin', 'manager', 'inventory_staff', 'warehouse'].map(r => (
+                  <button
+                    key={r}
+                    onClick={() => setRoleFilter(r)}
+                    className={`px-3 py-1 text-sm rounded-full ${
+                      roleFilter === r
+                        ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {r === 'all' ? 'All' : r === 'inventory_staff' ? 'Inventory' : r.charAt(0).toUpperCase() + r.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <Button variant="primary" icon={Plus} onClick={openAddModal}>
+                Add User
+              </Button>
             </div>
           </div>
           <Table
@@ -240,8 +345,8 @@ export default function UserManagementPage() {
         </Card.Body>
       </Card>
 
-      {/* Edit User Modal */}
-      <Modal isOpen={formOpen} onClose={closeFormModal} title="Edit User" size="md">
+      {/* Add / Edit User Modal */}
+      <Modal isOpen={formOpen} onClose={closeFormModal} title={editingUser ? 'Edit User' : 'Add User'} size="md">
         <form onSubmit={handleSubmitForm}>
           <ModalBody>
             <div className="space-y-4">
@@ -269,6 +374,15 @@ export default function UserManagementPage() {
                 onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))}
                 options={ROLE_OPTIONS}
               />
+              <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={(e) => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
+                  className="rounded"
+                />
+                Active
+              </label>
             </div>
           </ModalBody>
           <ModalFooter>
@@ -277,12 +391,28 @@ export default function UserManagementPage() {
                 Cancel
               </Button>
               <Button type="submit" variant="primary" loading={saving}>
-                Save Changes
+                {editingUser ? 'Save Changes' : 'Add User'}
               </Button>
             </div>
           </ModalFooter>
         </form>
       </Modal>
+
+      {/* Delete Confirmation */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="Remove User"
+        message={
+          deleteTarget
+            ? `Are you sure you want to remove ${deleteTarget.name}? This cannot be undone.`
+            : ''
+        }
+        confirmText="Remove"
+        variant="danger"
+        loading={deleting}
+      />
     </div>
   )
 }
