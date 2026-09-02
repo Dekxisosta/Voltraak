@@ -330,13 +330,22 @@ function buildManagerAlerts({ lowStock = [], poApprovals = [], discrepancies = [
  * Admin sees the union of every role's alerts, since admin can reach
  * every section — this is what makes the app's alerting "showcase all
  * features" for that role.
+ *
+ * Alerts are sorted by the color hierarchy so critical items always
+ * surface at the top, regardless of which role's builder produced them.
  */
+const ALERT_SEVERITY = { critical: 0, warning: 1, info: 2 }
+
 function buildAdminAlerts(data) {
-  return [
+  const all = [
     ...buildWarehouseAlerts(data),
     ...buildInventoryAlerts(data),
     ...buildManagerAlerts(data),
   ]
+  return all.sort(
+    (a, b) =>
+      (ALERT_SEVERITY[a.type] ?? 3) - (ALERT_SEVERITY[b.type] ?? 3)
+  )
 }
 
 const ALERT_BUILDERS = {
