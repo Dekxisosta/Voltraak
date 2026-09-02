@@ -182,13 +182,11 @@ export default function AuthLayout({ children }) {
         <div className="w-full max-w-sm">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[#0b1220] flex items-center justify-center p-1.5 shrink-0">
-              <img
-                src="/assets/logo/voltraak-logo.png"
-                alt="Voltraak"
-                className="w-full h-full object-contain"
-              />
-            </div>
+            <img
+              src="/assets/logo/voltraak-logo.png"
+              alt="Voltraak"
+              className="w-9 h-9 shrink-0 object-contain"
+            />
             <div className="leading-tight">
               <p className="font-heading font-semibold text-[var(--color-text-primary)]">Voltraak</p>
               <p className="text-xs text-[var(--color-text-tertiary)]">Inventory Management</p>

@@ -45,13 +45,11 @@ export default function Header({ onMenuClick }) {
 
           {/* Logo + wordmark — desktop only */}
           <div className="hidden lg:flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-md bg-white/10 flex items-center justify-center shrink-0 p-1">
-              <img
-                src="/assets/logo/voltraak-logo.png"
-                alt="Voltraak"
-                className="w-full h-full object-contain"
-              />
-            </div>
+            <img
+              src="/assets/logo/voltraak-logo.png"
+              alt="Voltraak"
+              className="w-8 h-8 shrink-0 object-contain"
+            />
             <div className="leading-tight min-w-0">
               <p className="text-sm font-semibold text-white truncate">Voltraak</p>
               <p className="text-[10px] text-gray-400 truncate">Inventory Management</p>
