@@ -1,4 +1,4 @@
-<img src="logo/voltraak-logo.png" width="50" align="left">
+<img src="logo/voltraak-logo.png" width="100" align="left">
 
 # Voltraak — Inventory Management System
 
