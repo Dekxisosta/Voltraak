@@ -1,7 +1,9 @@
 /**
  * Warehouse Staff dashboard
- * Surfaces receiving/picking/FEFO/discrepancy status and links straight
- * into the Warehouse section's tabs.
+ * Surfaces receiving/picking/FEFO status and links straight into the
+ * Warehouse section's tabs. Discrepancies are tracked here only as "your
+ * reports awaiting review" — Warehouse raises concerns but Inventory owns
+ * investigation/resolution (see pages/inventory/discrepancies).
  */
 
 import { useEffect, useState } from 'react'
@@ -12,13 +14,14 @@ import QuickRedirects from './components/QuickRedirects'
 import RecentActivity from './components/RecentActivity'
 import AlertsPanel from './components/AlertsPanel'
 
-// Same source DiscrepanciesPage.jsx reads/writes — subscribing here means
-// resolving a discrepancy there updates this card immediately, without a
-// dashboard reload.
-const discrepanciesSource = createResourceDataSource('warehouse/discrepancies')
+// Same resource Inventory's DiscrepanciesPage reads/writes — subscribing
+// here means a status change there updates this card immediately, without
+// a dashboard reload. Filtered to reports Warehouse itself submitted.
+const discrepanciesSource = createResourceDataSource('inventory/discrepancies')
 
 function buildStats(discrepancies) {
-  const open = discrepancies.filter((d) => d.status === 'open')
+  const ownReports = discrepancies.filter((d) => d.reported_by === 'Warehouse Staff')
+  const awaitingReview = ownReports.filter((d) => d.status === 'open')
 
   return [
     {
@@ -46,9 +49,9 @@ function buildStats(discrepancies) {
       color: 'yellow',
     },
     {
-      title: 'Open Discrepancies',
-      value: formatCompactNumber(open.length),
-      change: open.length > 0 ? `${open.filter((d) => d.priority === 'high').length} high priority` : null,
+      title: 'Reports Awaiting Review',
+      value: formatCompactNumber(awaitingReview.length),
+      change: awaitingReview.length > 0 ? `${awaitingReview.filter((d) => d.priority === 'high').length} high priority` : null,
       changeType: 'decrease',
       icon: AlertCircle,
       color: 'red',
@@ -82,10 +85,10 @@ const quickRedirectItems = [
     color: 'yellow',
   },
   {
-    label: 'Discrepancies',
-    description: 'Review counting mismatches',
+    label: 'Report Discrepancy',
+    description: 'Flag a stock count mismatch',
     basePath: '/warehouse',
-    tab: 'discrepancies',
+    tab: 'report-discrepancy',
     icon: AlertCircle,
     color: 'red',
   },

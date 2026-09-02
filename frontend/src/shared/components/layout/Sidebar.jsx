@@ -14,6 +14,7 @@ import {
   BarChart3,
   TrendingUp,
   ShoppingCart,
+  ClipboardCheck,
   FileBarChart,
   Users,
   Settings,
@@ -60,9 +61,9 @@ const getNavigationByRole = (role) => {
         roles: ['warehouse', 'manager'],
       },
       {
-        label: 'Discrepancies',
+        label: 'Report Discrepancy',
         basePath: '/warehouse',
-        tab: 'discrepancies',
+        tab: 'report-discrepancy',
         icon: AlertCircle,
         roles: ['warehouse', 'manager'],
       },
@@ -114,6 +115,13 @@ const getNavigationByRole = (role) => {
         icon: Calendar,
         roles: ['inventory_staff', 'manager'],
       },
+      {
+        label: 'Discrepancies',
+        basePath: '/inventory',
+        tab: 'discrepancies',
+        icon: AlertCircle,
+        roles: ['inventory_staff', 'manager'],
+      },
     ]
   }
 
@@ -154,6 +162,13 @@ const getNavigationByRole = (role) => {
         basePath: '/manager',
         tab: 'po-approvals',
         icon: ShoppingCart,
+        roles: ['manager'],
+      },
+      {
+        label: 'Adjustment Approvals',
+        basePath: '/manager',
+        tab: 'adjustment-approvals',
+        icon: ClipboardCheck,
         roles: ['manager'],
       },
       {
@@ -206,6 +221,13 @@ const getNavigationByRole = (role) => {
         icon: Calendar,
         roles: ['inventory_staff', 'manager'],
       },
+      {
+        label: 'Discrepancies',
+        basePath: '/inventory',
+        tab: 'discrepancies',
+        icon: AlertCircle,
+        roles: ['inventory_staff', 'manager'],
+      },
       // Warehouse staff tabs
       {
         label: 'Receiving',
@@ -229,9 +251,9 @@ const getNavigationByRole = (role) => {
         roles: ['warehouse', 'manager'],
       },
       {
-        label: 'Discrepancies',
+        label: 'Report Discrepancy',
         basePath: '/warehouse',
-        tab: 'discrepancies',
+        tab: 'report-discrepancy',
         icon: AlertCircle,
         roles: ['warehouse', 'manager'],
       },

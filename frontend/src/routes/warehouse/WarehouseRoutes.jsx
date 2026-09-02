@@ -18,5 +18,5 @@ export const warehouseLegacyRoutes = [
   { path: '/warehouse/receiving', tab: 'receiving', roles: ROLES },
   { path: '/warehouse/picking', tab: 'picking', roles: ROLES },
   { path: '/warehouse/fefo', tab: 'fefo', roles: ROLES },
-  { path: '/warehouse/discrepancies', tab: 'discrepancies', roles: ROLES },
+  { path: '/warehouse/report-discrepancy', tab: 'report-discrepancy', roles: ROLES },
 ]

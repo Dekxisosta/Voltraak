@@ -1,17 +1,23 @@
 /**
- * Discrepancies Page - Warehouse Staff
- * Report and track inventory discrepancies and physical count variances
+ * Discrepancies Page - Inventory Staff
+ * Investigate and resolve discrepancy reports and physical count variances.
+ *
+ * Warehouse Staff can only raise a concern (see
+ * warehouse/report-discrepancy/ReportDiscrepancyPage.jsx) — this page is where
+ * that concern actually gets triaged. Reports whose variance is large
+ * enough to need a stock write-off get sent to the Manager's Adjustment
+ * Approvals page via "Send for Approval" below.
  */
 
 import { useState, useEffect } from 'react'
-import { AlertCircle, Plus, FileText, CheckCircle, Clock, RotateCcw } from 'lucide-react'
+import { AlertCircle, Plus, FileText, CheckCircle, Clock, RotateCcw, Send } from 'lucide-react'
 import { Card, Table, StatusBadge, Button, Input, Modal, SearchBar, LoadingSpinner } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 // TODO: pass { api: inventoryApi } once the endpoint exists
-const discrepanciesSource = createResourceDataSource('warehouse/discrepancies')
+const discrepanciesSource = createResourceDataSource('inventory/discrepancies')
 
 
 
@@ -79,7 +85,14 @@ export default function DiscrepanciesPage() {
         priority: Math.abs(newDiscrepancyForm.actual_quantity - newDiscrepancyForm.expected_quantity) > 2 ? 'high' : 'medium',
         notes: newDiscrepancyForm.notes,
         created_at: new Date().toISOString(),
-        resolved_at: null
+        resolved_at: null,
+        // Significant variances (>5%) may end up needing a manager-approved
+        // write-off once investigated — flagged here, sent for approval below.
+        requires_approval: Math.abs(((newDiscrepancyForm.actual_quantity - newDiscrepancyForm.expected_quantity) / (newDiscrepancyForm.expected_quantity || 1)) * 100) > 5,
+        approval_status: null,
+        write_off_amount: null,
+        approved_by: null,
+        approved_at: null,
       })
 
       setData(prev => ({
@@ -133,6 +146,24 @@ export default function DiscrepanciesPage() {
     }
   }
 
+  const handleSendForApproval = async (discrepancy) => {
+    try {
+      const patch = { approval_status: 'pending' }
+      await discrepanciesSource.update(discrepancy.id, patch)
+      setData(prev => ({
+        ...prev,
+        discrepancies: prev.discrepancies.map(d => d.id === discrepancy.id ? { ...d, ...patch } : d)
+      }))
+      addNotification({
+        type: 'success',
+        title: 'Sent for Approval',
+        message: `${discrepancy.report_number} sent to Manager for write-off approval`
+      })
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: 'Failed to send for approval' })
+    }
+  }
+
   // Kanban already shows every status across its lanes, so a status
   // filter would just hide whole lanes without a clear reason why. Reset
   // to 'all' and lock the filter while that view is active; it re-enables
@@ -167,6 +198,20 @@ export default function DiscrepanciesPage() {
         return <StatusBadge variant="neutral" label="Low" />
       default:
         return <StatusBadge variant="neutral" label="Normal" />
+    }
+  }
+
+  const getApprovalBadge = (row) => {
+    if (!row.requires_approval) return <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
+    switch (row.approval_status) {
+      case 'pending':
+        return <StatusBadge variant="warning" label="Pending Manager" icon={Clock} />
+      case 'approved':
+        return <StatusBadge variant="ok" label="Write-off Approved" icon={CheckCircle} />
+      case 'rejected':
+        return <StatusBadge variant="critical" label="Write-off Rejected" />
+      default:
+        return <StatusBadge variant="neutral" label="Not Sent" />
     }
   }
 
@@ -238,6 +283,11 @@ export default function DiscrepanciesPage() {
       render: (value) => new Date(value).toLocaleDateString()
     },
     {
+      key: 'approval_status',
+      label: 'Write-off Approval',
+      render: (_, row) => getApprovalBadge(row)
+    },
+    {
       key: 'actions',
       label: 'Actions',
       // Rendered by both the list table and the card layout (Table.jsx
@@ -259,6 +309,11 @@ export default function DiscrepanciesPage() {
           {row.status === 'resolved' && (
             <Button size="sm" variant="secondary" icon={RotateCcw} onClick={() => handleUpdateStatus(row, 'open')}>
               Reopen
+            </Button>
+          )}
+          {row.requires_approval && !row.approval_status && (
+            <Button size="sm" variant="primary" icon={Send} onClick={() => handleSendForApproval(row)}>
+              Send for Approval
             </Button>
           )}
         </div>
@@ -295,7 +350,7 @@ export default function DiscrepanciesPage() {
             icon={Plus}
             onClick={() => setShowNewDiscrepancyModal(true)}
           >
-            Report Discrepancy
+            Log Discrepancy
           </Button>
         }
       />
@@ -416,7 +471,7 @@ export default function DiscrepanciesPage() {
       <Modal
         isOpen={showNewDiscrepancyModal}
         onClose={() => setShowNewDiscrepancyModal(false)}
-        title="Report New Discrepancy"
+        title="Log New Discrepancy"
         size="lg"
       >
         <form onSubmit={handleSubmitDiscrepancy} className="space-y-4">

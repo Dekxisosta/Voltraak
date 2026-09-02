@@ -14,7 +14,6 @@
  * export style is unaffected), then add one line here.
  */
 
-import { mockDiscrepancies } from './warehouse/discrepancies'
 import { mockFEFORecommendations } from './warehouse/fefo'
 import { mockPickingTasks } from './warehouse/picking'
 import { mockPurchaseOrders as mockReceivingPOs } from './warehouse/receiving'
@@ -24,6 +23,7 @@ import { mockPurchaseOrders as mockManagerPOs } from './manager/po-approvals'
 import { mockForecasts } from './manager/forecast'
 import { mockLowStockAlerts } from './manager/low-stock'
 
+import { mockDiscrepancies } from './inventory/discrepancies'
 import { mockDamageReports } from './inventory/damage-report'
 import { mockProducts } from './inventory/item-update'
 import { mockReservations } from './inventory/reservations'
@@ -32,7 +32,6 @@ import { mockStockTransactions } from './inventory/stock-in-out'
 import { mockExpiryBatches } from './inventory/expiry-alerts'
 
 export const SEED_COLLECTIONS = {
-  'warehouse/discrepancies': mockDiscrepancies,
   'warehouse/fefo': mockFEFORecommendations,
   'warehouse/picking': mockPickingTasks,
   'warehouse/receiving': mockReceivingPOs,
@@ -42,6 +41,7 @@ export const SEED_COLLECTIONS = {
   'manager/forecast': mockForecasts,
   'manager/low-stock': mockLowStockAlerts,
 
+  'inventory/discrepancies': mockDiscrepancies,
   'inventory/damage-report': mockDamageReports,
   'inventory/item-update': mockProducts,
   'inventory/reservations': mockReservations,

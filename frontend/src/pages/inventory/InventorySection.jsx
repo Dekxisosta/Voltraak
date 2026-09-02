@@ -10,6 +10,7 @@ import DamageReportPage from './damage-report/DamageReportPage'
 import ItemUpdatePage from './item-update/ItemUpdatePage'
 import ReservationsPage from './reservations/ReservationsPage'
 import ExpiryAlertsPage from './expiry-alerts/ExpiryAlertsPage'
+import DiscrepanciesPage from './discrepancies/DiscrepanciesPage'
 
 const TABS = {
   'stock-in-out': StockInOutPage,
@@ -18,6 +19,7 @@ const TABS = {
   'item-update': ItemUpdatePage,
   reservations: ReservationsPage,
   'expiry-alerts': ExpiryAlertsPage,
+  discrepancies: DiscrepanciesPage,
 }
 
 export default function InventorySection() {

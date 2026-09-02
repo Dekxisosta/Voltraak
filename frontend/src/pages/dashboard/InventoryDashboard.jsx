@@ -13,19 +13,22 @@ import RecentActivity from './components/RecentActivity'
 import AlertsPanel from './components/AlertsPanel'
 
 // Same sources ItemUpdatePage / StockLevelsPage / ReservationsPage /
-// ExpiryAlertsPage read and write — subscribing here means a mutation on
-// any of those pages updates these cards immediately, without a reload.
+// ExpiryAlertsPage / DiscrepanciesPage read and write — subscribing here
+// means a mutation on any of those pages updates these cards immediately,
+// without a reload.
 const productsSource = createResourceDataSource('inventory/item-update')
 const stockLevelsSource = createResourceDataSource('inventory/stock-levels')
 const reservationsSource = createResourceDataSource('inventory/reservations')
 const expiryBatchesSource = createResourceDataSource('inventory/expiry-alerts')
+const discrepanciesSource = createResourceDataSource('inventory/discrepancies')
 
-function buildStats({ products, stockLevels, reservations, expiryBatches }) {
+function buildStats({ products, stockLevels, reservations, expiryBatches, discrepancies }) {
   // "Low stock" mirrors the definition StockLevelsPage itself uses:
   // status 'critical' or 'warning' (out_of_stock is its own, worse bucket).
   const lowStock = stockLevels.filter((s) => s.status === 'critical' || s.status === 'warning')
   const activeReservations = reservations.filter((r) => r.status === 'active')
   const expiringSoon = expiryBatches.filter((b) => b.status === 'warning')
+  const openDiscrepancies = discrepancies.filter((d) => d.status === 'open' || d.status === 'investigating')
 
   return [
     {
@@ -53,6 +56,14 @@ function buildStats({ products, stockLevels, reservations, expiryBatches }) {
       changeType: 'neutral',
       icon: ArrowUpDown,
       color: 'purple',
+    },
+    {
+      title: 'Open Discrepancies',
+      value: openDiscrepancies.length,
+      change: openDiscrepancies.length > 0 ? `${openDiscrepancies.filter((d) => d.priority === 'high').length} high priority` : null,
+      changeType: 'decrease',
+      icon: AlertCircle,
+      color: 'red',
     },
     {
       title: 'Batches Nearing Expiry',
@@ -114,6 +125,14 @@ const quickRedirectItems = [
     icon: Calendar,
     color: 'yellow',
   },
+  {
+    label: 'Discrepancies',
+    description: 'Investigate and resolve count mismatches',
+    basePath: '/inventory',
+    tab: 'discrepancies',
+    icon: AlertCircle,
+    color: 'red',
+  },
 ]
 
 const colorClasses = {
@@ -129,6 +148,7 @@ export default function InventoryDashboard() {
   const [stockLevels, setStockLevels] = useState([])
   const [reservations, setReservations] = useState([])
   const [expiryBatches, setExpiryBatches] = useState([])
+  const [discrepancies, setDiscrepancies] = useState([])
 
   useEffect(() => {
     const unsubscribers = [
@@ -136,11 +156,12 @@ export default function InventoryDashboard() {
       stockLevelsSource.subscribe(setStockLevels),
       reservationsSource.subscribe(setReservations),
       expiryBatchesSource.subscribe(setExpiryBatches),
+      discrepanciesSource.subscribe(setDiscrepancies),
     ]
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe())
   }, [])
 
-  const stats = buildStats({ products, stockLevels, reservations, expiryBatches })
+  const stats = buildStats({ products, stockLevels, reservations, expiryBatches, discrepancies })
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">

@@ -22,4 +22,5 @@ export const inventoryLegacyRoutes = [
   { path: '/inventory/item-update', tab: 'item-update', roles: ROLES },
   { path: '/inventory/reservations', tab: 'reservations', roles: ROLES },
   { path: '/inventory/expiry-alerts', tab: 'expiry-alerts', roles: ROLES },
+  { path: '/inventory/discrepancies', tab: 'discrepancies', roles: ROLES },
 ]

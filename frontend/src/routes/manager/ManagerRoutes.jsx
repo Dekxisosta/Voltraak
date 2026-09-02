@@ -20,5 +20,6 @@ export const managerLegacyRoutes = [
   { path: '/manager/reports', tab: 'reports', roles: ROLES },
   { path: '/manager/low-stock', tab: 'low-stock', roles: ROLES },
   { path: '/manager/po-approvals', tab: 'po-approvals', roles: ROLES },
+  { path: '/manager/adjustment-approvals', tab: 'adjustment-approvals', roles: ROLES },
   { path: '/manager/users', tab: 'users', roles: ROLES },
 ]

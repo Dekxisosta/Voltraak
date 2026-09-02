@@ -95,6 +95,11 @@ export default function Table({
   kanbanBy,
   kanbanLanes,
   onKanbanMove,
+  // Called with the active view ('list' | 'card' | 'kanban') whenever it
+  // changes — including on mount and on auto-resolution, not just manual
+  // toggle clicks — so a page can react to entering/leaving a given view
+  // (e.g. disabling a filter that doesn't make sense in Kanban).
+  onViewChange,
 }) {
   const highlightRef = React.useRef(null)
 
@@ -158,6 +163,13 @@ export default function Table({
     return <ArrowUpDown className="h-4 w-4 opacity-50" />
   }
 
+  const activeView = views.includes(view) ? view : views[0]
+
+  React.useEffect(() => {
+    onViewChange?.(activeView)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -165,8 +177,6 @@ export default function Table({
       </div>
     )
   }
-
-  const activeView = views.includes(view) ? view : views[0]
 
   return (
     <div className={cn('overflow-hidden', className)}>

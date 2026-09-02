@@ -27,14 +27,6 @@ export const MOCK_SCHEMAS = {
     type: 'object',
     fields: ['id', 'name', 'email', 'role', 'role_display', 'permissions'],
   },
-  'warehouse/discrepancies': {
-    type: 'array',
-    fields: [
-      'id', 'report_number', 'product_name', 'product_sku',
-      'expected_quantity', 'actual_quantity', 'variance', 'variance_percentage',
-      'discrepancy_type', 'location', 'priority', 'status', 'created_at',
-    ],
-  },
   'warehouse/fefo': {
     type: 'array',
     fields: [
@@ -90,6 +82,15 @@ export const MOCK_SCHEMAS = {
   'manager/reports': {
     type: 'object',
     fields: ['summary', 'category_breakdown', 'movement_summary', 'top_movers'],
+  },
+  'inventory/discrepancies': {
+    type: 'array',
+    fields: [
+      'id', 'report_number', 'product_name', 'product_sku',
+      'expected_quantity', 'actual_quantity', 'variance', 'variance_percentage',
+      'discrepancy_type', 'location', 'priority', 'status', 'created_at', 'reported_by',
+      'requires_approval', 'approval_status', 'write_off_amount', 'approved_by', 'approved_at',
+    ],
   },
   'inventory/damage-report': {
     type: 'array',

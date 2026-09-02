@@ -30,7 +30,7 @@ import { createResourceDataSource } from '@/shared/services/dataSource'
 // One data source per resource, shared across every AlertsPanel instance —
 // same pattern the dashboards use, so mutations elsewhere in the app are
 // reflected here without a reload.
-const discrepanciesSource = createResourceDataSource('warehouse/discrepancies')
+const discrepanciesSource = createResourceDataSource('inventory/discrepancies')
 const fefoSource = createResourceDataSource('warehouse/fefo')
 const pickingSource = createResourceDataSource('warehouse/picking')
 
@@ -46,7 +46,6 @@ const poApprovalsSource = createResourceDataSource('manager/po-approvals')
 // (or no role yet) fall back to no subscriptions and an empty state.
 const ROLE_SOURCES = {
   warehouse: {
-    discrepancies: discrepanciesSource,
     fefo: fefoSource,
     picking: pickingSource,
   },
@@ -55,6 +54,7 @@ const ROLE_SOURCES = {
     expiryBatches: expiryBatchesSource,
     damageReports: damageReportsSource,
     reservations: reservationsSource,
+    discrepancies: discrepanciesSource,
   },
   manager: {
     lowStock: lowStockSource,
@@ -85,39 +85,14 @@ const alertTypeStyles = {
 }
 
 /**
- * Builds warehouse-role alerts from discrepancies, FEFO recommendations,
- * and picking tasks — the same three resources WarehouseDashboard's stat
- * cards summarize.
+ * Builds warehouse-role alerts from FEFO recommendations and picking
+ * tasks — the same two resources WarehouseDashboard's stat cards
+ * summarize. Discrepancies are no longer surfaced here: Warehouse only
+ * raises a concern (see ReportDiscrepancyPage.jsx) and doesn't investigate
+ * or track status, which is now Inventory's job.
  */
-function buildWarehouseAlerts({ discrepancies = [], fefo = [], picking = [] }) {
+function buildWarehouseAlerts({ fefo = [], picking = [] }) {
   const alerts = []
-
-  const openDiscrepancies = discrepancies.filter(
-    (d) => d.status === 'open' || d.status === 'investigating'
-  )
-  const highPriority = openDiscrepancies.filter((d) => d.priority === 'high')
-  if (highPriority.length > 0) {
-    const worst = highPriority[0]
-    alerts.push({
-      id: `disc-${worst.id}`,
-      type: 'critical',
-      title: 'High-Priority Discrepancy',
-      message: `${worst.report_number} — ${worst.product_name}: ${worst.variance > 0 ? '+' : ''}${worst.variance} units (${worst.discrepancy_type.replace(/_/g, ' ')})${highPriority.length > 1 ? `, +${highPriority.length - 1} more` : ''}`,
-      timestamp: worst.created_at,
-      icon: AlertTriangle,
-      action: { label: 'Review', to: '/warehouse?tab=discrepancies' },
-    })
-  } else if (openDiscrepancies.length > 0) {
-    alerts.push({
-      id: 'disc-open',
-      type: 'warning',
-      title: 'Open Discrepancies',
-      message: `${openDiscrepancies.length} count discrepanc${openDiscrepancies.length === 1 ? 'y needs' : 'ies need'} review`,
-      timestamp: openDiscrepancies[0].created_at,
-      icon: AlertTriangle,
-      action: { label: 'Review', to: '/warehouse?tab=discrepancies' },
-    })
-  }
 
   const criticalFefo = fefo.filter((b) => b.urgency_level === 'critical')
   if (criticalFefo.length > 0) {
@@ -151,16 +126,46 @@ function buildWarehouseAlerts({ discrepancies = [], fefo = [], picking = [] }) {
 
 /**
  * Builds inventory-staff-role alerts from stock levels, expiry batches,
- * damage reports, and reservations — the same four resources
- * InventoryDashboard's stat cards summarize.
+ * damage reports, reservations, and discrepancies — the same resources
+ * InventoryDashboard's stat cards summarize. Discrepancies moved here from
+ * warehouse: Inventory investigates and resolves reports that Warehouse
+ * raises.
  */
 function buildInventoryAlerts({
   stockLevels = [],
   expiryBatches = [],
   damageReports = [],
   reservations = [],
+  discrepancies = [],
 }) {
   const alerts = []
+
+  const openDiscrepancies = discrepancies.filter(
+    (d) => d.status === 'open' || d.status === 'investigating'
+  )
+  const highPriority = openDiscrepancies.filter((d) => d.priority === 'high')
+  if (highPriority.length > 0) {
+    const worst = highPriority[0]
+    alerts.push({
+      id: `disc-${worst.id}`,
+      type: 'critical',
+      title: 'High-Priority Discrepancy',
+      message: `${worst.report_number} — ${worst.product_name}: ${worst.variance > 0 ? '+' : ''}${worst.variance} units (${worst.discrepancy_type.replace(/_/g, ' ')})${highPriority.length > 1 ? `, +${highPriority.length - 1} more` : ''}`,
+      timestamp: worst.created_at,
+      icon: AlertTriangle,
+      action: { label: 'Review', to: '/inventory?tab=discrepancies' },
+    })
+  } else if (openDiscrepancies.length > 0) {
+    alerts.push({
+      id: 'disc-open',
+      type: 'warning',
+      title: 'Open Discrepancies',
+      message: `${openDiscrepancies.length} count discrepanc${openDiscrepancies.length === 1 ? 'y needs' : 'ies need'} review`,
+      timestamp: openDiscrepancies[0].created_at,
+      icon: AlertTriangle,
+      action: { label: 'Review', to: '/inventory?tab=discrepancies' },
+    })
+  }
 
   const outOfStock = stockLevels.filter((s) => s.status === 'out_of_stock')
   if (outOfStock.length > 0) {
@@ -241,8 +246,9 @@ function buildInventoryAlerts({
 
 /**
  * Builds manager-role alerts from low-stock alerts, pending PO approvals,
- * and open warehouse discrepancies (oversight) — mirroring what
- * ManagerDashboard's stat cards and quick redirects already surface.
+ * and open discrepancies (oversight, now owned by Inventory) plus any
+ * discrepancies Inventory has sent up for write-off approval — mirroring
+ * what ManagerDashboard's stat cards and quick redirects already surface.
  */
 function buildManagerAlerts({ lowStock = [], poApprovals = [], discrepancies = [] }) {
   const alerts = []
@@ -305,7 +311,20 @@ function buildManagerAlerts({ lowStock = [], poApprovals = [], discrepancies = [
       title: 'High-Priority Discrepancies',
       message: `${openHighPriorityDiscrepancies.length} unresolved discrepanc${openHighPriorityDiscrepancies.length === 1 ? 'y' : 'ies'} flagged by warehouse staff`,
       icon: AlertTriangle,
-      action: { label: 'View', to: '/warehouse?tab=discrepancies' },
+      action: { label: 'View', to: '/inventory?tab=discrepancies' },
+    })
+  }
+
+  const pendingWriteOffs = discrepancies.filter((d) => d.approval_status === 'pending')
+  if (pendingWriteOffs.length > 0) {
+    const totalValue = pendingWriteOffs.reduce((s, d) => s + (d.write_off_amount || 0), 0)
+    alerts.push({
+      id: 'pending-write-offs',
+      type: 'warning',
+      title: 'Write-offs Awaiting Approval',
+      message: `${pendingWriteOffs.length} adjustment${pendingWriteOffs.length > 1 ? 's' : ''} pending — ${formatCurrency(totalValue)} total`,
+      icon: ClipboardX,
+      action: { label: 'Review', to: '/manager?tab=adjustment-approvals' },
     })
   }
 

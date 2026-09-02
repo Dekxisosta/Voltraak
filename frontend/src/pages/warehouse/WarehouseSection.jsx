@@ -7,13 +7,13 @@ import TabbedSection from '@/shared/components/common/TabbedSection'
 import ReceivingPage from './receiving/ReceivingPage'
 import PickingPage from './picking/PickingPage'
 import FEFOPage from './fefo/FEFOPage'
-import DiscrepanciesPage from './discrepancies/DiscrepanciesPage'
+import ReportDiscrepancyPage from './report-discrepancy/ReportDiscrepancyPage'
 
 const TABS = {
   receiving: ReceivingPage,
   picking: PickingPage,
   fefo: FEFOPage,
-  discrepancies: DiscrepanciesPage,
+  'report-discrepancy': ReportDiscrepancyPage,
 }
 
 export default function WarehouseSection() {
