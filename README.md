@@ -1,6 +1,10 @@
-# Voltraak — Inventory Management System
+<div style="display: flex;">
+    <img src="logo/voltraak-logo.png" width="50px">
+    <br>
+    <h1>Voltraak — Inventory Management System</h1>
+</div>
 
-**WalangBrownout Appliances**
+
 
 ![Status](https://img.shields.io/badge/status-in%20development-orange?style=flat-square)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)
