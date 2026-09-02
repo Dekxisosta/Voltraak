@@ -49,7 +49,9 @@ export default defineConfig({
   },
   preview: {
     port: 3000,
-    host: true
+    host: true,
+    // Serve index.html for any unmatched path so BrowserRouter works on reload
+    historyApiFallback: true,
   },
   test: {
     globals: true,
