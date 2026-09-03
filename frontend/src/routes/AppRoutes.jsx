@@ -14,6 +14,9 @@ import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
 // Dashboard (shared)
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 
+// Notifications (all roles)
+import NotificationsPage from '@/pages/notifications/NotificationsPage'
+
 // Role-based route definitions
 import { warehouseRoutes, warehouseLegacyRoutes } from './warehouse/WarehouseRoutes'
 import { inventoryRoutes, inventoryLegacyRoutes } from './inventory/InventoryRoutes'
@@ -113,6 +116,13 @@ export default function AppRoutes() {
       <Route path="/dashboard" element={
         <ProtectedLayout>
           <DashboardPage />
+        </ProtectedLayout>
+      } />
+
+      {/* Notifications - all authenticated users */}
+      <Route path="/notifications" element={
+        <ProtectedLayout>
+          <NotificationsPage />
         </ProtectedLayout>
       } />
 

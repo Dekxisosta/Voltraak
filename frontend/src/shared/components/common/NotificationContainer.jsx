@@ -9,7 +9,7 @@ import { useNotifications } from '@/hooks/useNotifications'
 import { cn } from '@/utils'
 
 // How long a toast stays on screen before it auto-dismisses.
-const AUTO_DISMISS_MS = 10000
+const AUTO_DISMISS_MS = 5000
 // Must match the 'toast-out' animation duration in tailwind.config.js so the
 // notification is only unmounted once the exit animation has finished.
 const EXIT_ANIMATION_MS = 200
@@ -58,17 +58,17 @@ const colorMap = {
 export default function NotificationContainer() {
   const { notifications, removeNotification, markAsRead } = useNotifications()
 
-  if (notifications.length === 0) {
+  // Silent notifications (e.g. seed data loaded on login) are stored in
+  // the panel and counted in the badge but never shown as pop-up toasts.
+  const toastQueue = notifications.filter((n) => !n.silent)
+
+  if (toastQueue.length === 0) {
     return null
   }
 
-  // Portaled so this toast stack always mounts as the last element of
-  // <body>, keeping its stacking order predictable relative to other
-  // fixed z-indexed UI (modals, sidebar) no matter where in the tree
-  // NotificationContainer itself is rendered from.
   return createPortal(
     <div className="fixed top-4 right-4 z-50 flex w-96 max-w-sm flex-col">
-      {notifications.slice(0, 5).map((notification) => (
+      {toastQueue.slice(0, 3).map((notification) => (
         <NotificationItem
           key={notification.id}
           notification={notification}
@@ -102,12 +102,12 @@ function NotificationItem({ notification, onClose, onRead }) {
   }, [onClose])
 
   React.useEffect(() => {
-    // Auto-mark after 3 seconds
+    // Auto-mark after 2.5 seconds
     const readTimer = setTimeout(() => {
       if (!notification.read) {
         onRead()
       }
-    }, 3000)
+    }, 2500)
 
     // Auto-dismiss after 10 seconds (errors are pinned and skip this)
     const dismissTimer = isPinned ? null : setTimeout(handleClose, AUTO_DISMISS_MS)

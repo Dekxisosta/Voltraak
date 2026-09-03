@@ -28,7 +28,7 @@ import {
   Info,
   ArrowRight,
 } from 'lucide-react'
-import { useNotifications } from '@/hooks/useNotifications'
+import { useNotifications } from '@/shared/hooks/useNotifications'
 import { cn } from '@/utils'
 import { formatRelativeTime } from '@/shared/utils'
 
@@ -60,6 +60,24 @@ export default function NotificationPanel({ isOpen, onClose, anchorRef }) {
 
   const navigate = useNavigate()
   const panelRef = React.useRef(null)
+  const [anchorRect, setAnchorRect] = React.useState(null)
+
+  // Measure the anchor whenever the panel opens so we can pin it below the bell.
+  React.useLayoutEffect(() => {
+    if (!isOpen) return
+    const update = () => {
+      if (anchorRef?.current) {
+        setAnchorRect(anchorRef.current.getBoundingClientRect())
+      }
+    }
+    update()
+    window.addEventListener('scroll', update, true)
+    window.addEventListener('resize', update)
+    return () => {
+      window.removeEventListener('scroll', update, true)
+      window.removeEventListener('resize', update)
+    }
+  }, [isOpen, anchorRef])
 
   // Close on Escape
   React.useEffect(() => {
@@ -94,9 +112,18 @@ export default function NotificationPanel({ isOpen, onClose, anchorRef }) {
 
   if (!isOpen) return null
 
-  // Show at most 8 items in the dropdown; the full page shows everything.
-  const preview = notifications.slice(0, 8)
+  // Show at most 3 items in the dropdown; the full page shows everything.
+  const preview = notifications.slice(0, 3)
   const isEmpty = notifications.length === 0
+
+  // Desktop: pin the panel just below the bell using fixed coords from getBoundingClientRect.
+  const desktopStyle = anchorRect
+    ? {
+        top:   anchorRect.bottom + 8,
+        right: window.innerWidth - anchorRect.right,
+        width: 384, // w-96
+      }
+    : {}
 
   return createPortal(
     <>
@@ -118,13 +145,15 @@ export default function NotificationPanel({ isOpen, onClose, anchorRef }) {
           'animate-fade-in',
           // Mobile: full-width strip just below the header
           'top-14 left-2 right-2 rounded-xl max-h-[85vh]',
-          // Desktop: anchored dropdown on the right
-          'sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 sm:max-h-[520px]',
+          // Desktop: sized + positioned via inline style from anchorRect
+          'sm:left-auto sm:right-auto sm:top-auto sm:w-96 sm:max-h-[520px] sm:rounded-xl',
         )}
         style={{
           background:           'var(--color-glass-popover)',
           backdropFilter:       'blur(24px) saturate(180%)',
           WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          // Apply desktop coords only on sm+ (640px+)
+          ...(window.innerWidth >= 640 ? desktopStyle : {}),
         }}
       >
         {/* ── Header ───────────────────────────────────────────────── */}
@@ -188,9 +217,9 @@ export default function NotificationPanel({ isOpen, onClose, anchorRef }) {
                   )}
                 </React.Fragment>
               ))}
-              {notifications.length > 8 && (
+              {notifications.length > 3 && (
                 <li className="px-4 py-2 text-center text-xs text-[var(--color-text-muted)]">
-                  +{notifications.length - 8} more — see all below
+                  +{notifications.length - 3} more — see all below
                 </li>
               )}
             </ul>

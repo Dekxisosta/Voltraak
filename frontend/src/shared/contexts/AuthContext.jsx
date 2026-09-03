@@ -12,7 +12,7 @@ const AuthContext = createContext(undefined)
 export function AuthProvider({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { showNotification } = useNotifications()
+  const { showNotification, clearAll } = useNotifications()
 
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(null)
@@ -104,6 +104,7 @@ export function AuthProvider({ children }) {
       console.warn('Logout API call failed:', error)
     } finally {
       clearAuthData()
+      clearAll()
       navigate(redirectTo, { replace: true })
 
       showNotification({
@@ -112,7 +113,7 @@ export function AuthProvider({ children }) {
         message: 'You have been logged out successfully.'
       })
     }
-  }, [clearAuthData, navigate, showNotification])
+  }, [clearAuthData, clearAll, navigate, showNotification])
 
   // Update current user's profile (name/email)
   const updateProfile = useCallback(async (patch) => {

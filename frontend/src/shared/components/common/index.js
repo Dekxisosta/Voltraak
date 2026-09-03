@@ -35,3 +35,4 @@ export { default as TabbedSection } from './TabbedSection'
 
 // Notifications
 export { default as NotificationContainer } from './NotificationContainer'
+export { default as NotificationPanel } from './NotificationPanel'

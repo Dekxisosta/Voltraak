@@ -5,11 +5,13 @@
  * hamburger that appears in the brand zone.
  */
 
-import { useState } from 'react'
-import { Menu, Search, User, LogOut, Settings, Sun, Moon } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Menu, Search, User, LogOut, Settings, Sun, Moon, Bell } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/shared/contexts/ThemeContext'
 import { ProfileModal, PreferencesModal, GlobalSearchBar } from '@/components/common'
+import { useNotifications } from '@/shared/hooks/useNotifications'
+import NotificationPanel from '@/shared/components/common/NotificationPanel'
 import LiveClock from './LiveClock'
 import WeatherBadge from './WeatherBadge'
 
@@ -18,10 +20,13 @@ import WeatherBadge from './WeatherBadge'
 export default function Header({ onMenuClick }) {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
+  const { unreadCount } = useNotifications()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showPreferencesModal, setShowPreferencesModal] = useState(false)
   const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const bellRef = useRef(null)
 
   const handleLogout = () => {
     setShowUserMenu(false)
@@ -90,6 +95,34 @@ export default function Header({ onMenuClick }) {
           >
             {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
+
+          {/* Notification bell */}
+          <div className="relative">
+            <button
+              ref={bellRef}
+              type="button"
+              onClick={() => {
+                setShowNotifications((prev) => !prev)
+                setShowUserMenu(false)
+              }}
+              className="relative p-2 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30 rounded transition-colors"
+              aria-label="Notifications"
+              title="Notifications"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white ring-2 ring-[var(--color-glass-header)]">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            <NotificationPanel
+              isOpen={showNotifications}
+              onClose={() => setShowNotifications(false)}
+              anchorRef={bellRef}
+            />
+          </div>
 
           {/* User menu */}
           <div className="relative">
