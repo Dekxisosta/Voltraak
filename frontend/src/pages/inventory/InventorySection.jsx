@@ -11,8 +11,10 @@ import ItemUpdatePage from './item-update/ItemUpdatePage'
 import ReservationsPage from './reservations/ReservationsPage'
 import ExpiryAlertsPage from './expiry-alerts/ExpiryAlertsPage'
 import DiscrepanciesPage from './discrepancies/DiscrepanciesPage'
+import WorkQueuePage from '@/pages/work-queue/WorkQueuePage'
 
 const TABS = {
+  'work-queue': WorkQueuePage,
   'stock-in-out': StockInOutPage,
   'stock-levels': StockLevelsPage,
   'damage-report': DamageReportPage,

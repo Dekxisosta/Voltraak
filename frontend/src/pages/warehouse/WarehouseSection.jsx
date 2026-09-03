@@ -8,8 +8,10 @@ import ReceivingPage from './receiving/ReceivingPage'
 import PickingPage from './picking/PickingPage'
 import FEFOPage from './fefo/FEFOPage'
 import ReportDiscrepancyPage from './report-discrepancy/ReportDiscrepancyPage'
+import WorkQueuePage from '@/pages/work-queue/WorkQueuePage'
 
 const TABS = {
+  'work-queue': WorkQueuePage,
   receiving: ReceivingPage,
   picking: PickingPage,
   fefo: FEFOPage,

@@ -14,6 +14,7 @@ import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
 import { useState } from 'react'
 import {
   LayoutDashboard,
+  ListTodo,
   Package,
   Truck,
   Calendar,
@@ -36,33 +37,37 @@ import PreferencesModal from '../common/PreferencesModal'
 // ─── Role-based navigation config ────────────────────────────────────────────
 
 const warehouseNavItems = [
-  { label: 'Receiving',          basePath: '/warehouse', tab: 'receiving',          icon: Truck },
-  { label: 'Picking Lists',      basePath: '/warehouse', tab: 'picking',             icon: Package },
-  { label: 'FEFO Management',    basePath: '/warehouse', tab: 'fefo',                icon: Calendar },
-  { label: 'Report Discrepancy', basePath: '/warehouse', tab: 'report-discrepancy',  icon: AlertCircle },
+  { label: 'Work Queue',         basePath: '/warehouse', tab: 'work-queue',          icon: ListTodo },
+  { label: 'Receiving',          basePath: '/warehouse', tab: 'receiving',            icon: Truck },
+  { label: 'Picking Lists',      basePath: '/warehouse', tab: 'picking',              icon: Package },
+  { label: 'FEFO Management',    basePath: '/warehouse', tab: 'fefo',                 icon: Calendar },
+  { label: 'Report Discrepancy', basePath: '/warehouse', tab: 'report-discrepancy',   icon: AlertCircle },
 ]
 
 const inventoryNavItems = [
-  { label: 'Stock In/Out',   basePath: '/inventory', tab: 'stock-in-out',   icon: ArrowUpDown },
-  { label: 'Stock Levels',   basePath: '/inventory', tab: 'stock-levels',   icon: BarChart3 },
-  { label: 'Damage Reports', basePath: '/inventory', tab: 'damage-report',  icon: AlertCircle },
-  { label: 'Item Updates',   basePath: '/inventory', tab: 'item-update',    icon: Package },
-  { label: 'Reservations',   basePath: '/inventory', tab: 'reservations',   icon: Package },
-  { label: 'Expiry Alerts',  basePath: '/inventory', tab: 'expiry-alerts',  icon: Calendar },
-  { label: 'Discrepancies',  basePath: '/inventory', tab: 'discrepancies',  icon: AlertCircle },
+  { label: 'Work Queue',     basePath: '/inventory', tab: 'work-queue',    icon: ListTodo },
+  { label: 'Stock In/Out',   basePath: '/inventory', tab: 'stock-in-out',  icon: ArrowUpDown },
+  { label: 'Stock Levels',   basePath: '/inventory', tab: 'stock-levels',  icon: BarChart3 },
+  { label: 'Damage Reports', basePath: '/inventory', tab: 'damage-report', icon: AlertCircle },
+  { label: 'Item Updates',   basePath: '/inventory', tab: 'item-update',   icon: Package },
+  { label: 'Reservations',   basePath: '/inventory', tab: 'reservations',  icon: Package },
+  { label: 'Expiry Alerts',  basePath: '/inventory', tab: 'expiry-alerts', icon: Calendar },
+  { label: 'Discrepancies',  basePath: '/inventory', tab: 'discrepancies', icon: AlertCircle },
 ]
 
 const managerNavItems = [
-  { label: 'KPI Dashboard',       basePath: '/manager', tab: 'kpi',                  icon: TrendingUp },
-  { label: 'Forecast Reports',    basePath: '/manager', tab: 'forecast',             icon: FileBarChart },
-  { label: 'Inventory Reports',   basePath: '/manager', tab: 'reports',              icon: BarChart3 },
-  { label: 'Low Stock Alerts',    basePath: '/manager', tab: 'low-stock',            icon: AlertCircle },
-  { label: 'PO Approvals',        basePath: '/manager', tab: 'po-approvals',         icon: ShoppingCart },
-  { label: 'Adjustment Approvals',basePath: '/manager', tab: 'adjustment-approvals', icon: ClipboardCheck },
+  { label: 'Work Queue',          basePath: '/manager', tab: 'work-queue',            icon: ListTodo },
+  { label: 'KPI Dashboard',       basePath: '/manager', tab: 'kpi',                   icon: TrendingUp },
+  { label: 'Forecast Reports',    basePath: '/manager', tab: 'forecast',              icon: FileBarChart },
+  { label: 'Inventory Reports',   basePath: '/manager', tab: 'reports',               icon: BarChart3 },
+  { label: 'Low Stock Alerts',    basePath: '/manager', tab: 'low-stock',             icon: AlertCircle },
+  { label: 'PO Approvals',        basePath: '/manager', tab: 'po-approvals',          icon: ShoppingCart },
+  { label: 'Adjustment Approvals',basePath: '/manager', tab: 'adjustment-approvals',  icon: ClipboardCheck },
 ]
 
 const adminNavItems = [
-  { label: 'User Management', basePath: '/admin', tab: 'users', icon: Users },
+  { label: 'Work Queue',      basePath: '/admin', tab: 'work-queue', icon: ListTodo },
+  { label: 'User Management', basePath: '/admin', tab: 'users',      icon: Users },
 ]
 
 const getNavigationByRole = (role) => {

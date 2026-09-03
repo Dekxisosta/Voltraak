@@ -18,6 +18,7 @@ export const inventoryRoutes = [
 ]
 
 export const inventoryLegacyRoutes = [
+  { path: '/inventory/work-queue', tab: 'work-queue', roles: ROLES },
   { path: '/inventory/stock-in-out', tab: 'stock-in-out', roles: ROLES },
   { path: '/inventory/stock-levels', tab: 'stock-levels', roles: ROLES },
   { path: '/inventory/damage-report', tab: 'damage-report', roles: ROLES },

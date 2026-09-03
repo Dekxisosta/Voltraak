@@ -10,8 +10,10 @@ import ReportsPage from './reports/ReportsPage'
 import LowStockPage from './low-stock/LowStockPage'
 import POApprovalsPage from './po-approvals/POApprovalsPage'
 import AdjustmentApprovalsPage from './adjustment-approvals/AdjustmentApprovalsPage'
+import WorkQueuePage from '@/pages/work-queue/WorkQueuePage'
 
 const TABS = {
+  'work-queue': WorkQueuePage,
   kpi: KPIDashboardPage,
   forecast: ForecastPage,
   reports: ReportsPage,

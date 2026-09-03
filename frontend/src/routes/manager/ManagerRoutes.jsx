@@ -17,6 +17,7 @@ export const managerRoutes = [
 ]
 
 export const managerLegacyRoutes = [
+  { path: '/manager/work-queue', tab: 'work-queue', roles: ROLES },
   { path: '/manager/kpi', tab: 'kpi', roles: ROLES },
   { path: '/manager/forecast', tab: 'forecast', roles: ROLES },
   { path: '/manager/reports', tab: 'reports', roles: ROLES },

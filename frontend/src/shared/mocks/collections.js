@@ -31,6 +31,8 @@ import { mockStockLevels } from './inventory/stock-levels'
 import { mockStockTransactions } from './inventory/stock-in-out'
 import { mockExpiryBatches } from './inventory/expiry-alerts'
 
+import { mockWorkQueueItems } from './work-queue'
+
 export const SEED_COLLECTIONS = {
   'warehouse/fefo': mockFEFORecommendations,
   'warehouse/picking': mockPickingTasks,
@@ -48,6 +50,8 @@ export const SEED_COLLECTIONS = {
   'inventory/stock-levels': mockStockLevels,
   'inventory/stock-in-out': mockStockTransactions,
   'inventory/expiry-alerts': mockExpiryBatches,
+
+  'work-queue': mockWorkQueueItems,
 }
 
 export function isRegisteredCollection(key) {

@@ -17,6 +17,7 @@ export const warehouseRoutes = [
 ]
 
 export const warehouseLegacyRoutes = [
+  { path: '/warehouse/work-queue', tab: 'work-queue', roles: ROLES },
   { path: '/warehouse/receiving', tab: 'receiving', roles: ROLES },
   { path: '/warehouse/picking', tab: 'picking', roles: ROLES },
   { path: '/warehouse/fefo', tab: 'fefo', roles: ROLES },

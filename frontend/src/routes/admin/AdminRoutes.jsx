@@ -14,5 +14,6 @@ export const adminRoutes = [
 ]
 
 export const adminLegacyRoutes = [
+  { path: '/admin/work-queue', tab: 'work-queue', roles: ROLES },
   { path: '/admin/users', tab: 'users', roles: ROLES },
 ]
