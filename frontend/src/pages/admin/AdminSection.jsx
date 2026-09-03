@@ -5,10 +5,8 @@
 
 import TabbedSection from '@/shared/components/common/TabbedSection'
 import UserManagementPage from './users/UserManagementPage'
-import WorkQueuePage from '@/pages/work-queue/WorkQueuePage'
 
 const TABS = {
-  'work-queue': WorkQueuePage,
   users: UserManagementPage,
 }
 
