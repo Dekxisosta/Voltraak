@@ -1,9 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import laravel from 'laravel-vite-plugin'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    laravel({
+      input: ['src/main.jsx'],
+      // Laravel's public dir lives in the sibling `backend/` app, not here.
+      // frontend/ is intentionally NOT moved under backend/resources/js -
+      // this keeps the existing structure/aliases intact while Laravel
+      // serves the built assets straight out of backend/public/build.
+      publicDirectory: '../backend/public',
+      buildDirectory: 'build',
+      refresh: [
+        '../backend/routes/**',
+        '../backend/app/Modules/**/Controllers/**',
+        '../backend/resources/views/**',
+      ],
+    }),
+    react(),
+  ],
   resolve: {
     alias: {
       '@/shared': path.resolve(__dirname, './src/shared'),
@@ -35,13 +52,15 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist',
+    // outDir/rollupOptions.input are derived by the laravel() plugin above
+    // (publicDirectory + buildDirectory, and the `input` option) - don't
+    // override outDir here or assets will build to the wrong place.
+    emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
       output: {
         manualChunks: {
           'vendor': ['react', 'react-dom'],
-          'router': ['react-router-dom'],
           'icons': ['lucide-react']
         }
       }

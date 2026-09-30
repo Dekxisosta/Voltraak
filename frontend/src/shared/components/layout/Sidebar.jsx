@@ -1,16 +1,8 @@
 /**
- * Left navigation panel.
- *
- * Rendered inside the 220px left column of the AppShell body row.
- * The logo and user info now live in the Header, so this panel is
- * pure navigation: a role-scoped link list + a slim settings/logout strip
- * at the bottom.
- *
- * On mobile it is mounted inside a drawer overlay; `onClose` is passed in
- * that case to wire up the close button.
+ * Left navigation panel - Inertia version.
  */
 
-import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
+import { Link, usePage } from '@inertiajs/react'
 import { useState } from 'react'
 import {
   LayoutDashboard,
@@ -34,44 +26,42 @@ import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/utils'
 import PreferencesModal from '../common/PreferencesModal'
 
-// ─── Role-based navigation config ────────────────────────────────────────────
-
 const warehouseNavItems = [
-  { label: 'Work Queue',         basePath: '/warehouse', tab: 'work-queue',          icon: ListTodo },
-  { label: 'Receiving',          basePath: '/warehouse', tab: 'receiving',            icon: Truck },
-  { label: 'Picking Lists',      basePath: '/warehouse', tab: 'picking',              icon: Package },
-  { label: 'FEFO Management',    basePath: '/warehouse', tab: 'fefo',                 icon: Calendar },
-  { label: 'Report Discrepancy', basePath: '/warehouse', tab: 'report-discrepancy',   icon: AlertCircle },
+  { label: 'Work Queue',         href: '/warehouse?tab=work-queue',          icon: ListTodo },
+  { label: 'Receiving',          href: '/warehouse?tab=receiving',            icon: Truck },
+  { label: 'Picking Lists',      href: '/warehouse?tab=picking',              icon: Package },
+  { label: 'FEFO Management',    href: '/warehouse?tab=fefo',                 icon: Calendar },
+  { label: 'Report Discrepancy', href: '/warehouse?tab=report-discrepancy',   icon: AlertCircle },
 ]
 
 const inventoryNavItems = [
-  { label: 'Work Queue',     basePath: '/inventory', tab: 'work-queue',    icon: ListTodo },
-  { label: 'Stock In/Out',   basePath: '/inventory', tab: 'stock-in-out',  icon: ArrowUpDown },
-  { label: 'Stock Levels',   basePath: '/inventory', tab: 'stock-levels',  icon: BarChart3 },
-  { label: 'Damage Reports', basePath: '/inventory', tab: 'damage-report', icon: AlertCircle },
-  { label: 'Item Updates',   basePath: '/inventory', tab: 'item-update',   icon: Package },
-  { label: 'Reservations',   basePath: '/inventory', tab: 'reservations',  icon: Package },
-  { label: 'Expiry Alerts',  basePath: '/inventory', tab: 'expiry-alerts', icon: Calendar },
-  { label: 'Discrepancies',  basePath: '/inventory', tab: 'discrepancies', icon: AlertCircle },
+  { label: 'Work Queue',     href: '/inventory?tab=work-queue',    icon: ListTodo },
+  { label: 'Stock In/Out',   href: '/inventory?tab=stock-in-out',  icon: ArrowUpDown },
+  { label: 'Stock Levels',   href: '/inventory?tab=stock-levels',  icon: BarChart3 },
+  { label: 'Damage Reports', href: '/inventory?tab=damage-report', icon: AlertCircle },
+  { label: 'Item Updates',   href: '/inventory?tab=item-update',   icon: Package },
+  { label: 'Reservations',   href: '/inventory?tab=reservations',  icon: Package },
+  { label: 'Expiry Alerts',  href: '/inventory?tab=expiry-alerts', icon: Calendar },
+  { label: 'Discrepancies',  href: '/inventory?tab=discrepancies', icon: AlertCircle },
 ]
 
 const managerNavItems = [
-  { label: 'Work Queue',          basePath: '/manager', tab: 'work-queue',            icon: ListTodo },
-  { label: 'KPI Dashboard',       basePath: '/manager', tab: 'kpi',                   icon: TrendingUp },
-  { label: 'Forecast Reports',    basePath: '/manager', tab: 'forecast',              icon: FileBarChart },
-  { label: 'Inventory Reports',   basePath: '/manager', tab: 'reports',               icon: BarChart3 },
-  { label: 'Low Stock Alerts',    basePath: '/manager', tab: 'low-stock',             icon: AlertCircle },
-  { label: 'PO Approvals',        basePath: '/manager', tab: 'po-approvals',          icon: ShoppingCart },
-  { label: 'Adjustment Approvals',basePath: '/manager', tab: 'adjustment-approvals',  icon: ClipboardCheck },
+  { label: 'Work Queue',          href: '/manager?tab=work-queue',            icon: ListTodo },
+  { label: 'KPI Dashboard',       href: '/manager?tab=kpi',                   icon: TrendingUp },
+  { label: 'Forecast Reports',    href: '/manager?tab=forecast',              icon: FileBarChart },
+  { label: 'Inventory Reports',   href: '/manager?tab=reports',               icon: BarChart3 },
+  { label: 'Low Stock Alerts',    href: '/manager?tab=low-stock',             icon: AlertCircle },
+  { label: 'PO Approvals',        href: '/manager?tab=po-approvals',          icon: ShoppingCart },
+  { label: 'Adjustment Approvals',href: '/manager?tab=adjustment-approvals',  icon: ClipboardCheck },
 ]
 
 const adminNavItems = [
-  { label: 'Work Queue',      basePath: '/admin', tab: 'work-queue', icon: ListTodo },
-  { label: 'User Management', basePath: '/admin', tab: 'users',      icon: Users },
+  { label: 'Work Queue',      href: '/admin?tab=work-queue', icon: ListTodo },
+  { label: 'User Management', href: '/admin?tab=users',      icon: Users },
 ]
 
 const getNavigationByRole = (role) => {
-  const base = [{ label: 'Dashboard', basePath: '/dashboard', icon: LayoutDashboard }]
+  const base = [{ label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard }]
   if (role === 'warehouse')      return [...base, ...warehouseNavItems]
   if (role === 'inventory_staff') return [...base, ...inventoryNavItems]
   if (role === 'manager')        return [...base, ...managerNavItems]
@@ -79,15 +69,12 @@ const getNavigationByRole = (role) => {
   return base
 }
 
-// ─── Section label helper ────────────────────────────────────────────────────
-
-// Groups with a subtle uppercase label so the admin's long list stays scannable
 const SECTION_LABELS = {
-  '/dashboard':  null,          // no label for the single top item
-  '/admin':      'Admin',
-  '/manager':    'Manager',
-  '/inventory':  'Inventory',
-  '/warehouse':  'Warehouse',
+  '/dashboard': null,
+  '/admin': 'Admin',
+  '/manager': 'Manager',
+  '/inventory': 'Inventory',
+  '/warehouse': 'Warehouse',
 }
 
 function groupNavItems(items) {
@@ -95,11 +82,11 @@ function groupNavItems(items) {
   let current = null
 
   for (const item of items) {
-    const sectionKey = item.basePath
+    const sectionKey = item.href.split('?')[0]
     const label = SECTION_LABELS[sectionKey] ?? null
 
-    if (!current || current.basePath !== sectionKey) {
-      current = { basePath: sectionKey, label, items: [] }
+    if (!current || current.sectionKey !== sectionKey) {
+      current = { sectionKey, label, items: [] }
       groups.push(current)
     }
     current.items.push(item)
@@ -107,27 +94,20 @@ function groupNavItems(items) {
   return groups
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
 export default function Sidebar({ onClose }) {
   const { user, logout } = useAuth()
-  const location = useLocation()
-  const [searchParams] = useSearchParams()
+  const { url } = usePage()
   const [showPreferences, setShowPreferences] = useState(false)
 
   const navigation = getNavigationByRole(user?.role)
-  const activeTab = searchParams.get('tab')
-
   const groups = groupNavItems(navigation)
 
-  const handleLogout = async () => {
-    try { await logout() } catch { /* force logout */ }
+  const handleLogout = () => {
+    logout()
   }
 
   return (
     <div className="flex h-full flex-col">
-
-      {/* ── Mobile close button ───────────────────────────────────── */}
       {onClose && (
         <div className="flex items-center justify-between px-3 py-3 border-b border-white/10 lg:hidden">
           <div className="flex items-center gap-2">
@@ -148,11 +128,9 @@ export default function Sidebar({ onClose }) {
         </div>
       )}
 
-      {/* ── Navigation ───────────────────────────────────────────── */}
       <nav className="flex-1 min-h-0 overflow-y-auto px-2 py-3 space-y-4">
         {groups.map((group) => (
-          <div key={group.basePath}>
-            {/* Section label — only for multi-item groups that have a label */}
+          <div key={group.sectionKey}>
             {group.label && group.items.length > 1 && (
               <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest text-gray-500 select-none">
                 {group.label}
@@ -160,13 +138,11 @@ export default function Sidebar({ onClose }) {
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive = item.tab
-                  ? location.pathname === item.basePath && activeTab === item.tab
-                  : location.pathname === item.basePath
+                const isActive = url === item.href || url.startsWith(item.href.split('?')[0] + '?')
 
                 return (
                   <NavItem
-                    key={item.tab ? `${item.basePath}?tab=${item.tab}` : item.basePath}
+                    key={item.href}
                     item={item}
                     isActive={isActive}
                     onClick={onClose}
@@ -178,7 +154,6 @@ export default function Sidebar({ onClose }) {
         ))}
       </nav>
 
-      {/* ── Bottom strip ─────────────────────────────────────────── */}
       <div className="px-2 py-3 border-t border-white/10 space-y-0.5">
         <button
           onClick={() => setShowPreferences(true)}
@@ -202,14 +177,10 @@ export default function Sidebar({ onClose }) {
   )
 }
 
-// ─── NavItem ─────────────────────────────────────────────────────────────────
-
 function NavItem({ item, isActive, onClick }) {
-  const to = item.tab ? `${item.basePath}?tab=${item.tab}` : item.basePath
-
   return (
-    <NavLink
-      to={to}
+    <Link
+      href={item.href}
       onClick={onClick}
       className={cn(
         'flex items-center gap-2.5 px-2 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-white/20',
@@ -220,6 +191,6 @@ function NavItem({ item, isActive, onClick }) {
     >
       <item.icon className="h-4 w-4 shrink-0" />
       <span className="truncate">{item.label}</span>
-    </NavLink>
+    </Link>
   )
 }
