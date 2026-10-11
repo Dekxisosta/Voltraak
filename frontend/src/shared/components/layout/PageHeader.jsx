@@ -1,14 +1,10 @@
 /**
- * Reusable page header component with breadcrumbs and actions
+ * Reusable page header component with breadcrumbs and actions - Inertia version
  */
 
 import { ChevronRight, Home } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link } from '@inertiajs/react'
 import { cn } from '@/utils'
-
-
-
-
 
 export default function PageHeader({
   title,
@@ -19,13 +15,12 @@ export default function PageHeader({
 }) {
   return (
     <div className={cn('mb-6', className)}>
-      {/* Breadcrumbs */}
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav className="mb-4" aria-label="Breadcrumb">
           <ol className="flex items-center space-x-2 text-sm">
             <li>
               <Link
-                to="/dashboard"
+                href="/dashboard"
                 className="flex items-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               >
                 <Home className="h-4 w-4" />
@@ -38,7 +33,7 @@ export default function PageHeader({
                 <ChevronRight className="h-4 w-4 text-gray-400 dark:text-gray-500 mx-2" />
                 {item.href && index < breadcrumbs.length - 1 ? (
                   <Link
-                    to={item.href}
+                    href={item.href}
                     className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   >
                     {item.label}
@@ -54,7 +49,6 @@ export default function PageHeader({
         </nav>
       )}
 
-      {/* Title and actions */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">{title}</h1>
@@ -73,7 +67,6 @@ export default function PageHeader({
   )
 }
 
-// Convenience component for common page layouts
 export function PageContainer({
   children,
   className,
@@ -85,7 +78,6 @@ export function PageContainer({
   )
 }
 
-// Responsive grid layout for pages
 export function PageGrid({
   children,
   cols = 1,

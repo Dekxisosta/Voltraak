@@ -1,19 +1,39 @@
 import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App'
+import { createInertiaApp } from '@inertiajs/react'
+import { createRoot } from 'react-dom/client'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { DensityProvider } from '@/contexts/DensityContext'
+import { LayoutPreferenceProvider } from '@/contexts/LayoutPreferenceContext'
+import { NotificationProvider } from '@/hooks/useNotifications'
+import NotificationContainer from '@/components/common/NotificationContainer'
+import { AuthProvider } from '@/contexts/AuthContext'
 import './styles/index.css'
 
-const rootElement = document.getElementById('root')
-
-if (!rootElement) {
-  throw new Error('Failed to find the root element')
-}
-
-ReactDOM.createRoot(rootElement).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
-)
+createInertiaApp({
+  resolve: name => {
+    const pages = import.meta.glob('./pages/**/*.jsx', { eager: true })
+    const page = pages[`./pages/${name}.jsx`]
+    if (!page) {
+      throw new Error(`Page not found: ${name}`)
+    }
+    return page
+  },
+  setup({ el, App, props }) {
+    createRoot(el).render(
+      <React.StrictMode>
+        <ThemeProvider>
+          <DensityProvider>
+            <LayoutPreferenceProvider>
+              <NotificationProvider>
+                <AuthProvider>
+                  <App {...props} />
+                  <NotificationContainer />
+                </AuthProvider>
+              </NotificationProvider>
+            </LayoutPreferenceProvider>
+          </DensityProvider>
+        </ThemeProvider>
+      </React.StrictMode>
+    )
+  },
+})
