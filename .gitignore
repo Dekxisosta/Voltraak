@@ -1,0 +1,42 @@
+# ─── Laravel ─────────────────────────────────────────────────────────────────
+/vendor
+/bootstrap/cache/*.php
+/storage/*.key
+/storage/logs/*.log
+/public/storage
+.env
+.env.backup
+.env.production
+.env.staging
+.env.*.local
+.phpunit.result.cache
+auth.json
+Homestead.json
+Homestead.yaml
+composer.phar
+
+# ─── Vite / Frontend build ────────────────────────────────────────────────────
+/public/build
+/public/hot
+/node_modules
+dist/
+coverage/
+.vitest/
+
+# ─── Logs & debug ────────────────────────────────────────────────────────────
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ─── Editor ──────────────────────────────────────────────────────────────────
+/.fleet
+/.idea
+# Ignore personal/local VS Code overrides but keep shared workspace settings
+.vscode/*.code-snippets
+.vscode/launch.json
