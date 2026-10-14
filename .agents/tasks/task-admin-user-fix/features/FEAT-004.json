@@ -1,0 +1,23 @@
+{
+  "id": "FEAT-004",
+  "type": "fix",
+  "description": "Fix field name mismatch between backend and frontend. UserResource returns 'last_login_at' but UserManagementPage.jsx reads 'u.last_login' in the Last Login column render function. Decision: Update the frontend to read 'last_login_at' to match the backend resource (avoids backend change and aligns with Laravel naming convention for timestamp fields).",
+  "status": "pending",
+  "steps": [
+    "In resources/js/pages/admin/users/UserManagementPage.jsx, find the columns definition for 'last_login'",
+    "Change the render function to read 'last_login_at' instead of 'last_login': (val) => (val ? new Date(val).toLocaleString() : 'Never')",
+    "Update resources/js/shared/mocks/manager/users.js to rename 'last_login' to 'last_login_at' in all mock user objects, so mock and API data have the same shape"
+  ],
+  "acceptance_criteria": [
+    "The Last Login column in the user table displays correctly when using real API data (VITE_DATA_SOURCE=api)",
+    "The Last Login column displays correctly when using mock data (VITE_DATA_SOURCE=mocks)",
+    "No console errors about undefined 'last_login' or 'last_login_at'"
+  ],
+  "verification": [
+    "Run the app with VITE_DATA_SOURCE=api and confirm Last Login column shows timestamps or 'Never'",
+    "Run the app with VITE_DATA_SOURCE=mocks and confirm Last Login column shows the same format",
+    "Inspect a user object in DevTools Network tab response and confirm the field is named 'last_login_at'"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

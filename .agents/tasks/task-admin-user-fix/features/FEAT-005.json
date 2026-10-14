@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-005",
+  "type": "fix",
+  "description": "Add admin role RBAC to user CRUD routes and update authorization logic. Currently user CRUD routes (GET/POST/PUT/DELETE /api/v1/users/*) use only auth:sanctum middleware. StoreUserRequest::authorize() requires isManager(), but the task specifies admin-only access for User Management. RoleMiddleware already supports 'admin' role and treats ADMIN as having access everywhere. Decision: Add role:admin middleware to user CRUD routes (index, store, show, update, destroy, toggleStatus) so only admins can manage users. Update StoreUserRequest and UpdateUserRequest authorize() methods to check isAdmin() instead of isManager(). Preserve the profile routes (GET/PUT /api/v1/users/profile) as self-service for any authenticated user.",
+  "status": "pending",
+  "steps": [
+    "In app/Modules/UserManagement/Routes/api.php, wrap the user CRUD routes (index, store, show, update, destroy, toggleStatus) in a role:admin middleware group. Keep the profile routes (GET/PUT profile) under auth:sanctum only (no role restriction).",
+    "In app/Modules/UserManagement/Requests/StoreUserRequest.php, change authorize() from return $this->user() && $this->user()->isManager(); to return $this->user() && $this->user()->isAdmin();",
+    "Add an isAdmin() helper method to app/Models/User.php if it does not exist: public function isAdmin(): bool { return $this->role === UserRole::ADMIN; }",
+    "In app/Modules/UserManagement/Requests/UpdateUserRequest.php, change the manager check in authorize() from $user->isManager() to ($user->id == $targetUserId || $user->isAdmin())",
+    "Update the canManageUser and canUpdateUser methods in app/Modules/UserManagement/Services/UserService.php to check isAdmin() instead of isManager() where appropriate, so service-layer authorization aligns with route middleware"
+  ],
+  "acceptance_criteria": [
+    "Only users with role 'admin' can access GET /api/v1/users (list users)",
+    "Only users with role 'admin' can POST /api/v1/users (create user)",
+    "Only users with role 'admin' can PUT /api/v1/users/{id} (update user) or PATCH /api/v1/users/{id}/toggle-status",
+    "Only users with role 'admin' can DELETE /api/v1/users/{id}",
+    "Users with role 'manager', 'inventory_staff', or 'warehouse' receive a 403 Forbidden response when attempting these operations",
+    "Any authenticated user can still access GET /api/v1/users/profile and PUT /api/v1/users/profile (self-service profile)"
+  ],
+  "verification": [
+    "Log in as an admin user and confirm the /admin?tab=users page loads and all CRUD operations work",
+    "Log in as a manager user and confirm navigating to /admin?tab=users returns a 403 or redirects with an error message",
+    "Run backend tests: docker compose exec app php artisan test --filter=UserController (if tests exist, or create a basic test for RBAC)",
+    "Manually test via curl or Postman: GET /api/v1/users with a manager token returns 403"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

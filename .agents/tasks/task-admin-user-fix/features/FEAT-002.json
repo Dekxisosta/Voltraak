@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix response shape mismatch between backend paginated response and frontend expectations. The backend UserController::index() returns paginatedResponse() which wraps data in { success, data: { items: [...], pagination: {...} }, message, timestamp }. The frontend does setData({ users: result, loading: false }), treating the whole response as the array. Frontend must extract result.data.items (or result if the outer envelope is unwrapped by apiClient).",
+  "status": "pending",
+  "steps": [
+    "In resources/js/shared/api/client.js, check if apiClient.get() already unwraps the outer { success, data, message } envelope and returns only data. Read the interceptor logic.",
+    "If apiClient returns the full envelope, modify UserManagementPage.jsx loadUsers() to extract result.data.items instead of treating result as the array. If apiClient already unwraps to data, then extract result.items.",
+    "Also extract result.data.pagination (or result.pagination) and store it in state if pagination UI is planned, or ignore it if the page does not paginate",
+    "Update the mock in resources/js/shared/mocks/manager/users.js to return the same shape as the real API after client unwrapping, so mock and API modes behave identically"
+  ],
+  "acceptance_criteria": [
+    "When VITE_DATA_SOURCE=api, the user table displays users from result.data.items (or result.items if apiClient unwraps)",
+    "When VITE_DATA_SOURCE=mocks, the user table displays the same structure from mockUsers",
+    "No console errors about undefined or incorrect data structures"
+  ],
+  "verification": [
+    "Run the app with VITE_DATA_SOURCE=api and confirm the user table populates correctly",
+    "Run the app with VITE_DATA_SOURCE=mocks and confirm the user table populates correctly",
+    "Open DevTools console and confirm no errors about undefined .items or .data"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

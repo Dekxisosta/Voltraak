@@ -1,0 +1,29 @@
+{
+  "project_type": "Laravel 11 backend (PHP 8.1+) + React 18 SPA frontend with Vite 5",
+  "language": "PHP (backend), JavaScript/JSX (frontend)",
+  "build_system": "Composer for Laravel, npm for React frontend. Docker Compose orchestrates both services.",
+  "test_framework": "PHPUnit for backend (tests/Feature, tests/Unit), Vitest for frontend",
+  "build_command": "docker compose up for full stack; npm run build for frontend production build; composer install for backend deps",
+  "test_command": "npm run test for frontend unit tests; docker compose exec app php artisan test for backend tests",
+  "verification_instructions": "1. Start docker services: docker compose up -d\n2. Run backend tests: docker compose exec app php artisan test --filter=User\n3. Run frontend tests: npm run test\n4. Manual verification: visit http://localhost:5173/admin?tab=users after logging in with manager/admin credentials",
+  "snapshot_or_generated_files": null,
+  "environment_constraints": "Docker containers must be running for backend API access. Frontend runs mock data by default (VITE_DATA_SOURCE=mocks); set VITE_DATA_SOURCE=api to use real Laravel backend. MySQL container must be healthy before Laravel app starts.",
+  "contribution_requirements": "No explicit CONTRIBUTING.md found. Follow Laravel and React best practices. Maintain existing modular architecture (app/Modules/<Module> for backend). Preserve RBAC enforcement via RoleMiddleware. Use existing BaseController response helpers (successResponse, errorResponse, paginatedResponse).",
+  "key_patterns": "Backend: Controller -> Service -> Model architecture. Request classes handle validation and authorization. Resources shape API responses. BaseController provides successResponse/errorResponse/paginatedResponse helpers. Frontend: fetchData() wrapper toggles between mocks and API. API client (resources/js/shared/api/*) uses apiClient from client.js. Pages follow Card/Table/Modal component patterns.",
+  "relevant_files": [
+    "resources/js/pages/admin/users/UserManagementPage.jsx",
+    "resources/js/shared/api/users.js",
+    "resources/js/shared/api/client.js",
+    "app/Modules/UserManagement/Routes/api.php",
+    "app/Modules/UserManagement/Controllers/UserController.php",
+    "app/Modules/UserManagement/Services/UserService.php",
+    "app/Modules/UserManagement/Requests/StoreUserRequest.php",
+    "app/Modules/UserManagement/Requests/UpdateUserRequest.php",
+    "app/Modules/UserManagement/Resources/UserResource.php",
+    "app/Core/Controllers/BaseController.php",
+    "app/Core/Middleware/RoleMiddleware.php",
+    "app/Support/Enums/UserRole.php",
+    "resources/js/shared/mocks/manager/users.js"
+  ],
+  "directory_structure": "Backend: app/Modules/UserManagement/{Controllers,Services,Requests,Resources,Routes}. Frontend: resources/js/{pages/admin/users, shared/{api,components,mocks}}. Tests: tests/{Feature,Unit} for backend, resources/js/**/*.test.jsx for frontend (if exists)."
+}

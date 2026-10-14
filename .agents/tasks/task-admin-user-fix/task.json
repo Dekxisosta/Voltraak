@@ -1,0 +1,7 @@
+{
+  "task_id": "task-admin-user-fix",
+  "task_description": "Fix all admin-related frontend/backend request and response mismatches end-to-end for User Management, preserving RBAC, existing business logic, and unrelated functionality",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}

@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "fix",
+  "description": "Wire frontend mutation handlers to call backend API endpoints. Currently handleSubmitForm (create/update), handleToggleActive, and handleConfirmDelete in UserManagementPage.jsx perform only optimistic local state updates without hitting usersApi methods. Each handler must call the real API, then update local state from the response or reload the list on success.",
+  "status": "pending",
+  "steps": [
+    "In resources/js/pages/admin/users/UserManagementPage.jsx, modify handleSubmitForm to call usersApi.createUser(form) when adding (editingUser is null) or usersApi.updateUser(editingUser.id, form) when editing, await the response, and update state from response.data (or reload via loadUsers())",
+    "Modify handleToggleActive to call await usersApi.toggleUserStatus(user.id), then update local state from the returned user data",
+    "Modify handleConfirmDelete to call await usersApi.deleteUser(deleteTarget.id), then remove the user from local state on success",
+    "Add error handling for each API call: catch exceptions, display error notification via addNotification, and revert optimistic updates if any were applied"
+  ],
+  "acceptance_criteria": [
+    "Creating a user via the Add User form sends a POST request to /api/v1/users and the new user appears in the table with data from the server response",
+    "Editing a user via the Edit button sends a PUT request to /api/v1/users/{id} and the updated user reflects server-returned data",
+    "Toggling user active status sends a PATCH request to /api/v1/users/{id}/toggle-status",
+    "Deleting a user sends a DELETE request to /api/v1/users/{id} and removes the user from the table on success",
+    "Network errors or validation failures display error notifications and do not permanently update local state"
+  ],
+  "verification": [
+    "Start the Docker stack: docker compose up -d",
+    "Open the frontend at http://localhost:5173/admin?tab=users with VITE_DATA_SOURCE=api in .env",
+    "Open browser DevTools Network tab and verify each CRUD operation sends the correct HTTP request and updates the UI from the response",
+    "Create a user and confirm the user appears with a server-assigned ID",
+    "Edit a user and confirm the changes persist after page reload",
+    "Toggle a user's status and confirm it persists after reload",
+    "Delete a user and confirm it no longer appears after reload"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

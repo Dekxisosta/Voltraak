@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-003",
+  "type": "fix",
+  "description": "Add password field to the Add User form and handle password requirement. StoreUserRequest requires 'password' (min 8 chars, must contain uppercase, lowercase, digit, special char), but the Add User form has no password field. Options: (1) add a password input to the form, (2) make password nullable and auto-generate a temporary password on the backend, (3) add a separate reset-password step. Decision: Add a password input field to the Add User form (cleanest for user creation flow, maintains security, aligns with StoreUserRequest validation).",
+  "status": "pending",
+  "steps": [
+    "In resources/js/pages/admin/users/UserManagementPage.jsx, add a 'password' field to emptyForm initial state (empty string)",
+    "In the Add/Edit modal form JSX, add an Input component with type='password', label='Password', required={!editingUser}, visible only when adding (not editing), and bound to form.password",
+    "Add client-side validation in validateForm() to check password requirements when adding: min 8 chars, at least one uppercase, one lowercase, one digit, one special char. Set formErrors.password if invalid.",
+    "When editing a user, do not show the password field and do not send 'password' in the update payload (UpdateUserRequest allows password updates separately via current_password flow)"
+  ],
+  "acceptance_criteria": [
+    "The Add User form displays a Password field with type='password'",
+    "Client-side validation enforces: min 8 characters, at least one uppercase letter, one lowercase letter, one digit, one special character",
+    "Creating a user with a valid password succeeds and returns 201 Created",
+    "Creating a user with an invalid password shows a validation error",
+    "The Edit User form does not display the password field (password changes are separate from profile edits per UpdateUserRequest logic)"
+  ],
+  "verification": [
+    "Open the Add User modal and confirm a Password field is visible",
+    "Try to create a user without a password and confirm validation prevents submission",
+    "Try to create a user with a weak password (e.g., 'test') and confirm validation fails",
+    "Create a user with a strong password (e.g., 'Password123!') and confirm the user is created successfully",
+    "Open the Edit User modal and confirm no Password field is shown"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
