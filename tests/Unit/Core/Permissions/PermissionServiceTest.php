@@ -31,7 +31,7 @@ class PermissionServiceTest extends TestCase
     /** @test */
     public function inventory_user_inherits_warehouse_permissions()
     {
-        $user = new User(['role' => UserRole::INVENTORY->value]);
+        $user = new User(['role' => UserRole::INVENTORY_STAFF->value]);
 
         // Should have warehouse permissions
         $this->assertTrue($this->permissionService->hasPermission($user, 'view_products'));
@@ -75,7 +75,7 @@ class PermissionServiceTest extends TestCase
     /** @test */
     public function it_checks_all_permissions_correctly()
     {
-        $inventoryUser = new User(['role' => UserRole::INVENTORY->value]);
+        $inventoryUser = new User(['role' => UserRole::INVENTORY_STAFF->value]);
         
         $this->assertTrue($this->permissionService->hasAllPermissions(
             $inventoryUser, 
@@ -92,7 +92,7 @@ class PermissionServiceTest extends TestCase
     public function it_checks_feature_access_correctly()
     {
         $warehouseUser = new User(['role' => UserRole::WAREHOUSE->value]);
-        $inventoryUser = new User(['role' => UserRole::INVENTORY->value]);
+        $inventoryUser = new User(['role' => UserRole::INVENTORY_STAFF->value]);
         $managerUser = new User(['role' => UserRole::MANAGER->value]);
 
         // Warehouse access
@@ -115,7 +115,7 @@ class PermissionServiceTest extends TestCase
     public function it_gets_user_permissions_with_inheritance()
     {
         $warehousePermissions = $this->permissionService->getUserPermissions(UserRole::WAREHOUSE);
-        $inventoryPermissions = $this->permissionService->getUserPermissions(UserRole::INVENTORY);
+        $inventoryPermissions = $this->permissionService->getUserPermissions(UserRole::INVENTORY_STAFF);
         $managerPermissions = $this->permissionService->getUserPermissions(UserRole::MANAGER);
 
         // Warehouse should have only warehouse permissions
@@ -137,7 +137,7 @@ class PermissionServiceTest extends TestCase
     public function it_checks_role_levels_correctly()
     {
         $warehouseUser = new User(['role' => UserRole::WAREHOUSE->value]);
-        $inventoryUser = new User(['role' => UserRole::INVENTORY->value]);
+        $inventoryUser = new User(['role' => UserRole::INVENTORY_STAFF->value]);
         $managerUser = new User(['role' => UserRole::MANAGER->value]);
 
         $this->assertEquals(1, $this->permissionService->getUserRoleLevel($warehouseUser));
@@ -149,21 +149,21 @@ class PermissionServiceTest extends TestCase
     public function it_checks_minimum_role_level()
     {
         $warehouseUser = new User(['role' => UserRole::WAREHOUSE->value]);
-        $inventoryUser = new User(['role' => UserRole::INVENTORY->value]);
+        $inventoryUser = new User(['role' => UserRole::INVENTORY_STAFF->value]);
         $managerUser = new User(['role' => UserRole::MANAGER->value]);
 
         // Warehouse user can access warehouse features
         $this->assertTrue($this->permissionService->hasMinimumRoleLevel($warehouseUser, UserRole::WAREHOUSE));
-        $this->assertFalse($this->permissionService->hasMinimumRoleLevel($warehouseUser, UserRole::INVENTORY));
+        $this->assertFalse($this->permissionService->hasMinimumRoleLevel($warehouseUser, UserRole::INVENTORY_STAFF));
 
         // Inventory user can access warehouse and inventory features
         $this->assertTrue($this->permissionService->hasMinimumRoleLevel($inventoryUser, UserRole::WAREHOUSE));
-        $this->assertTrue($this->permissionService->hasMinimumRoleLevel($inventoryUser, UserRole::INVENTORY));
+        $this->assertTrue($this->permissionService->hasMinimumRoleLevel($inventoryUser, UserRole::INVENTORY_STAFF));
         $this->assertFalse($this->permissionService->hasMinimumRoleLevel($inventoryUser, UserRole::MANAGER));
 
         // Manager can access all features
         $this->assertTrue($this->permissionService->hasMinimumRoleLevel($managerUser, UserRole::WAREHOUSE));
-        $this->assertTrue($this->permissionService->hasMinimumRoleLevel($managerUser, UserRole::INVENTORY));
+        $this->assertTrue($this->permissionService->hasMinimumRoleLevel($managerUser, UserRole::INVENTORY_STAFF));
         $this->assertTrue($this->permissionService->hasMinimumRoleLevel($managerUser, UserRole::MANAGER));
     }
 
