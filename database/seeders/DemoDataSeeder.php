@@ -8,68 +8,49 @@ use App\Models\User;
 
 class DemoDataSeeder extends Seeder
 {
-    /**
-     * Seed demo data for Voltraak IMS
-     */
     public function run(): void
     {
-        // Create admin user
-        User::firstOrCreate(
-            ['email' => 'admin@voltraak.com'],
+        $users = [
             [
-                'name' => 'System Administrator',
-                'email' => 'admin@voltraak.com',
+                'email'    => 'admin@voltraak.com',
+                'name'     => 'System Administrator',
                 'password' => Hash::make('admin123'),
-                'role' => 'manager',
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        // Create manager user
-        User::firstOrCreate(
-            ['email' => 'manager@voltraak.com'],
+                'role'     => 'admin',
+            ],
             [
-                'name' => 'Store Manager',
-                'email' => 'manager@voltraak.com',
+                'email'    => 'manager@voltraak.com',
+                'name'     => 'Store Manager',
                 'password' => Hash::make('manager123'),
-                'role' => 'manager',
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        // Create inventory staff user
-        User::firstOrCreate(
-            ['email' => 'inventory@voltraak.com'],
+                'role'     => 'manager',
+            ],
             [
-                'name' => 'Inventory Staff',
-                'email' => 'inventory@voltraak.com',
+                'email'    => 'inventory@voltraak.com',
+                'name'     => 'Inventory Staff',
                 'password' => Hash::make('inventory123'),
-                'role' => 'inventory_staff',
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
-
-        // Create warehouse user
-        User::firstOrCreate(
-            ['email' => 'warehouse@voltraak.com'],
+                'role'     => 'inventory_staff',
+            ],
             [
-                'name' => 'Warehouse Worker',
-                'email' => 'warehouse@voltraak.com',
+                'email'    => 'warehouse@voltraak.com',
+                'name'     => 'Warehouse Worker',
                 'password' => Hash::make('warehouse123'),
-                'role' => 'warehouse',
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]
-        );
+                'role'     => 'warehouse',
+            ],
+        ];
 
-        $this->command->info('Demo users created successfully!');
-        $this->command->info('Login credentials:');
-        $this->command->info('Admin: admin@voltraak.com / admin123');
-        $this->command->info('Manager: manager@voltraak.com / manager123');
-        $this->command->info('Inventory: inventory@voltraak.com / inventory123');
-        $this->command->info('Warehouse: warehouse@voltraak.com / warehouse123');
+        foreach ($users as $data) {
+            User::firstOrCreate(
+                ['email' => $data['email']],
+                array_merge($data, [
+                    'is_active'          => true,
+                    'email_verified_at'  => now(),
+                ])
+            );
+        }
+
+        $this->command->info('Demo users created:');
+        $this->command->info('  admin@voltraak.com      / admin123');
+        $this->command->info('  manager@voltraak.com    / manager123');
+        $this->command->info('  inventory@voltraak.com  / inventory123');
+        $this->command->info('  warehouse@voltraak.com  / warehouse123');
     }
 }
