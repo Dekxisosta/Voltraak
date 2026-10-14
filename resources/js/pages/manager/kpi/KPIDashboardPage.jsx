@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@inertiajs/react'
 import {
   BarChart3, TrendingUp, Package, AlertTriangle, DollarSign, Users,
   ClipboardCheck, ArrowRight,
@@ -19,7 +19,7 @@ import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { fetchData } from '@/shared/services/dataSource'
 import { mockKPIData } from '@/shared/mocks/manager/kpi'
-// TODO: import { reportingApi } from '@/api'
+import { reportingApi } from '@/shared/api/reporting'
 
 // Tooltips are themed manually (rather than relying on recharts' default
 // white tooltip) so they read correctly in dark mode too, using the same
@@ -108,29 +108,37 @@ export default function KPIDashboardPage() {
   const { addNotification } = useNotifications()
 
   useEffect(() => {
-    loadKPIData()
-  }, [timeframe])
+    // Ignore a response that lands after the timeframe changed again.
+    let cancelled = false
 
-  const loadKPIData = async () => {
-    try {
-      setLoading(true)
-      
-      const result = await fetchData(
-        () => mockKPIData,
-        () => null // TODO: reportingApi.getKPIDashboard()
-      )
-      setData(result)
-      setLoading(false)
-    } catch (error) {
-      console.error('Error loading KPI data:', error)
-      addNotification({
-        type: 'error',
-        title: 'Loading Error',
-        message: 'Failed to load KPI dashboard data'
-      })
-      setLoading(false)
+    const loadKPIData = async () => {
+      try {
+        setLoading(true)
+
+        const response = await fetchData(
+          () => mockKPIData,
+          () => reportingApi.getManagerKPIs(timeframe)
+        )
+        if (cancelled) return
+        // Backend wraps in Laravel envelope { success, data: {...}, message, timestamp }
+        setData(response.data || response)
+        setLoading(false)
+      } catch (error) {
+        if (cancelled) return
+        console.error('Error loading KPI data:', error)
+        addNotification({
+          type: 'error',
+          title: 'Loading Error',
+          message: 'Failed to load KPI dashboard data'
+        })
+        setLoading(false)
+      }
     }
-  }
+
+    loadKPIData()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeframe])
 
   const _getMetricTrend = (current, target) => {
     const diff = current - target
@@ -187,7 +195,7 @@ export default function KPIDashboardPage() {
         title="KPI Dashboard"
         subtitle="Executive inventory performance metrics"
         icon={BarChart3}
-        action={
+        actions={
           <select
             value={timeframe}
             onChange={(e) => setTimeframe(e.target.value)}
@@ -210,10 +218,12 @@ export default function KPIDashboardPage() {
                 <Package className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4 flex-1">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.totalSKUs}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data?.metrics?.totalSKUs || 0}</p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total SKUs</p>
                 <div className="flex items-center mt-1">
-                  <span className="text-xs text-gray-600 dark:text-gray-400">+5 this month</span>
+                  {data?.changes?.newSkusThisMonth != null && (
+                    <span className="text-xs text-gray-600 dark:text-gray-400">+{data.changes.newSkusThisMonth} this month</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -229,13 +239,17 @@ export default function KPIDashboardPage() {
               </div>
               <div className="ml-4 flex-1">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  ₱{(data.metrics.stockValue / 1000000).toFixed(1)}M
+                  ₱{((data?.metrics?.stockValue || 0) / 1000000).toFixed(1)}M
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Stock Value</p>
-                <div className="flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 text-gray-600 dark:text-gray-400 mr-1" />
-                  <span className="text-xs text-gray-600 dark:text-gray-400">+3.5% from last month</span>
-                </div>
+                {data?.changes?.stockValueChangePct != null && (
+                  <div className="flex items-center mt-1">
+                    <TrendingUp className="h-3 w-3 text-gray-600 dark:text-gray-400 mr-1" />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                      {data.changes.stockValueChangePct > 0 ? '+' : ''}{data.changes.stockValueChangePct}% from last month
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </Card.Body>
@@ -249,11 +263,11 @@ export default function KPIDashboardPage() {
                 <AlertTriangle className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4 flex-1">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.lowStockItems}</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data?.metrics?.lowStockItems || 0}</p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Low Stock Items</p>
                 <StatusBadge 
-                  variant={data.metrics.lowStockItems > 15 ? 'critical' : data.metrics.lowStockItems > 8 ? 'warning' : 'ok'} 
-                  label={data.metrics.lowStockItems > 15 ? 'High' : data.metrics.lowStockItems > 8 ? 'Medium' : 'Low'}
+                  variant={(data?.metrics?.lowStockItems || 0) > 15 ? 'critical' : (data?.metrics?.lowStockItems || 0) > 8 ? 'warning' : 'ok'} 
+                  label={(data?.metrics?.lowStockItems || 0) > 15 ? 'High' : (data?.metrics?.lowStockItems || 0) > 8 ? 'Medium' : 'Low'}
                   size="sm"
                 />
               </div>
@@ -269,11 +283,11 @@ export default function KPIDashboardPage() {
                 <Users className="h-6 w-6 text-gray-600 dark:text-gray-400" />
               </div>
               <div className="ml-4 flex-1">
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.shrinkageRate}%</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data?.metrics?.shrinkageRate || 0}%</p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Shrinkage Rate</p>
                 <StatusBadge 
-                  variant={getMetricStatus(data.metrics.shrinkageRate, 5, true)} 
-                  label={data.metrics.shrinkageRate <= 3 ? 'Excellent' : data.metrics.shrinkageRate <= 5 ? 'Good' : 'Needs Attention'}
+                  variant={getMetricStatus(data?.metrics?.shrinkageRate || 0, 5, true)} 
+                  label={(data?.metrics?.shrinkageRate || 0) <= 3 ? 'Excellent' : (data?.metrics?.shrinkageRate || 0) <= 5 ? 'Good' : 'Needs Attention'}
                   size="sm"
                 />
               </div>
@@ -290,12 +304,19 @@ export default function KPIDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Inventory Accuracy</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.inventoryAccuracy}%</p>
-                <StatusBadge variant={getMetricStatus(data.metrics.inventoryAccuracy, 95)} label="" size="sm" className="mt-1" />
+                {/* null = no physical counts in the selected period */}
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  {data?.metrics?.inventoryAccuracy == null ? 'N/A' : `${data.metrics.inventoryAccuracy}%`}
+                </p>
+                {data?.metrics?.inventoryAccuracy != null && (
+                  <StatusBadge variant={getMetricStatus(data.metrics.inventoryAccuracy, 95)} label="" size="sm" className="mt-1" />
+                )}
               </div>
-              <MetricGauge percent={data.metrics.inventoryAccuracy} />
+              <MetricGauge percent={data?.metrics?.inventoryAccuracy ?? 0} />
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 95%+</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              {data?.metrics?.inventoryAccuracy == null ? 'No physical counts in this period' : 'Target: 95%+'}
+            </p>
           </Card.Body>
         </Card>
 
@@ -305,10 +326,10 @@ export default function KPIDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Turnover Rate</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.turnoverRate}x</p>
-                <StatusBadge variant={getMetricStatus(data.metrics.turnoverRate, 3)} label="" size="sm" className="mt-1" />
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data?.metrics?.turnoverRate || 0}x</p>
+                <StatusBadge variant={getMetricStatus(data?.metrics?.turnoverRate || 0, 3)} label="" size="sm" className="mt-1" />
               </div>
-              <MetricGauge percent={(data.metrics.turnoverRate / 6) * 100} />
+              <MetricGauge percent={((data?.metrics?.turnoverRate || 0) / 6) * 100} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 3x+</p>
           </Card.Body>
@@ -320,10 +341,10 @@ export default function KPIDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Service Level</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.serviceLevel}%</p>
-                <StatusBadge variant={getMetricStatus(data.metrics.serviceLevel, 90)} label="" size="sm" className="mt-1" />
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data?.metrics?.serviceLevel || 0}%</p>
+                <StatusBadge variant={getMetricStatus(data?.metrics?.serviceLevel || 0, 90)} label="" size="sm" className="mt-1" />
               </div>
-              <MetricGauge percent={data.metrics.serviceLevel} />
+              <MetricGauge percent={data?.metrics?.serviceLevel || 0} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 90%+</p>
           </Card.Body>
@@ -335,10 +356,10 @@ export default function KPIDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">FEFO Compliance</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.metrics.fefoCompliance}%</p>
-                <StatusBadge variant={getMetricStatus(data.metrics.fefoCompliance, 85)} label="" size="sm" className="mt-1" />
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data?.metrics?.fefoCompliance || 0}%</p>
+                <StatusBadge variant={getMetricStatus(data?.metrics?.fefoCompliance || 0, 85)} label="" size="sm" className="mt-1" />
               </div>
-              <MetricGauge percent={data.metrics.fefoCompliance} />
+              <MetricGauge percent={data?.metrics?.fefoCompliance || 0} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Target: 85%+</p>
           </Card.Body>
@@ -354,7 +375,7 @@ export default function KPIDashboardPage() {
           </Card.Header>
           <Card.Body>
             <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={data.trends.stockValue} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <AreaChart data={data?.trends?.stockValue || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="stockValueGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.35} />
@@ -400,7 +421,7 @@ export default function KPIDashboardPage() {
               <ResponsiveContainer width="100%" height={220} className="sm:flex-1">
                 <PieChart>
                   <Pie
-                    data={data.categoryBreakdown}
+                    data={data?.categoryBreakdown || []}
                     dataKey="value"
                     nameKey="category"
                     innerRadius={55}
@@ -409,7 +430,7 @@ export default function KPIDashboardPage() {
                     strokeWidth={2}
                     stroke="var(--color-surface-card)"
                   >
-                    {data.categoryBreakdown.map((entry, index) => (
+                    {(data?.categoryBreakdown || []).map((entry, index) => (
                       <Cell key={index} fill={entry.color} />
                     ))}
                   </Pie>
@@ -419,7 +440,7 @@ export default function KPIDashboardPage() {
 
               {/* Legend */}
               <div className="w-full sm:w-40 space-y-2.5 flex-shrink-0">
-                {data.categoryBreakdown.map((category, index) => (
+                {(data?.categoryBreakdown || []).map((category, index) => (
                   <div key={index} className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />
@@ -447,15 +468,15 @@ export default function KPIDashboardPage() {
           <Card.Body>
             <div className="flex items-baseline justify-between mb-4">
               <div>
-                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.pendingApprovals.count}</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data?.pendingApprovals?.count || 0}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Purchase orders awaiting review</p>
               </div>
               <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                ₱{(data.pendingApprovals.totalValue / 1000).toFixed(0)}K total
+                ₱{((data?.pendingApprovals?.totalValue || 0) / 1000).toFixed(0)}K total
               </p>
             </div>
             <div className="space-y-2">
-              {data.pendingApprovals.items.map((po) => (
+              {(data?.pendingApprovals?.items || []).map((po) => (
                 <div key={po.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{po.poNumber}</p>
@@ -469,7 +490,7 @@ export default function KPIDashboardPage() {
               ))}
             </div>
             <Link
-              to="/manager?tab=po-approvals"
+              href="/manager?tab=po-approvals"
               className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
             >
               Review approvals <ArrowRight className="h-4 w-4 ml-1" />
@@ -480,15 +501,15 @@ export default function KPIDashboardPage() {
         {/* Stock Movement Summary */}
         <Card>
           <Card.Header>
-            <h3 className="text-lg font-medium">Stock Movement (30d)</h3>
+            <h3 className="text-lg font-medium">Stock Movement ({timeframe})</h3>
           </Card.Header>
           <Card.Body>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart
                 data={[
-                  { name: 'Stock In', units: data.movementSummary.stockIn, fill: '#22c55e' },
-                  { name: 'Stock Out', units: data.movementSummary.stockOut, fill: '#ef4444' },
-                  { name: 'Adjustments', units: data.movementSummary.adjustments, fill: '#94a3b8' },
+                  { name: 'Stock In', units: data?.movementSummary?.stockIn || 0, fill: '#22c55e' },
+                  { name: 'Stock Out', units: data?.movementSummary?.stockOut || 0, fill: '#ef4444' },
+                  { name: 'Adjustments', units: data?.movementSummary?.adjustments || 0, fill: '#94a3b8' },
                 ]}
                 margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
               >
@@ -511,10 +532,12 @@ export default function KPIDashboardPage() {
             </ResponsiveContainer>
             <div className="flex items-center justify-between p-3 rounded-lg bg-gray-900 dark:bg-gray-100 mt-2">
               <span className="text-sm font-medium text-gray-100 dark:text-gray-900">Net Change</span>
-              <span className="text-lg font-bold text-gray-100 dark:text-gray-900">+{data.movementSummary.netChange} units</span>
+              <span className="text-lg font-bold text-gray-100 dark:text-gray-900">
+                {(data?.movementSummary?.netChange || 0) > 0 ? '+' : ''}{data?.movementSummary?.netChange || 0} units
+              </span>
             </div>
             <Link
-              to="/manager?tab=reports"
+              href="/manager?tab=reports"
               className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
             >
               View full report <ArrowRight className="h-4 w-4 ml-1" />
@@ -532,7 +555,7 @@ export default function KPIDashboardPage() {
           <Card.Body>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart
-                data={[...data.topMovers].sort((a, b) => b.revenue - a.revenue)}
+                data={[...(data?.topMovers || [])].sort((a, b) => b.revenue - a.revenue)}
                 layout="vertical"
                 margin={{ top: 4, right: 30, left: 4, bottom: 0 }}
               >
@@ -557,7 +580,7 @@ export default function KPIDashboardPage() {
               </BarChart>
             </ResponsiveContainer>
             <Link
-              to="/manager?tab=reports"
+              href="/manager?tab=reports"
               className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
             >
               View full report <ArrowRight className="h-4 w-4 ml-1" />
@@ -575,7 +598,7 @@ export default function KPIDashboardPage() {
           </Card.Header>
           <Card.Body>
             <div className="space-y-2">
-              {data.criticalStock.map((item) => (
+              {(data?.criticalStock || []).map((item) => (
                 <div key={item.id} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{item.productName}</p>
@@ -583,7 +606,11 @@ export default function KPIDashboardPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {item.status === 'out_of_stock' ? 'Out of stock' : `${item.daysUntilStockout}d to stockout`}
+                      {item.status === 'out_of_stock'
+                        ? 'Out of stock'
+                        : item.daysUntilStockout == null
+                          ? 'Low cover'
+                          : `${item.daysUntilStockout}d to stockout`}
                     </span>
                     <StatusBadge
                       variant={item.status === 'out_of_stock' ? 'critical' : 'warning'}
@@ -595,7 +622,7 @@ export default function KPIDashboardPage() {
               ))}
             </div>
             <Link
-              to="/manager?tab=low-stock"
+              href="/manager?tab=low-stock"
               className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
             >
               View all low stock <ArrowRight className="h-4 w-4 ml-1" />
@@ -605,7 +632,7 @@ export default function KPIDashboardPage() {
       </div>
 
       {/* Alerts Section */}
-      {data.alerts.length > 0 && (
+      {(data?.alerts || []).length > 0 && (
         <Card>
           <Card.Header>
             <div className="flex items-center">
@@ -615,7 +642,7 @@ export default function KPIDashboardPage() {
           </Card.Header>
           <Card.Body>
             <div className="space-y-3">
-              {data.alerts.map((alert) => (
+              {(data?.alerts || []).map((alert) => (
                 <div
                   key={alert.id}
                   className={`p-4 rounded-lg border-l-4 ${

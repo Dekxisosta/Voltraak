@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@inertiajs/react'
 import { TrendingUp, ArrowUp, ArrowDown, ArrowRight, ShoppingCart } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,7 +16,7 @@ import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { fetchData } from '@/shared/services/dataSource'
 import { mockForecasts, getDemandTrend } from '@/shared/mocks/manager/forecast'
-// TODO: import { reportingApi } from '@/api'
+import { reportingApi } from '@/shared/api/reporting'
 
 /** Derive week count from timeframe string, e.g. '8w' → 8 */
 function weeksFromTimeframe(tf) { return parseInt(tf, 10) }
@@ -71,19 +71,36 @@ export default function ForecastPage() {
   const loadForecasts = async () => {
     try {
       setData(prev => ({ ...prev, loading: true }))
-      const [forecasts, trend] = await Promise.all([
+      
+      console.log('[ForecastPage] Loading forecasts from API...', { timeframe })
+      
+      const [forecastsResponse, trendResponse] = await Promise.all([
         fetchData(
           () => mockForecasts,
-          () => null // TODO: reportingApi.getForecasts()
+          () => reportingApi.getForecasts()
         ),
         fetchData(
           () => getDemandTrend(timeframe),
-          () => null // TODO: reportingApi.getDemandTrend(timeframe)
+          () => reportingApi.getDemandTrend(timeframe)
         ),
       ])
-      setData({ forecasts, trend, loading: false })
+      
+      console.log('[ForecastPage] Raw API responses:', { forecastsResponse, trendResponse })
+      
+      // Backend wraps in Laravel envelope { success, data: {...}, message, timestamp }
+      const forecasts = forecastsResponse.data || forecastsResponse
+      const trend = trendResponse.data || trendResponse
+      
+      console.log('[ForecastPage] Processed data:', { forecasts, trend })
+      
+      setData({ 
+        forecasts: Array.isArray(forecasts) ? forecasts : [], 
+        trend: Array.isArray(trend) ? trend : [], 
+        loading: false 
+      })
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: 'Failed to load forecast data' })
+      console.error('[ForecastPage] Failed to load forecast data:', error)
+      addNotification({ type: 'error', title: 'Error', message: `Failed to load forecast data: ${error.message || 'Unknown error'}` })
       setData(prev => ({ ...prev, loading: false }))
     }
   }
@@ -98,7 +115,7 @@ export default function ForecastPage() {
   const forecastLabel = `${weeks}-Week Forecast`
 
   // Apply timeframe scaling to every item
-  const scaledForecasts = data.forecasts.map(f => applyTimeframe(f, timeframe))
+  const scaledForecasts = (data.forecasts || []).map(f => applyTimeframe(f, timeframe))
 
   const columns = [
     { key: 'product_name', label: 'Product', sortable: true },
@@ -112,8 +129,8 @@ export default function ForecastPage() {
   ]
 
   const filteredForecasts = scaledForecasts.filter(f =>
-    f.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    f.sku.toLowerCase().includes(searchTerm.toLowerCase())
+    (f.product_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (f.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   // Forecast demand aggregated by category, for the breakdown widget.
@@ -150,8 +167,8 @@ export default function ForecastPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{scaledForecasts.filter(f => f.suggestedOrder > 0).length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Items Need Reorder</p></div></Card.Body></Card>
         <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{scaledForecasts.filter(f => f.trend === 'up').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Trending Up</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{Math.round(scaledForecasts.reduce((s, f) => s + f.confidence, 0) / (scaledForecasts.length || 1))}%</p><p className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{scaledForecasts.reduce((s, f) => s + f.forecastDemand, 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total {forecastLabel}</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{Math.round(scaledForecasts.reduce((s, f) => s + (f.confidence || 0), 0) / (scaledForecasts.length || 1))}%</p><p className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{scaledForecasts.reduce((s, f) => s + (f.forecastDemand || 0), 0)}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total {forecastLabel}</p></div></Card.Body></Card>
       </div>
 
       {/* Demand Trend + Category Breakdown */}
@@ -162,7 +179,7 @@ export default function ForecastPage() {
           </Card.Header>
           <Card.Body>
             <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={data.trend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+              <AreaChart data={data.trend || []} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="actualDemandGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-accent)" stopOpacity={0.35} />
@@ -283,7 +300,7 @@ export default function ForecastPage() {
             })}
           </div>
           <Link
-            to="/manager?tab=po-approvals"
+            href="/manager?tab=po-approvals"
             className="mt-4 inline-flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
           >
             Send to purchase approvals <ArrowRight className="h-4 w-4 ml-1" />

@@ -3,10 +3,8 @@
  */
 
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { useForm, usePage } from '@inertiajs/react'
 import { Eye, EyeOff, LogIn, KeyRound, Mail, Lock, Construction } from 'lucide-react'
-import { useAuth } from '@/shared/contexts/AuthContext'
-import { useFormNotifications } from '@/shared/hooks/useNotifications'
 import { cn } from '@/shared/utils'
 import { dataSourceMode } from '@/shared/services/dataSource'
 import { Modal, ModalBody } from '@/shared/components/common'
@@ -15,77 +13,30 @@ import DemoCredentialsModal from './components/DemoCredentialsModal'
 
 
 export default function LoginPage() {
-  const location = useLocation()
-  const { login } = useAuth()
-  const { showValidationErrors } = useFormNotifications()
-
-  const [formData, setFormData] = useState({
+  const { data, setData, post, processing, errors, clearErrors } = useForm({
     email: '',
     password: '',
+    remember: false,
   })
-  const [errors, setErrors] = useState({})
+
   const [showPassword, setShowPassword] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showDemoCredentials, setShowDemoCredentials] = useState(false)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
 
-  // Get the page user was trying to access before login
-  const from = (location.state)?.from || '/dashboard'
-
   const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }))
-    }
-  }
-
-  const validateForm = () => {
-    const newErrors = {}
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required'
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address'
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required'
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    const { name, value, type, checked } = e.target
+    setData(name, type === 'checkbox' ? checked : value)
+    if (errors[name]) clearErrors(name)
   }
 
   const handleUseDemoAccount = (account) => {
-    setFormData({ email: account.email, password: account.password })
-    setErrors({})
+    setData({ email: account.email, password: account.password, remember: false })
     setShowDemoCredentials(false)
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
-    
-    if (!validateForm()) {
-      showValidationErrors(errors)
-      return
-    }
-
-    setIsSubmitting(true)
-
-    try {
-      await login(formData.email, formData.password, from)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Login failed'
-      setErrors({ general: message })
-      showValidationErrors({ general: message })
-    } finally {
-      setIsSubmitting(false)
-    }
+    post('/login')
   }
 
   return (
@@ -122,7 +73,7 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               required
-              value={formData.email}
+              value={data.email}
               onChange={handleChange}
               className={cn(
                 'form-input rounded-xl pl-10',
@@ -149,7 +100,7 @@ export default function LoginPage() {
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               required
-              value={formData.password}
+              value={data.password}
               onChange={handleChange}
               className={cn(
                 'form-input rounded-xl pl-10 pr-10',
@@ -179,8 +130,10 @@ export default function LoginPage() {
           <label htmlFor="remember-me" className="flex items-center gap-2 cursor-pointer select-none">
             <input
               id="remember-me"
-              name="remember-me"
+              name="remember"
               type="checkbox"
+              checked={data.remember}
+              onChange={handleChange}
               className="h-4 w-4 rounded border-[var(--color-border-secondary)] text-[var(--color-accent)] focus:ring-[var(--color-accent)]"
             />
             <span className="text-sm text-[var(--color-text-secondary)]">Remember me</span>
@@ -198,13 +151,13 @@ export default function LoginPage() {
         {/* Submit button */}
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={processing}
           className={cn(
             'w-full btn btn-primary btn-lg rounded-xl',
-            isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+            processing ? 'opacity-50 cursor-not-allowed' : ''
           )}
         >
-          {isSubmitting ? (
+          {processing ? (
             <>
               <div className="loading-spinner" />
               Signing in...

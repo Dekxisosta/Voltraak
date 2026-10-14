@@ -3,7 +3,7 @@
  */
 
 import { useAuth } from '@/shared/contexts/AuthContext'
-import { HeroBanner } from '@/components/layout'
+import { HeroBanner } from '@/shared/components/layout'
 import DashboardStats from './components/DashboardStats'
 import RecentActivity from './components/RecentActivity'
 import QuickActions from './components/QuickActions'

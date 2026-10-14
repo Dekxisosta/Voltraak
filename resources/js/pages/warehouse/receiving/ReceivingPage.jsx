@@ -11,7 +11,35 @@ import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { fetchData } from '@/shared/services/dataSource'
 import { mockPurchaseOrders } from '@/shared/mocks/warehouse/receiving'
+import { procurementApi } from '@/shared/api/procurement'
+import { unwrapList } from '@/shared/api/inventoryMappers'
+import ReceiveModal from './ReceiveModal'
 
+/**
+ * Backend purchase order -> the shape this page renders.
+ * Backend: { expected_delivery_date, total_amount: "123.00",
+ *            items: [{ id, product_name, quantity, received_quantity, remaining_quantity }] }
+ * Page:    { expected_delivery, total_amount: number,
+ *            items: [{ id, product_name, quantity_ordered, quantity_received, quantity_remaining }] }
+ * Mock data already uses the page shape and passes through unchanged.
+ */
+const normalizePurchaseOrder = (po) => ({
+  ...po,
+  supplier: po.supplier || { name: '—', contact_person: '' },
+  expected_delivery: po.expected_delivery_date ?? po.expected_delivery ?? null,
+  total_amount: Number(po.total_amount) || 0,
+  items: (po.items || []).map(item => {
+    const ordered = Number(item.quantity_ordered ?? item.quantity) || 0
+    const received = Number(item.quantity_received ?? item.received_quantity) || 0
+    return {
+      ...item,
+      product_name: item.product_name || item.product?.name || 'Unknown Product',
+      quantity_ordered: ordered,
+      quantity_received: received,
+      quantity_remaining: Math.max(0, Number(item.remaining_quantity ?? (ordered - received)) || 0),
+    }
+  }),
+})
 
 export default function ReceivingPage() {
   const [data, setData] = useState({
@@ -19,6 +47,8 @@ export default function ReceivingPage() {
     loading: true
   })
   const [searchTerm, setSearchTerm] = useState('')
+  const [receiveModal, setReceiveModal] = useState({ isOpen: false, order: null })
+  const [submitting, setSubmitting] = useState(false)
   const { addNotification } = useNotifications()
   const highlightRowId = useHighlightParam()
 
@@ -32,7 +62,13 @@ export default function ReceivingPage() {
       
       const orders = await fetchData(
         () => mockPurchaseOrders,
-        () => null // TODO: procurementApi.getPurchaseOrders()
+        async () => {
+          const response = await procurementApi.getPurchaseOrders({ 
+            status: 'sent,approved,received', // Include received for partial re-receipts
+            per_page: 100,
+          })
+          return unwrapList(response).map(normalizePurchaseOrder)
+        }
       )
       
       setData({ purchaseOrders: orders, loading: false })
@@ -41,43 +77,58 @@ export default function ReceivingPage() {
       addNotification({
         type: 'error',
         title: 'Loading Error',
-        message: 'Failed to load purchase orders'
+        message: error.message || 'Failed to load purchase orders'
       })
       setData(prev => ({ ...prev, loading: false }))
     }
   }
 
-  const handleConfirmReceipt = async (poId) => {
+  const handleConfirmReceipt = async (receiptData) => {
     try {
-      // Mock confirmation - will be replaced with API call
+      setSubmitting(true)
+      
+      await fetchData(
+        () => ({ success: true }), // Mock mode: nothing to persist
+        () => procurementApi.receivePurchaseOrder(receiveModal.order.id, receiptData)
+      )
+      
       addNotification({
         type: 'success',
         title: 'Receipt Confirmed',
-        message: `Purchase order PO-2024-${poId.toString().padStart(3, '0')} marked`
+        message: `${receiveModal.order.po_number} received and inventory updated`
       })
 
-      // Reload data
-      loadPurchaseOrders()
+      setReceiveModal({ isOpen: false, order: null })
+      loadPurchaseOrders() // Reload to reflect changes
     } catch (error) {
       console.error('Error confirming receipt:', error)
       addNotification({
         type: 'error',
         title: 'Confirmation Error',
-        message: 'Failed to confirm receipt'
+        message: Object.values(error.errors || {}).flat()[0] || error.message || 'Failed to confirm receipt'
       })
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  const getStatusBadge = (status, expectedDelivery) => {
-    const deliveryDate = new Date(expectedDelivery)
-    const today = new Date()
-    const isOverdue = deliveryDate < today && status !== 'received'
+  const openReceiveModal = (order) => {
+    setReceiveModal({ isOpen: true, order })
+  }
+
+  const isOverdue = (po) =>
+    Boolean(po.expected_delivery) && new Date(po.expected_delivery) < new Date() && po.status !== 'received'
+
+  const getStatusBadge = (status, expectedDelivery, order) => {
+    const overdue = Boolean(expectedDelivery) && new Date(expectedDelivery) < new Date() && status !== 'received'
 
     if (status === 'received') {
-      return <StatusBadge variant="ok" label="Received" icon={CheckCircle} />
+      // "received" is the backend's partial-receipt status; fully received orders become "completed"
+      const outstanding = (order?.items || []).some(item => item.quantity_remaining > 0)
+      return <StatusBadge variant="ok" label={outstanding ? 'Partially Received' : 'Received'} icon={CheckCircle} />
     }
-    if (status === 'shipped') {
-      return isOverdue 
+    if (status === 'sent') { // Changed from 'shipped' to 'sent' to match backend
+      return overdue 
         ? <StatusBadge variant="critical" label="Overdue" icon={Clock} />
         : <StatusBadge variant="warning" label="In Transit" icon={Truck} />
     }
@@ -115,24 +166,24 @@ export default function ReceivingPage() {
     {
       key: 'expected_delivery',
       label: 'Expected Delivery',
-      render: (value) => new Date(value).toLocaleDateString()
+      render: (value) => (value ? new Date(value).toLocaleDateString() : '—')
     },
     {
       key: 'status',
       label: 'Status',
-      render: (_, row) => getStatusBadge(row.status, row.expected_delivery)
+      render: (_, row) => getStatusBadge(row.status, row.expected_delivery, row)
     },
     {
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
         <div className="flex space-x-2">
-          {row.status === 'shipped' && (
+          {(row.status === 'sent' || row.status === 'approved' || row.status === 'received') && (
             <Button
               size="sm"
               variant="primary"
               icon={PackageCheck}
-              onClick={() => handleConfirmReceipt(row.id)}
+              onClick={() => openReceiveModal(row)}
             >
               Confirm Receipt
             </Button>
@@ -144,7 +195,7 @@ export default function ReceivingPage() {
 
   const filteredOrders = data.purchaseOrders.filter(po =>
     po.po_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    po.supplier.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (po.supplier?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   if (data.loading) {
@@ -193,7 +244,7 @@ export default function ReceivingPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.purchaseOrders.filter(po => po.status === 'shipped').length}
+                  {data.purchaseOrders.filter(po => po.status === 'sent').length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">In Transit</p>
               </div>
@@ -225,11 +276,7 @@ export default function ReceivingPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {data.purchaseOrders.filter(po => {
-                    const deliveryDate = new Date(po.expected_delivery)
-                    const today = new Date()
-                    return deliveryDate < today && po.status !== 'received'
-                  }).length}
+                  {data.purchaseOrders.filter(isOverdue).length}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Overdue</p>
               </div>
@@ -237,6 +284,15 @@ export default function ReceivingPage() {
           </Card.Body>
         </Card>
       </div>
+
+      {/* Receive Modal */}
+      <ReceiveModal
+        isOpen={receiveModal.isOpen}
+        onClose={() => setReceiveModal({ isOpen: false, order: null })}
+        purchaseOrder={receiveModal.order}
+        onConfirm={handleConfirmReceipt}
+        loading={submitting}
+      />
     </div>
   )
 }

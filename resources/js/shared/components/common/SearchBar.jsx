@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { Search, X, Filter } from 'lucide-react'
-import { cn, debounce } from '@/utils'
+import { cn, debounce } from '@/shared/utils'
 
 export default function SearchBar({
   value,

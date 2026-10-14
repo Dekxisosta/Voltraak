@@ -30,7 +30,7 @@ export { default as FilterPanel, FilterGroup, FilterField, DateRangeFilter, Stat
 
 // Route protection and authentication
 export { default as ProtectedRoute, ConditionalRender, usePermissionCheck } from './ProtectedRoute'
-export { default as RouteGuard, RoleGuard, PermissionGuard, useAccessControl } from './RouteGuard'
+export { default as RouteGuard, RoleGuard, PermissionGuard } from './RouteGuard'
 export { default as TabbedSection } from './TabbedSection'
 
 // Notifications

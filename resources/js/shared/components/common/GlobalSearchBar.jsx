@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { router } from '@inertiajs/react'
 import {
   Search,
   X,
@@ -24,7 +24,7 @@ import {
   Users,
   Loader2,
 } from 'lucide-react'
-import { cn, debounce } from '@/utils'
+import { cn, debounce } from '@/shared/utils'
 import { useAuth } from '@/shared/contexts/AuthContext'
 import { searchGlobal } from '@/shared/services/globalSearch'
 
@@ -47,8 +47,7 @@ const ICONS = {
  */
 export default function GlobalSearchBar({ className, placeholder = 'Search products, batches...', dark = false }) {
   const { user } = useAuth()
-  const navigate = useNavigate()
-
+  
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [isOpen, setIsOpen] = useState(false)
@@ -97,7 +96,7 @@ export default function GlobalSearchBar({ className, placeholder = 'Search produ
 
   const goToResult = (result) => {
     if (!result) return
-    navigate(result.path)
+    router.visit(result.path)
     setIsOpen(false)
     setQuery('')
     setResults([])

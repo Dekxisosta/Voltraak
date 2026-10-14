@@ -10,9 +10,12 @@ import Modal, { ModalBody, ModalFooter } from '@/shared/components/common/Modal'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { createResourceDataSource } from '@/shared/services/dataSource'
-// TODO: pass { api: inventoryApi } once the endpoint exists
-const expirySource = createResourceDataSource('inventory/expiry-alerts')
+import { createResourceDataSource, mutateData } from '@/shared/services/dataSource'
+import { inventoryApi } from '@/shared/api/inventory'
+import { expiryAlertsApi, describeError } from '@/shared/api/inventoryMappers'
+// In API mode the rows are the backend's batches (see expiryAlertsApi);
+// prioritizing flags a batch and writing off goes through mark-expired.
+const expirySource = createResourceDataSource('inventory/expiry-alerts', { api: expiryAlertsApi })
 
 export default function ExpiryAlertsPage() {
   const [data, setData] = useState({ batches: [], loading: true })
@@ -40,7 +43,7 @@ export default function ExpiryAlertsPage() {
       const result = await expirySource.list()
       setData({ batches: result, loading: false })
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: 'Failed to load expiry data' })
+      addNotification({ type: 'error', title: 'Error', message: describeError(error, 'Failed to load expiry data') })
       setData(prev => ({ ...prev, loading: false }))
     }
   }
@@ -49,11 +52,20 @@ export default function ExpiryAlertsPage() {
     const batch = writeOffTarget
     setWriteOffLoading(true)
     try {
-      await expirySource.update(batch.id, { status: 'written_off' })
+      // Real mode: the backend removes the stock and records the transaction.
+      // Mock mode: flip the status in the local store.
+      await mutateData(
+        () => expirySource.update(batch.id, { status: 'written_off' }),
+        () => inventoryApi.markBatchExpired(batch.id)
+      )
+      // The backend zeroes the batch's stock when it is written off.
+      const writtenOff = expirySource.isUsingMocks
+        ? { status: 'written_off' }
+        : { status: 'written_off', quantity: 0 }
       setData(prev => ({
         ...prev,
         batches: prev.batches.map(b =>
-          b.id === batch.id ? { ...b, status: 'written_off' } : b
+          b.id === batch.id ? { ...b, ...writtenOff } : b
         )
       }))
       addNotification({
@@ -63,7 +75,7 @@ export default function ExpiryAlertsPage() {
       })
       setWriteOffTarget(null)
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: `Failed to write off ${batch.batch_number}` })
+      addNotification({ type: 'error', title: 'Error', message: describeError(error, `Failed to write off ${batch.batch_number}`) })
     } finally {
       setWriteOffLoading(false)
     }
@@ -87,7 +99,7 @@ export default function ExpiryAlertsPage() {
       })
       setPrioritizeTarget(null)
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: `Failed to prioritize ${batch.batch_number}` })
+      addNotification({ type: 'error', title: 'Error', message: describeError(error, `Failed to prioritize ${batch.batch_number}`) })
     } finally {
       setPrioritizeLoading(false)
     }

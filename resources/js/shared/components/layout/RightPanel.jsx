@@ -8,8 +8,8 @@
  * Usage in a page component:
  *
  *   import { useEffect } from 'react'
- *   import { useAppShell } from '@/components/layout'
- *   import RightPanel, { RightPanelSection } from '@/components/layout/RightPanel'
+ *   import { useAppShell } from '@/shared/components/layout'
+ *   import RightPanel, { RightPanelSection } from '@/shared/components/layout/RightPanel'
  *   import AlertsPanel from './components/AlertsPanel'
  *
  *   export default function MyPage() {
@@ -28,7 +28,7 @@
  *   }
  */
 
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 // ─── Root wrapper ─────────────────────────────────────────────────────────────
 

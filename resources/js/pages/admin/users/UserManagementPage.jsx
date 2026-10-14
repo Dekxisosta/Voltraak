@@ -22,9 +22,19 @@ import {
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { fetchData } from '@/shared/services/dataSource'
+import { useAuth } from '@/shared/contexts/AuthContext'
+import { mutateData, fetchData } from '@/shared/services/dataSource'
 import { mockUsers } from '@/shared/mocks/manager/users'
-// TODO: import { usersApi } from '@/api'
+import { usersApi, fetchAllUsers, extractUser, normalizeUser } from '@/shared/api/users'
+
+// Mirrors StoreUserRequest's password rule so the user gets feedback before a round-trip.
+const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
+
+// Backend validation errors arrive as { field: [messages] }; the form wants { field: 'message' }.
+const firstErrors = (errors = {}) =>
+  Object.fromEntries(
+    Object.entries(errors).map(([field, msgs]) => [field, Array.isArray(msgs) ? msgs[0] : String(msgs)])
+  )
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrator' },
@@ -33,13 +43,14 @@ const ROLE_OPTIONS = [
   { value: 'warehouse', label: 'Warehouse Staff' },
 ]
 
-const emptyForm = { name: '', email: '', role: 'warehouse', is_active: true }
+const emptyForm = { name: '', email: '', password: '', role: 'warehouse', is_active: true }
 
 export default function UserManagementPage() {
   const [data, setData] = useState({ users: [], loading: true })
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const { addNotification } = useNotifications()
+  const { user: currentUser } = useAuth()
   const highlightRowId = useHighlightParam()
 
   // Add/Edit modal — editingUser is null when adding
@@ -65,11 +76,11 @@ export default function UserManagementPage() {
       setData(prev => ({ ...prev, loading: true }))
       const result = await fetchData(
         () => mockUsers,
-        () => null // TODO: usersApi.getUsers()
+        () => fetchAllUsers()
       )
-      setData({ users: result, loading: false })
-    } catch {
-      addNotification({ type: 'error', title: 'Error', message: 'Failed to load users' })
+      setData({ users: result.map(normalizeUser), loading: false })
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: error?.message || 'Failed to load users' })
       setData(prev => ({ ...prev, loading: false }))
     }
   }
@@ -78,13 +89,17 @@ export default function UserManagementPage() {
     setTogglingId(user.id)
     try {
       const action = user.is_active ? 'deactivated' : 'activated'
+      const updated = await mutateData(
+        () => ({ ...user, is_active: !user.is_active }),
+        async () => normalizeUser(extractUser(await usersApi.toggleUserStatus(user.id)))
+      )
       setData(prev => ({
         ...prev,
-        users: prev.users.map(u =>
-          u.id === user.id ? { ...u, is_active: !u.is_active } : u
-        ),
+        users: prev.users.map(u => (u.id === user.id ? { ...u, ...updated } : u)),
       }))
       addNotification({ type: 'success', title: `User ${action}`, message: `${user.name} has been ${action}` })
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: error?.message || 'Failed to update user status' })
     } finally {
       setTogglingId(null)
     }
@@ -99,7 +114,7 @@ export default function UserManagementPage() {
 
   const openEditModal = (user) => {
     setEditingUser(user)
-    setForm({ name: user.name, email: user.email, role: user.role, is_active: user.is_active })
+    setForm({ name: user.name, email: user.email, password: '', role: user.role, is_active: user.is_active })
     setFormErrors({})
     setFormOpen(true)
   }
@@ -122,6 +137,14 @@ export default function UserManagementPage() {
       )
       if (duplicate) errors.email = 'A user with this email already exists'
     }
+    if (!editingUser) {
+      if (!form.password) {
+        errors.password = 'Password is required'
+      } else if (form.password.length < 8 || !PASSWORD_RULE.test(form.password)) {
+        errors.password =
+          'At least 8 characters with an uppercase letter, a lowercase letter, a number and a special character (@$!%*?&)'
+      }
+    }
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -132,32 +155,52 @@ export default function UserManagementPage() {
     setSaving(true)
     try {
       const roleLabel = ROLE_OPTIONS.find(r => r.value === form.role)?.label || form.role
+      const name = form.name.trim()
+      const email = form.email.trim().toLowerCase()
 
       if (editingUser) {
+        // The backend ignores role / is_active on self-edits, so don't send them.
+        const payload = isSelf(editingUser)
+          ? { name, email }
+          : { name, email, role: form.role, is_active: form.is_active }
+
+        const updated = await mutateData(
+          () => ({ ...editingUser, ...payload, role_display: roleLabel }),
+          async () => normalizeUser(extractUser(await usersApi.updateUser(editingUser.id, payload)))
+        )
         setData(prev => ({
           ...prev,
-          users: prev.users.map(u =>
-            u.id === editingUser.id
-              ? { ...u, name: form.name.trim(), email: form.email.trim(), role: form.role, role_display: roleLabel, is_active: form.is_active }
-              : u
-          ),
+          users: prev.users.map(u => (u.id === editingUser.id ? { ...u, ...updated } : u)),
         }))
-        addNotification({ type: 'success', title: 'User Updated', message: `${form.name} has been updated` })
+        addNotification({ type: 'success', title: 'User Updated', message: `${name} has been updated` })
       } else {
-        const newUser = {
-          id: Math.max(0, ...data.users.map(u => u.id)) + 1,
-          name: form.name.trim(),
-          email: form.email.trim(),
-          role: form.role,
-          role_display: roleLabel,
-          is_active: form.is_active,
-          last_login: null,
-          created_at: new Date().toISOString(),
-        }
-        setData(prev => ({ ...prev, users: [newUser, ...prev.users] }))
-        addNotification({ type: 'success', title: 'User Added', message: `${form.name} has been added as ${roleLabel}` })
+        const payload = { name, email, password: form.password, role: form.role, is_active: form.is_active }
+        const created = await mutateData(
+          () => ({
+            id: Math.max(0, ...data.users.map(u => u.id)) + 1,
+            name,
+            email,
+            role: form.role,
+            role_display: roleLabel,
+            is_active: form.is_active,
+            last_login: null,
+            created_at: new Date().toISOString(),
+          }),
+          async () => normalizeUser(extractUser(await usersApi.createUser(payload)))
+        )
+        setData(prev => ({ ...prev, users: [created, ...prev.users] }))
+        addNotification({ type: 'success', title: 'User Added', message: `${name} has been added as ${roleLabel}` })
       }
       setFormOpen(false)
+    } catch (error) {
+      if (error?.errors) {
+        setFormErrors(firstErrors(error.errors))
+      }
+      addNotification({
+        type: 'error',
+        title: editingUser ? 'Update Failed' : 'Create Failed',
+        message: error?.message || 'Failed to save user',
+      })
     } finally {
       setSaving(false)
     }
@@ -167,13 +210,23 @@ export default function UserManagementPage() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
+      await mutateData(
+        () => null,
+        () => usersApi.deleteUser(deleteTarget.id)
+      )
       setData(prev => ({ ...prev, users: prev.users.filter(u => u.id !== deleteTarget.id) }))
       addNotification({ type: 'success', title: 'User Removed', message: `${deleteTarget.name} has been removed` })
+      setDeleteTarget(null)
+    } catch (error) {
+      // e.g. 422 "Cannot delete user with existing records: ..." - keep the row, show why.
+      addNotification({ type: 'error', title: 'Delete Failed', message: error?.message || 'Failed to remove user' })
       setDeleteTarget(null)
     } finally {
       setDeleting(false)
     }
   }
+
+  const isSelf = (user) => Boolean(currentUser) && String(user.id) === String(currentUser.id)
 
   const getRoleBadge = (role) => {
     const map = {
@@ -219,7 +272,7 @@ export default function UserManagementPage() {
             variant={row.is_active ? 'danger' : 'primary'}
             icon={row.is_active ? UserX : UserCheck}
             loading={togglingId === row.id}
-            disabled={togglingId === row.id || deleting}
+            disabled={togglingId === row.id || deleting || isSelf(row)}
             onClick={() => handleToggleActive(row)}
           >
             {row.is_active ? 'Deactivate' : 'Activate'}
@@ -228,7 +281,7 @@ export default function UserManagementPage() {
             size="sm"
             variant="danger"
             icon={Trash2}
-            disabled={togglingId === row.id || deleting}
+            disabled={togglingId === row.id || deleting || isSelf(row)}
             onClick={() => setDeleteTarget(row)}
           >
             Delete
@@ -295,9 +348,8 @@ export default function UserManagementPage() {
             <div className="text-center">
               <p className="text-3xl font-bold text-gray-600 dark:text-gray-400">
                 {data.users.filter(u => {
-                  const d = new Date(u.last_login)
-                  const now = new Date()
-                  return now - d < 24 * 60 * 60 * 1000
+                  if (!u.last_login) return false
+                  return new Date() - new Date(u.last_login) < 24 * 60 * 60 * 1000
                 }).length}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">Active Today</p>
@@ -367,16 +419,30 @@ export default function UserManagementPage() {
                 error={formErrors.email}
                 placeholder="user@voltraak.com"
               />
+              {!editingUser && (
+                <Input
+                  label="Password"
+                  type="password"
+                  required
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
+                  error={formErrors.password}
+                />
+              )}
               <Select
                 label="Role"
                 required
                 value={form.role}
                 onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))}
                 options={ROLE_OPTIONS}
+                error={formErrors.role}
+                disabled={editingUser ? isSelf(editingUser) : false}
               />
               <label className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
                 <input
                   type="checkbox"
+                  disabled={editingUser ? isSelf(editingUser) : false}
                   checked={form.is_active}
                   onChange={(e) => setForm(prev => ({ ...prev, is_active: e.target.checked }))}
                   className="rounded"

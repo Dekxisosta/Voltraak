@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { Eye, EyeOff } from 'lucide-react'
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 export default function Input({
   type = 'text',

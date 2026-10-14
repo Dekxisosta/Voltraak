@@ -24,7 +24,7 @@ class AuthApi {
   async login(credentials) {
     const data = USE_MOCKS
       ? await mockAuthApi.login(credentials)
-      : (await apiClient.post('/auth/login', credentials)).data
+      : (await apiClient.post('/api/v1/auth/login', credentials)).data
 
     if (data?.token) {
       localStorage.setItem(TOKEN_KEY, data.token)
@@ -44,7 +44,7 @@ class AuthApi {
       if (USE_MOCKS) {
         await mockAuthApi.logout()
       } else {
-        await apiClient.post('/auth/logout')
+        await apiClient.post('/api/v1/auth/logout')
       }
     } finally {
       localStorage.removeItem(TOKEN_KEY)
@@ -59,7 +59,7 @@ class AuthApi {
     if (USE_MOCKS) {
       return mockAuthApi.me(this.getStoredToken())
     }
-    const response = await apiClient.get('/auth/me')
+    const response = await apiClient.get('/api/v1/auth/me')
     return response.data
   }
 
@@ -69,7 +69,7 @@ class AuthApi {
   async refreshToken() {
     const data = USE_MOCKS
       ? await mockAuthApi.refreshToken(this.getStoredToken())
-      : (await apiClient.post('/auth/refresh')).data
+      : (await apiClient.post('/api/v1/auth/refresh')).data
 
     if (data?.token) {
       localStorage.setItem(TOKEN_KEY, data.token)
@@ -85,7 +85,7 @@ class AuthApi {
     if (USE_MOCKS) {
       return mockAuthApi.forgotPassword(email)
     }
-    const response = await apiClient.post('/auth/forgot-password', email)
+    const response = await apiClient.post('/api/v1/auth/forgot-password', email)
     return response.data
   }
 
@@ -96,7 +96,7 @@ class AuthApi {
     if (USE_MOCKS) {
       return mockAuthApi.resetPassword(resetData)
     }
-    const response = await apiClient.post('/auth/reset-password', resetData)
+    const response = await apiClient.post('/api/v1/auth/reset-password', resetData)
     return response.data
   }
 
@@ -106,7 +106,7 @@ class AuthApi {
   async updateProfile(patch) {
     const user = USE_MOCKS
       ? await mockAuthApi.updateProfile(this.getStoredToken(), patch)
-      : (await apiClient.patch('/auth/profile', patch)).data
+      : (await apiClient.patch('/api/v1/auth/profile', patch)).data
 
     localStorage.setItem(USER_KEY, JSON.stringify(user))
     return user
@@ -119,7 +119,7 @@ class AuthApi {
     if (USE_MOCKS) {
       return mockAuthApi.changePassword(this.getStoredToken(), passwordData)
     }
-    const response = await apiClient.patch('/auth/change-password', passwordData)
+    const response = await apiClient.patch('/api/v1/auth/change-password', passwordData)
     return response.data
   }
 

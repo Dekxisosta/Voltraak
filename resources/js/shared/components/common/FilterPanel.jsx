@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { X, RotateCcw } from 'lucide-react'
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 import Button from './Button'
 
 export default function FilterPanel({

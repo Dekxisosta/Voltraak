@@ -21,8 +21,8 @@ import {
   Info,
 } from 'lucide-react'
 import { useNotifications } from '@/shared/hooks/useNotifications'
-import { Pagination } from '@/components/common'
-import { cn } from '@/utils'
+import { Pagination } from '@/shared/components/common'
+import { cn } from '@/shared/utils'
 import { formatRelativeTime } from '@/shared/utils'
 
 // ── Constants ────────────────────────────────────────────────────────────

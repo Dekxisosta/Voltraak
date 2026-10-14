@@ -11,7 +11,7 @@
  * (stroke-dashoffset, stroke) aren't filtered out by Tailwind's purge.
  */
 
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 const SIZES = {
   sm: { box: 16, stroke: 2 },

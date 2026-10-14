@@ -2,7 +2,7 @@
  * Reusable button component with consistent styling
  */
 
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 const variantStyles = {
   primary: 'btn-primary',

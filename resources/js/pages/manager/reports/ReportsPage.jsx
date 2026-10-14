@@ -10,7 +10,7 @@ import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { fetchData } from '@/shared/services/dataSource'
 import { mockReportData } from '@/shared/mocks/manager/reports'
-// TODO: import { reportingApi } from '@/api'
+import { reportingApi } from '@/shared/api/reporting'
 
 export default function ReportsPage() {
   const [data, setData] = useState(null)
@@ -26,27 +26,71 @@ export default function ReportsPage() {
   const loadReportData = async () => {
     try {
       setLoading(true)
-      const result = await fetchData(
+      const response = await fetchData(
         () => mockReportData,
-        () => null // TODO: reportingApi.getInventoryReport()
+        () => reportingApi.getInventoryReport({ period: reportPeriod })
       )
-      setData(result)
-      setLoading(false)
+      // Backend wraps in Laravel envelope { success, data: {...}, message, timestamp }
+      setData(response?.data || response)
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: 'Failed to load report data' })
+      addNotification({ type: 'error', title: 'Error', message: error?.message || 'Failed to load report data' })
+    } finally {
       setLoading(false)
     }
+  }
+
+  const buildCsv = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const rows = [
+      ['Inventory Report', `Last ${reportPeriod}`],
+      [],
+      ['Summary'],
+      ['Total Inventory Value', data?.summary?.total_inventory_value ?? 0],
+      ['Total SKUs', data?.summary?.total_skus ?? 0],
+      ['Total Units', data?.summary?.total_units ?? 0],
+      ['Avg Turnover Rate', data?.summary?.avg_turnover_rate ?? 0],
+      [],
+      ['Category', 'Value', 'Units', 'Percentage'],
+      ...(data?.category_breakdown || []).map(c => [c.category, c.value, c.units, c.percentage]),
+      [],
+      ['Stock Movement'],
+      ['Stock In', data?.movement_summary?.total_stock_in ?? 0],
+      ['Stock Out', data?.movement_summary?.total_stock_out ?? 0],
+      ['Adjustments', data?.movement_summary?.total_adjustments ?? 0],
+      ['Net Change', data?.movement_summary?.net_change ?? 0],
+      [],
+      ['Top Mover', 'Units Sold', 'Revenue'],
+      ...(data?.top_movers || []).map(m => [m.name, m.units_sold, m.revenue]),
+    ]
+    return rows.map(r => r.map(esc).join(',')).join('\n')
   }
 
   const handleExport = async (format) => {
     setExporting(format)
     try {
-      await new Promise(resolve => setTimeout(resolve, 800))
-      addNotification({ type: 'success', title: 'Export Started', message: `Report is being exported as ${format.toUpperCase()}` })
+      if (format === 'csv') {
+        const blob = new Blob([buildCsv()], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `inventory-report-${reportPeriod}-${new Date().toISOString().slice(0, 10)}.csv`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        URL.revokeObjectURL(url)
+      } else {
+        // PDF: the browser's print dialog ("Save as PDF") on the rendered report.
+        window.print()
+      }
+      addNotification({ type: 'success', title: 'Export Ready', message: `Report exported as ${format.toUpperCase()}` })
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Export Failed', message: error?.message || `Could not export ${format.toUpperCase()}` })
     } finally {
       setExporting(null)
     }
   }
+
+  const signed = (n) => `${n > 0 ? '+' : ''}${(n || 0).toLocaleString()}`
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-96"><LoadingSpinner size="lg" message="Generating reports..." /></div>
@@ -72,10 +116,10 @@ export default function ReportsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><DollarSign className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">₱{(data.summary.total_inventory_value / 1000000).toFixed(2)}M</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Inventory Value</p></div></div></Card.Body></Card>
-        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Package className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">{data.summary.total_skus}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total SKUs</p></div></div></Card.Body></Card>
-        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><BarChart3 className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">{data.summary.total_units.toLocaleString()}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Units</p></div></div></Card.Body></Card>
-        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><TrendingUp className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">{data.summary.avg_turnover_rate}x</p><p className="text-sm text-gray-600 dark:text-gray-400">Avg Turnover Rate</p></div></div></Card.Body></Card>
+        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><DollarSign className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">₱{(Number(data?.summary?.total_inventory_value || 0) / 1000000).toFixed(2)}M</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Inventory Value</p></div></div></Card.Body></Card>
+        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><Package className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">{data?.summary?.total_skus || 0}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total SKUs</p></div></div></Card.Body></Card>
+        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><BarChart3 className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">{(data?.summary?.total_units || 0).toLocaleString()}</p><p className="text-sm text-gray-600 dark:text-gray-400">Total Units</p></div></div></Card.Body></Card>
+        <Card><Card.Body><div className="flex items-center"><div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg"><TrendingUp className="h-6 w-6 text-gray-600 dark:text-gray-400" /></div><div className="ml-4"><p className="text-xl font-bold">{data?.summary?.avg_turnover_rate || 0}x</p><p className="text-sm text-gray-600 dark:text-gray-400">Avg Turnover Rate</p></div></div></Card.Body></Card>
       </div>
 
       {/* Category Breakdown */}
@@ -83,7 +127,7 @@ export default function ReportsPage() {
         <Card.Header><h3 className="text-lg font-semibold">Category Breakdown</h3></Card.Header>
         <Card.Body>
           <div className="space-y-4">
-            {data.category_breakdown.map(cat => (
+            {(data?.category_breakdown || []).map(cat => (
               <div key={cat.category} className="flex items-center">
                 <div className="w-40 text-sm font-medium text-gray-700 dark:text-gray-300">{cat.category}</div>
                 <div className="flex-1 mx-4">
@@ -104,10 +148,10 @@ export default function ReportsPage() {
           <Card.Header><h3 className="text-lg font-semibold">Stock Movement Summary</h3></Card.Header>
           <Card.Body>
             <div className="space-y-4">
-              <div className="flex justify-between items-center py-2 border-b"><span className="text-gray-600 dark:text-gray-400">Stock In</span><span className="font-bold text-gray-600 dark:text-gray-400">+{data.movement_summary.total_stock_in}</span></div>
-              <div className="flex justify-between items-center py-2 border-b"><span className="text-gray-600 dark:text-gray-400">Stock Out</span><span className="font-bold text-gray-600 dark:text-gray-400">-{data.movement_summary.total_stock_out}</span></div>
-              <div className="flex justify-between items-center py-2 border-b"><span className="text-gray-600 dark:text-gray-400">Adjustments</span><span className="font-bold text-gray-600 dark:text-gray-400">{data.movement_summary.total_adjustments}</span></div>
-              <div className="flex justify-between items-center py-2"><span className="text-gray-700 dark:text-gray-300 font-medium">Net Change</span><span className="font-bold text-gray-600 dark:text-gray-400">+{data.movement_summary.net_change}</span></div>
+              <div className="flex justify-between items-center py-2 border-b"><span className="text-gray-600 dark:text-gray-400">Stock In</span><span className="font-bold text-gray-600 dark:text-gray-400">+{(data?.movement_summary?.total_stock_in || 0).toLocaleString()}</span></div>
+              <div className="flex justify-between items-center py-2 border-b"><span className="text-gray-600 dark:text-gray-400">Stock Out</span><span className="font-bold text-gray-600 dark:text-gray-400">-{(data?.movement_summary?.total_stock_out || 0).toLocaleString()}</span></div>
+              <div className="flex justify-between items-center py-2 border-b"><span className="text-gray-600 dark:text-gray-400">Adjustments</span><span className="font-bold text-gray-600 dark:text-gray-400">{(data?.movement_summary?.total_adjustments || 0).toLocaleString()}</span></div>
+              <div className="flex justify-between items-center py-2"><span className="text-gray-700 dark:text-gray-300 font-medium">Net Change</span><span className="font-bold text-gray-600 dark:text-gray-400">{signed(data?.movement_summary?.net_change)}</span></div>
             </div>
           </Card.Body>
         </Card>
@@ -116,9 +160,9 @@ export default function ReportsPage() {
           <Card.Header><h3 className="text-lg font-semibold">Top Movers</h3></Card.Header>
           <Card.Body>
             <div className="space-y-3">
-              {data.top_movers.map((item, idx) => (
+              {(data?.top_movers || []).map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center py-2 border-b last:border-0">
-                  <div><span className="text-sm font-medium">{item.name}</span><br /><span className="text-xs text-gray-500 dark:text-gray-400">{item.units_sold} units sold</span></div>
+                  <div><span className="text-sm font-medium">{item.name}</span><br /><span className="text-xs text-gray-500 dark:text-gray-400">{Number(item.units_sold || 0).toLocaleString()} units sold</span></div>
                   <span className="font-bold text-gray-600 dark:text-gray-400">₱{(item.revenue / 1000).toFixed(0)}K</span>
                 </div>
               ))}

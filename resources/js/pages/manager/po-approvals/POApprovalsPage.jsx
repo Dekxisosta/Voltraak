@@ -11,8 +11,66 @@ import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { createResourceDataSource } from '@/shared/services/dataSource'
 import { printPOAsPdf } from './poPrintService'
-// TODO: pass { api: procurementApi } once the endpoint exists
-const poApprovalsSource = createResourceDataSource('manager/po-approvals')
+import { procurementApi } from '@/shared/api/procurement'
+
+// The list endpoint returns a plain array under `data` (no pagination meta), so
+// page through it until a short page comes back.
+const PAGE_SIZE = 100
+const APPROVAL_STATUSES = ['pending', 'approved', 'rejected']
+
+const unwrap = (response) => {
+  const payload = response?.data ?? response
+  const list = payload?.items ?? payload?.data ?? payload
+  return Array.isArray(list) ? list : []
+}
+
+async function fetchOrdersByStatus(status) {
+  const orders = []
+  for (let page = 1; ; page += 1) {
+    const batch = unwrap(await procurementApi.getPurchaseOrders({ status, per_page: PAGE_SIZE, page }))
+    orders.push(...batch)
+    if (batch.length < PAGE_SIZE) break
+  }
+  return orders
+}
+
+/**
+ * Map a backend PurchaseOrderResource onto the row shape this page renders.
+ * Rows that already have the flat shape (mock data) pass through unchanged.
+ */
+function normalizeOrder(po) {
+  if (!po || typeof po.supplier === 'string') return po
+  return {
+    ...po,
+    supplier: po.supplier?.name ?? 'Unknown supplier',
+    total_amount: Number(po.total_amount) || 0,
+    items_count: po.items_count ?? po.total_items ?? po.items?.length ?? 0,
+    requested_by: po.requested_by ?? po.creator?.name ?? 'System',
+    requested_at: po.requested_at ?? po.created_at ?? po.order_date,
+    priority: po.priority ?? 'medium',
+  }
+}
+
+// API adapter for PO approvals resource. Approving / rejecting go through the
+// dedicated /approve and /reject endpoints - PUT /purchase-orders/{id} only edits
+// supplier, items and notes and ignores `status`.
+const poApprovalsSource = createResourceDataSource('manager/po-approvals', {
+  api: {
+    list: async () => {
+      const lists = await Promise.all(APPROVAL_STATUSES.map(fetchOrdersByStatus))
+      return lists.flat().map(normalizeOrder)
+    },
+    get: async (id) => normalizeOrder((await procurementApi.getPurchaseOrder(id))?.data),
+    create: (data) => procurementApi.createPurchaseOrder(data),
+    update: async (id, data) => {
+      if (data?.status === 'approved') return procurementApi.approvePurchaseOrder(id)
+      if (data?.status === 'rejected') return procurementApi.rejectPurchaseOrder(id, data.reason ? { reason: data.reason } : {})
+      const { status, ...editable } = data || {}
+      return procurementApi.updatePurchaseOrder(id, editable)
+    },
+    remove: (id) => procurementApi.deletePurchaseOrder(id),
+  },
+})
 
 export default function POApprovalsPage() {
   const [data, setData] = useState({ orders: [], loading: true })
@@ -33,10 +91,12 @@ export default function POApprovalsPage() {
     try {
       setData(prev => ({ ...prev, loading: true }))
       const result = await poApprovalsSource.list()
-      setData({ orders: result, loading: false })
+      // Handle both paginated Laravel responses and plain arrays
+      const orders = (Array.isArray(result) ? result : (result?.data || result?.orders || [])).map(normalizeOrder)
+      setData({ orders, loading: false })
     } catch (error) {
       addNotification({ type: 'error', title: 'Error', message: 'Failed to load purchase orders' })
-      setData(prev => ({ ...prev, loading: false }))
+      setData({ orders: [], loading: false })
     }
   }
 
@@ -44,10 +104,11 @@ export default function POApprovalsPage() {
     setApprovingId(po.id)
     try {
       await poApprovalsSource.update(po.id, { status: 'approved' })
-      addNotification({ type: 'success', title: 'PO Approved', message: `${po.po_number} approved - ₱${po.total_amount.toLocaleString()} to ${po.supplier}` })
+      addNotification({ type: 'success', title: 'PO Approved', message: `${po.po_number} approved - ₱${Number(po.total_amount).toLocaleString()} to ${po.supplier}` })
       loadPurchaseOrders()
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: `Failed to approve ${po.po_number}` })
+      addNotification({ type: 'error', title: 'Error', message: error?.message || `Failed to approve ${po.po_number}` })
+      loadPurchaseOrders()
     } finally {
       setApprovingId(null)
     }
@@ -59,7 +120,8 @@ export default function POApprovalsPage() {
       addNotification({ type: 'warning', title: 'PO Rejected', message: `${po.po_number} has been rejected` })
       loadPurchaseOrders()
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: `Failed to reject ${po.po_number}` })
+      addNotification({ type: 'error', title: 'Error', message: error?.message || `Failed to reject ${po.po_number}` })
+      loadPurchaseOrders()
     }
   }
 
@@ -80,7 +142,13 @@ export default function POApprovalsPage() {
   const handleKanbanMove = (po, newStatus) => {
     if (newStatus === 'approved') return handleApprove(po)
     if (newStatus === 'rejected') return handleReject(po)
-    poApprovalsSource.update(po.id, { status: newStatus }).then(loadPurchaseOrders)
+    // Re-opening a decided order has no backend transition (pending is only
+    // reachable from draft), so say so instead of silently doing nothing.
+    if (newStatus === 'pending' && po.status !== 'pending') {
+      addNotification({ type: 'warning', title: 'Not Allowed', message: `${po.po_number} has already been ${po.status} and cannot be reopened` })
+      return
+    }
+    return poApprovalsSource.update(po.id, { status: newStatus }).then(loadPurchaseOrders)
   }
 
   const handlePrint = (po) => {
@@ -118,11 +186,11 @@ export default function POApprovalsPage() {
   const columns = [
     { key: 'po_number', label: 'PO Number', sortable: true },
     { key: 'supplier', label: 'Supplier' },
-    { key: 'total_amount', label: 'Amount', render: (val) => `₱${val.toLocaleString()}` },
+    { key: 'total_amount', label: 'Amount', render: (val) => `₱${Number(val || 0).toLocaleString()}` },
     { key: 'items_count', label: 'Items' },
     { key: 'priority', label: 'Priority', render: (val) => getPriorityBadge(val) },
     { key: 'requested_by', label: 'Requested By' },
-    { key: 'requested_at', label: 'Date', render: (val) => new Date(val).toLocaleDateString() },
+    { key: 'requested_at', label: 'Date', render: (val) => (val ? new Date(val).toLocaleDateString() : '—') },
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     { key: 'actions', label: 'Actions', render: (_, row) => {
       if (row.status === 'pending') {
@@ -142,9 +210,9 @@ export default function POApprovalsPage() {
     }},
   ]
 
-  const filteredOrders = data.orders
+  const filteredOrders = (data.orders || [])
     .filter(o => filterStatus === 'all' || o.status === filterStatus)
-    .filter(o => o.po_number.toLowerCase().includes(searchTerm.toLowerCase()) || o.supplier.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(o => (o.po_number || '').toLowerCase().includes(searchTerm.toLowerCase()) || (o.supplier || '').toLowerCase().includes(searchTerm.toLowerCase()))
 
   if (data.loading) {
     return <div className="flex items-center justify-center min-h-96"><LoadingSpinner size="lg" message="Loading purchase orders..." /></div>
@@ -155,10 +223,10 @@ export default function POApprovalsPage() {
       <PageHeader title="PO Approvals" subtitle="Review and approve purchase orders" icon={ShoppingCart} />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.orders.filter(o => o.status === 'pending').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Pending Approval</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.orders.filter(o => o.status === 'approved').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Approved</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{data.orders.filter(o => o.status === 'pending' && o.priority === 'high').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">High Priority</p></div></Card.Body></Card>
-        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">₱{(data.orders.filter(o => o.status === 'pending').reduce((s, o) => s + o.total_amount, 0) / 1000).toFixed(0)}K</p><p className="text-sm text-gray-600 dark:text-gray-400">Pending Value</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{(data.orders || []).filter(o => o.status === 'pending').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Pending Approval</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{(data.orders || []).filter(o => o.status === 'approved').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">Approved</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{(data.orders || []).filter(o => o.status === 'pending' && o.priority === 'high').length}</p><p className="text-sm text-gray-600 dark:text-gray-400">High Priority</p></div></Card.Body></Card>
+        <Card><Card.Body><div className="text-center"><p className="text-3xl font-bold text-gray-600 dark:text-gray-400">₱{((data.orders || []).filter(o => o.status === 'pending').reduce((s, o) => s + Number(o.total_amount || 0), 0) / 1000).toFixed(0)}K</p><p className="text-sm text-gray-600 dark:text-gray-400">Pending Value</p></div></Card.Body></Card>
       </div>
 
       <Card>

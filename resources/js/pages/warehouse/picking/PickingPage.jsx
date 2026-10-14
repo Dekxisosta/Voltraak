@@ -10,8 +10,9 @@ import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { fetchData } from '@/shared/services/dataSource'
+import { fulfillCustomerOrder } from '@/shared/services/mockStore'
 import { mockPickingTasks } from '@/shared/mocks/warehouse/picking'
-// TODO: import { inventoryApi } from '@/api'
+import { inventoryApi } from '@/shared/api/inventory'
 
 
 export default function PickingPage() {
@@ -34,7 +35,11 @@ export default function PickingPage() {
       
       const result = await fetchData(
         () => mockPickingTasks,
-        () => null // TODO: inventoryApi.getProducts()
+        async () => {
+          const response = await inventoryApi.getPickingList()
+          // Envelope: { success, message, data: { items: [...] } } -> picking tasks
+          return transformPickingData(response)
+        }
       )
       setData({ pickingTasks: result, loading: false })
     } catch (error) {
@@ -42,10 +47,65 @@ export default function PickingPage() {
       addNotification({
         type: 'error',
         title: 'Loading Error',
-        message: 'Failed to load picking tasks'
+        message: error.message || 'Failed to load picking tasks'
       })
       setData(prev => ({ ...prev, loading: false }))
     }
+  }
+
+  /**
+   * Map the backend numeric priority score (base 50, +100 overdue, +50 due today,
+   * +25 due soon) onto the page's high / medium / normal badges.
+   */
+  const mapPriority = (score) => {
+    const value = Number(score)
+    if (!Number.isFinite(value)) return 'medium'
+    if (value >= 150) return 'high'
+    if (value >= 100) return 'medium'
+    return 'normal'
+  }
+
+  /**
+   * Transform the backend picking list into the page's picking-task format.
+   *
+   * Backend: GET /customer-orders/picking/list ->
+   *   { success, data: { items: [ one row per allocated reservation:
+   *     { reservation_id, order_id, order_number, customer_name, required_date,
+   *       priority (number), product_name, quantity, batch_number, bin_location,
+   *       expiry_date, ... } ] } }
+   * Frontend: one task per order, with its reservation rows as items[].
+   */
+  const transformPickingData = (response) => {
+    const payload = response?.data ?? response
+    const rows = Array.isArray(payload) ? payload : (payload?.items ?? [])
+
+    const tasks = new Map()
+    rows.forEach(row => {
+      if (!tasks.has(row.order_id)) {
+        tasks.set(row.order_id, {
+          id: row.order_id,
+          order_number: row.order_number,
+          customer_name: row.customer_name || '',
+          route: row.route || 'Route A', // Backend has no routes yet
+          priority: mapPriority(row.priority),
+          // Picking-list orders are confirmed; the picker starts them locally
+          status: 'pending',
+          due_time: row.required_date || null,
+          items: [],
+        })
+      }
+      tasks.get(row.order_id).items.push({
+        id: row.reservation_id,
+        product_name: row.product_name || 'Unknown Product',
+        batch_number: row.batch_number || 'N/A',
+        quantity: row.quantity,
+        bin_location: row.bin_location || 'Unassigned',
+        expiry_date: row.expiry_date || null,
+        picked: false, // Tracked locally until the order is fulfilled
+      })
+    })
+
+    return Array.from(tasks.values())
   }
 
   const handleMarkPicked = async (taskId, itemId) => {
@@ -61,7 +121,7 @@ export default function PickingPage() {
             return {
               ...task,
               items: updatedItems,
-              status: allPicked ? 'completed' : 'in_progress'
+              status: allPicked ? 'in_progress' : 'in_progress' // Keep in_progress until completed
             }
           }
           return task
@@ -83,8 +143,51 @@ export default function PickingPage() {
     }
   }
 
+  const handleStartPicking = async (taskId) => {
+    try {
+      setData(prev => ({
+        ...prev,
+        pickingTasks: prev.pickingTasks.map(task => 
+          task.id === taskId ? { ...task, status: 'in_progress' } : task
+        )
+      }))
+
+      addNotification({
+        type: 'success',
+        title: 'Picking Started',
+        message: 'Order picking has begun'
+      })
+    } catch (error) {
+      console.error('Error starting picking:', error)
+      addNotification({
+        type: 'error',
+        title: 'Update Error',
+        message: 'Failed to start picking'
+      })
+    }
+  }
+
   const handleCompleteOrder = async (taskId) => {
     try {
+      const task = data.pickingTasks.find(t => t.id === taskId)
+      if (!task) throw new Error('Task not found')
+
+      // Call the backend API to fulfill the order
+      await fetchData(
+        // Mock mode: use our stock operation helper
+        () => {
+          fulfillCustomerOrder(taskId, task.order_number)
+          return { success: true }
+        },
+        // API mode: call real endpoint
+        async () => {
+          return await inventoryApi.fulfillCustomerOrder(taskId, {
+            notes: 'Order picked and fulfilled from picking page'
+          })
+        }
+      )
+
+      // Update local state
       setData(prev => ({
         ...prev,
         pickingTasks: prev.pickingTasks.map(task => 
@@ -94,15 +197,15 @@ export default function PickingPage() {
 
       addNotification({
         type: 'success',
-        title: 'Order Completed',
-        message: 'Picking task marked'
+        title: 'Order Fulfilled',
+        message: 'Order completed and inventory updated'
       })
     } catch (error) {
       console.error('Error completing order:', error)
       addNotification({
         type: 'error',
         title: 'Completion Error',
-        message: 'Failed to complete picking task'
+        message: error.message || 'Failed to complete picking task'
       })
     }
   }
@@ -130,6 +233,9 @@ export default function PickingPage() {
   }
 
   const getExpiryStatus = (expiryDate) => {
+    if (!expiryDate) {
+      return <StatusBadge variant="neutral" label="No expiry" />
+    }
     const expiry = new Date(expiryDate)
     const today = new Date()
     const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
@@ -187,17 +293,22 @@ export default function PickingPage() {
     },
     {
       key: 'due_time',
-      label: 'Due Time',
-      render: (value) => new Date(value).toLocaleTimeString([], { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      })
+      label: 'Due',
+      render: (value) => {
+        if (!value) return '—'
+        // The API provides a date only (YYYY-MM-DD); mock data carries a full timestamp
+        if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          return new Date(`${value}T00:00:00`).toLocaleDateString()
+        }
+        return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
     },
     {
       key: 'actions',
       label: 'Actions',
       render: (_, row) => (
         <div className="flex space-x-2">
+          {/* Complete button: enabled when order is in_progress and all items are picked */}
           {row.status === 'in_progress' && row.items.every(item => item.picked) && (
             <Button
               size="sm"
@@ -206,6 +317,18 @@ export default function PickingPage() {
               onClick={() => handleCompleteOrder(row.id)}
             >
               Complete
+            </Button>
+          )}
+          
+          {/* Start Picking button: enabled when order is confirmed/pending */}
+          {row.status === 'pending' && (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={Package}
+              onClick={() => handleStartPicking(row.id)}
+            >
+              Start Picking
             </Button>
           )}
         </div>

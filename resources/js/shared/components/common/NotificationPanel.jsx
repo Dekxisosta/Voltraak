@@ -15,7 +15,7 @@
 
 import React from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { router } from '@inertiajs/react'
 import {
   X,
   Bell,
@@ -29,7 +29,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { useNotifications } from '@/shared/hooks/useNotifications'
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 import { formatRelativeTime } from '@/shared/utils'
 
 // ── Icon / colour maps (mirrors NotificationContainer) ──────────────────
@@ -58,8 +58,7 @@ export default function NotificationPanel({ isOpen, onClose, anchorRef }) {
     clearAll,
   } = useNotifications()
 
-  const navigate = useNavigate()
-  const panelRef = React.useRef(null)
+    const panelRef = React.useRef(null)
   const [anchorRect, setAnchorRect] = React.useState(null)
 
   // Measure the anchor whenever the panel opens so we can pin it below the bell.
@@ -107,7 +106,7 @@ export default function NotificationPanel({ isOpen, onClose, anchorRef }) {
 
   const handleSeeAll = () => {
     onClose()
-    navigate('/notifications')
+    router.visit('/notifications')
   }
 
   if (!isOpen) return null

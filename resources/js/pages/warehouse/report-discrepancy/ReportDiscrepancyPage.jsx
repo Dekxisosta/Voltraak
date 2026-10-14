@@ -14,10 +14,16 @@ import { AlertCircle, Send } from 'lucide-react'
 import { Card, Button, Input, ConfirmModal, StatusBadge, LoadingSpinner } from '@/shared/components/common'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
-import { createResourceDataSource } from '@/shared/services/dataSource'
+import { createResourceDataSource, dataSourceMode } from '@/shared/services/dataSource'
+import { discrepancyApi, describeError } from '@/shared/api/inventoryMappers'
 // Same resource Inventory's DiscrepanciesPage reads/writes — Warehouse only
 // ever calls .create() on it, never .update()/.remove().
-const discrepanciesSource = createResourceDataSource('inventory/discrepancies')
+// In API mode the rows are the backend's discrepancy reports (see discrepancyApi).
+// The backend only returns the reports the current warehouse user raised.
+const discrepanciesSource = createResourceDataSource('inventory/discrepancies', { api: discrepancyApi })
+
+// Mock data has no per-user ownership, so it is matched by the mock author name.
+const isMine = (d) => dataSourceMode === 'api' || d.reported_by === 'Warehouse Staff'
 
 const emptyForm = {
   product_id: '',
@@ -39,7 +45,7 @@ export default function ReportDiscrepancyPage() {
   useEffect(() => {
     loadRecentReports()
     return discrepanciesSource.subscribe(all => {
-      setRecentReports(all.filter(d => d.reported_by === 'Warehouse Staff').slice(0, 5))
+      setRecentReports(all.filter(isMine).slice(0, 5))
     })
   }, [])
 
@@ -47,7 +53,7 @@ export default function ReportDiscrepancyPage() {
     try {
       setLoadingRecent(true)
       const all = await discrepanciesSource.list()
-      setRecentReports(all.filter(d => d.reported_by === 'Warehouse Staff').slice(0, 5))
+      setRecentReports(all.filter(isMine).slice(0, 5))
     } catch (error) {
       console.error('Error loading recent reports:', error)
     } finally {
@@ -68,8 +74,10 @@ export default function ReportDiscrepancyPage() {
   const handleConfirmSubmit = async () => {
     setSubmitting(true)
     try {
-      const all = await discrepanciesSource.list()
-      const reportNumber = `DISC-2024-${String(all.length + 1).padStart(3, '0')}`
+      // Only mock mode numbers reports client-side; the backend assigns its own.
+      const reportNumber = dataSourceMode === 'api'
+        ? undefined
+        : `DISC-2024-${String((await discrepanciesSource.list()).length + 1).padStart(3, '0')}`
       const newDiscrepancy = await discrepanciesSource.create({
         report_number: reportNumber,
         product_name: form.product_id,
@@ -104,7 +112,7 @@ export default function ReportDiscrepancyPage() {
       setShowConfirm(false)
     } catch (error) {
       console.error('Error submitting discrepancy:', error)
-      addNotification({ type: 'error', title: 'Submission Error', message: 'Failed to send discrepancy to Inventory' })
+      addNotification({ type: 'error', title: 'Submission Error', message: describeError(error, 'Failed to send discrepancy to Inventory') })
     } finally {
       setSubmitting(false)
     }

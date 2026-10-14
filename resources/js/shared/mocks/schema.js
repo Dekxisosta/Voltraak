@@ -143,12 +143,4 @@ export const MOCK_SCHEMAS = {
       'days_to_expiry', 'status',
     ],
   },
-  'work-queue': {
-    type: 'array',
-    fields: [
-      'id', 'type', 'title', 'description', 'priority', 'status',
-      'role', 'ref_id', 'ref_number', 'navigate_to',
-      'due_date', 'created_at', 'updated_at', 'metadata',
-    ],
-  },
 }

@@ -3,8 +3,8 @@
  */
 
 import React from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthContext'
+import { router } from '@inertiajs/react'
+import { useAuth } from '@/shared/contexts/AuthContext'
 import LoadingSpinner from './LoadingSpinner'
 
 export default function ProtectedRoute({
@@ -15,7 +15,6 @@ export default function ProtectedRoute({
   redirectTo = '/login',
 }) {
   const { isAuthenticated, loading, user, hasRole, hasPermission } = useAuth()
-  const location = useLocation()
 
   // Use requiredRoles if provided, otherwise use roles
   const rolesToCheck = requiredRoles || roles
@@ -29,13 +28,8 @@ export default function ProtectedRoute({
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    return (
-      <Navigate
-        to={redirectTo}
-        state={{ from: location.pathname }}
-        replace
-      />
-    )
+    router.visit(redirectTo)
+    return null
   }
 
   // Check role requirements

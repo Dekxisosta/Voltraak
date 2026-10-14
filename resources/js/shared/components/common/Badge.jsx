@@ -2,7 +2,7 @@
  * Generic badge component for labels, counts, and indicators
  */
 
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 
 

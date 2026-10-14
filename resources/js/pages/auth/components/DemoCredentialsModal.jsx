@@ -87,15 +87,17 @@ export default function DemoCredentialsModal({ isOpen, onClose, onSelect }) {
                     <span className="text-xs font-mono text-[var(--color-text-muted)] bg-[var(--color-bg-secondary)] rounded px-1.5 py-0.5">
                       {account.password}
                     </span>
-                    <button
-                      type="button"
+                    <span
+                      role="button"
+                      tabIndex={0}
                       onClick={(e) => handleCopyPassword(e, account)}
-                      className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors"
+                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleCopyPassword(e, account)}
+                      className="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-accent)] transition-colors cursor-pointer"
                       aria-label={`Copy password for ${account.role_display}`}
                       title="Copy password"
                     >
                       {justCopied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-                    </button>
+                    </span>
                   </div>
                 </div>
 

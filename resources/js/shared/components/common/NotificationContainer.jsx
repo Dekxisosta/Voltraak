@@ -5,8 +5,8 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react'
-import { useNotifications } from '@/hooks/useNotifications'
-import { cn } from '@/utils'
+import { useNotifications } from '@/shared/hooks/useNotifications'
+import { cn } from '@/shared/utils'
 
 // How long a toast stays on screen before it auto-dismisses.
 const AUTO_DISMISS_MS = 5000

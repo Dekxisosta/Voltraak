@@ -2,7 +2,7 @@
  * Main application component with routing and providers
  */
 
-import { ErrorBoundary, NotificationContainer } from '@/components/common'
+import { ErrorBoundary, NotificationContainer } from '@/shared/components/common'
 import { AuthProvider } from '@/shared/contexts/AuthContext'
 import { ThemeProvider } from '@/shared/contexts/ThemeContext'
 import { DensityProvider } from '@/shared/contexts/DensityContext'

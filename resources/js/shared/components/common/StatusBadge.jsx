@@ -4,7 +4,7 @@
  */
 
 import { CheckCircle, AlertTriangle, AlertCircle, Minus } from 'lucide-react'
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 const variantStyles = {
   ok: {

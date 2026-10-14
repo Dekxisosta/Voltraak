@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { router } from '@inertiajs/react'
 import {
   AlertTriangle,
   BellRing,
@@ -357,8 +357,7 @@ const ALERT_BUILDERS = {
 
 export default function AlertsPanel({ hideHeader = false }) {
   const { user } = useAuth()
-  const navigate = useNavigate()
-  const role = user?.role
+    const role = user?.role
   const sources = ROLE_SOURCES[role]
 
   const [resourceData, setResourceData] = useState({})
@@ -412,7 +411,7 @@ export default function AlertsPanel({ hideHeader = false }) {
       {alerts.length > 0 ? (
         <div className="space-y-2">
           {alerts.map((alert) => (
-            <AlertItem key={alert.id} alert={alert} onNavigate={navigate} />
+            <AlertItem key={alert.id} alert={alert} onNavigate={(path) => router.visit(path)} />
           ))}
         </div>
       ) : (

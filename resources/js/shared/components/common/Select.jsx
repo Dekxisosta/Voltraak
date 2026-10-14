@@ -3,7 +3,7 @@
  */
 
 import { ChevronDown } from 'lucide-react'
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 
 

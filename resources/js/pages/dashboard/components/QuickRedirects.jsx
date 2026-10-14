@@ -7,7 +7,7 @@
  * existing ?tab= convention, so no new routes are needed.
  */
 
-import { Link } from 'react-router-dom'
+import { Link } from '@inertiajs/react'
 import { ArrowRight } from 'lucide-react'
 
 const colorClasses = {

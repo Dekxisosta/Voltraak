@@ -1,21 +1,20 @@
 /**
  * useHighlightParam
  *
- * Reads a one-shot `?highlight=<id>` query param (set by the global search
- * bar when it links straight to a record) and hands it to whoever wants to
- * scroll to / flash that row — typically passed to <Table highlightRowId=.
+ * Reads a one-shot `?highlight=<id>` query param and returns it.
+ * The param is cleared from the URL after 2.5 s via Inertia router so a
+ * refresh / shared link doesn't keep re-triggering the highlight.
  *
- * The id is captured once on mount so it survives even after the param is
- * cleared from the URL a moment later (kept out of the URL long-term so a
- * refresh or share of the link doesn't keep re-triggering the highlight).
+ * No React Router dependency — uses URLSearchParams + Inertia router.
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { router } from '@inertiajs/react'
 
 export function useHighlightParam(paramName = 'highlight') {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [highlightId] = useState(() => searchParams.get(paramName))
+  const [highlightId] = useState(() =>
+    new URLSearchParams(window.location.search).get(paramName)
+  )
   const cleared = useRef(false)
 
   useEffect(() => {
@@ -23,13 +22,12 @@ export function useHighlightParam(paramName = 'highlight') {
     cleared.current = true
 
     const timer = setTimeout(() => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete(paramName)
-          return next
-        },
-        { replace: true }
+      const next = new URLSearchParams(window.location.search)
+      next.delete(paramName)
+      const qs = next.toString()
+      router.visit(
+        `${window.location.pathname}${qs ? `?${qs}` : ''}`,
+        { replace: true, preserveState: true, preserveScroll: true }
       )
     }, 2500)
 

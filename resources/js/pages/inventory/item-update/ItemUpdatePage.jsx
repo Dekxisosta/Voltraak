@@ -9,11 +9,16 @@ import { Card, Table, StatusBadge, Button, Input, Select, SearchBar, LoadingSpin
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { fetchData } from '@/shared/services/dataSource'
-import { mockProducts } from '@/shared/mocks/inventory/item-update'
-// TODO: import { inventoryApi } from '@/api'
+import { createResourceDataSource } from '@/shared/services/dataSource'
+import { productApi, PRODUCT_ERROR_FIELDS, describeError } from '@/shared/api/inventoryMappers'
 
-const emptyForm = { name: '', sku: '', category: '', unit_price: '', current_stock: '', reorder_point: '', is_active: true }
+// In API mode the rows are the backend's products (see productApi)
+const productSource = createResourceDataSource('inventory/item-update', { api: productApi })
+// Stock quantity is not part of a product's details on the backend: it only
+// changes through stock transactions (Stock In/Out), so it is read-only there.
+const STOCK_EDITABLE = productSource.isUsingMocks
+
+const emptyForm = { name: '', sku: '', category: '', unit_price: '', current_stock: STOCK_EDITABLE ? '' : '0', reorder_point: '', is_active: true }
 
 export default function ItemUpdatePage() {
   const [data, setData] = useState({ products: [], loading: true })
@@ -37,13 +42,10 @@ export default function ItemUpdatePage() {
   const loadProducts = async () => {
     try {
       setData(prev => ({ ...prev, loading: true }))
-      const result = await fetchData(
-        () => mockProducts,
-        () => null // TODO: inventoryApi.getProducts()
-      )
+      const result = await productSource.list()
       setData({ products: result, loading: false })
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: 'Failed to load products' })
+      addNotification({ type: 'error', title: 'Error', message: describeError(error, 'Failed to load products') })
       setData(prev => ({ ...prev, loading: false }))
     }
   }
@@ -88,10 +90,24 @@ export default function ItemUpdatePage() {
     }
     if (!form.category.trim()) errors.category = 'Category is required'
     if (form.unit_price === '' || Number(form.unit_price) < 0) errors.unit_price = 'Enter a valid price'
-    if (form.current_stock === '' || Number(form.current_stock) < 0) errors.current_stock = 'Enter a valid stock quantity'
+    if (STOCK_EDITABLE && (form.current_stock === '' || Number(form.current_stock) < 0)) errors.current_stock = 'Enter a valid stock quantity'
     if (form.reorder_point === '' || Number(form.reorder_point) < 0) errors.reorder_point = 'Enter a valid reorder point'
     setFormErrors(errors)
     return Object.keys(errors).length === 0
+  }
+
+  /** Show the API's per-field validation errors next to the matching inputs. */
+  const applyServerErrors = (error) => {
+    if (!error?.errors || typeof error.errors !== 'object') return false
+    const mapped = {}
+    Object.entries(error.errors).forEach(([field, messages]) => {
+      const key = PRODUCT_ERROR_FIELDS[field] || field
+      const first = Array.isArray(messages) ? messages[0] : messages
+      if (first) mapped[key] = String(first)
+    })
+    if (Object.keys(mapped).length === 0) return false
+    setFormErrors(mapped)
+    return true
   }
 
   const handleSubmitForm = async (e) => {
@@ -112,23 +128,27 @@ export default function ItemUpdatePage() {
       }
 
       if (editingProduct) {
+        const saved = await productSource.update(editingProduct.id, payload)
         setData(prev => ({
           ...prev,
           products: prev.products.map(p => p.id === editingProduct.id
-            ? { ...p, ...payload, available_stock: payload.current_stock }
+            ? { ...p, ...payload, available_stock: payload.current_stock, ...saved }
             : p)
         }))
-        addNotification({ type: 'success', title: 'Product Updated', message: `${payload.name} has been updated` })
+        addNotification({ type: 'success', title: 'Product Updated', message: `${saved?.name || payload.name} has been updated` })
       } else {
-        const newProduct = {
-          id: Math.max(0, ...data.products.map(p => p.id)) + 1,
+        const created = await productSource.create({
           ...payload,
           available_stock: payload.current_stock,
-        }
-        setData(prev => ({ ...prev, products: [newProduct, ...prev.products] }))
-        addNotification({ type: 'success', title: 'Product Added', message: `${payload.name} has been added` })
+        })
+        setData(prev => ({ ...prev, products: [created, ...prev.products] }))
+        addNotification({ type: 'success', title: 'Product Added', message: `${created?.name || payload.name} has been added` })
       }
       setFormOpen(false)
+    } catch (error) {
+      if (!applyServerErrors(error)) {
+        addNotification({ type: 'error', title: 'Error', message: describeError(error, `Failed to ${editingProduct ? 'update' : 'add'} product`) })
+      }
     } finally {
       setSaving(false)
     }
@@ -138,8 +158,13 @@ export default function ItemUpdatePage() {
     if (!deleteTarget) return
     setDeleting(true)
     try {
+      await productSource.remove(deleteTarget.id)
       setData(prev => ({ ...prev, products: prev.products.filter(p => p.id !== deleteTarget.id) }))
       addNotification({ type: 'success', title: 'Product Removed', message: `${deleteTarget.name} has been removed` })
+      setDeleteTarget(null)
+    } catch (error) {
+      // e.g. 409: the product still has stock, reservations or history
+      addNotification({ type: 'error', title: 'Cannot Remove Product', message: describeError(error, 'Failed to remove product') })
       setDeleteTarget(null)
     } finally {
       setDeleting(false)
@@ -150,11 +175,11 @@ export default function ItemUpdatePage() {
     { key: 'sku', label: 'SKU', sortable: true },
     { key: 'name', label: 'Product Name', sortable: true },
     { key: 'category', label: 'Category' },
-    { key: 'unit_price', label: 'Unit Price', render: (val) => `₱${val.toLocaleString()}` },
+    { key: 'unit_price', label: 'Unit Price', render: (val) => `₱${Number(val || 0).toLocaleString()}` },
     { key: 'current_stock', label: 'Stock' },
     { key: 'reorder_point', label: 'Reorder Point' },
     { key: 'is_active', label: 'Status', render: (val) => <StatusBadge variant={val ? 'ok' : 'neutral'} label={val ? 'Active' : 'Inactive'} /> },
-    { key: 'last_updated', label: 'Last Updated' },
+    { key: 'last_updated', label: 'Last Updated', render: (val) => val || '—' },
     { key: 'actions', label: 'Actions', render: (_, row) => (
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="secondary" icon={Edit} onClick={() => openEditModal(row)}>Edit</Button>
@@ -164,9 +189,9 @@ export default function ItemUpdatePage() {
   ]
 
   const filteredProducts = data.products.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.sku || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (p.category || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   if (data.loading) {
@@ -234,6 +259,8 @@ export default function ItemUpdatePage() {
                   type="number"
                   min="0"
                   required
+                  disabled={!STOCK_EDITABLE}
+                  helpText={STOCK_EDITABLE ? undefined : 'Changes through Stock In/Out'}
                   value={form.current_stock}
                   onChange={(e) => setForm(prev => ({ ...prev, current_stock: e.target.value }))}
                   error={formErrors.current_stock}

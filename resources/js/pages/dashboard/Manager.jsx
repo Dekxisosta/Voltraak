@@ -1,7 +1,7 @@
 import React from 'react'
 import { usePage, router } from '@inertiajs/react'
 import { TrendingUp, TrendingDown, Package, DollarSign, AlertTriangle, CheckCircle, Clock, BarChart3 } from 'lucide-react'
-import AppShell from '@/components/layout/AppShell'
+import AppShell from '@/shared/components/layout/AppShell'
 
 export default function ManagerDashboard() {
   const { dashboard, user } = usePage().props

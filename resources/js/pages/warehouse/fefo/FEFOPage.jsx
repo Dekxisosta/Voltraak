@@ -9,9 +9,9 @@ import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner } from '@/s
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { fetchData } from '@/shared/services/dataSource'
+import { fetchData, dataSourceMode } from '@/shared/services/dataSource'
 import { mockFEFORecommendations } from '@/shared/mocks/warehouse/fefo'
-// TODO: import { inventoryApi } from '@/api'
+import { fefoApi, describeError } from '@/shared/api/inventoryMappers'
 
 
 export default function FEFOPage() {
@@ -34,7 +34,7 @@ export default function FEFOPage() {
       
       const result = await fetchData(
         () => mockFEFORecommendations,
-        () => null // TODO: inventoryApi.getFEFORecommendations()
+        () => fefoApi.list()
       )
       setData({ recommendations: result, loading: false })
     } catch (error) {
@@ -42,7 +42,7 @@ export default function FEFOPage() {
       addNotification({
         type: 'error',
         title: 'Loading Error',
-        message: 'Failed to load FEFO recommendations'
+        message: describeError(error, 'Failed to load FEFO recommendations')
       })
       setData(prev => ({ ...prev, loading: false }))
     }
@@ -70,6 +70,13 @@ export default function FEFOPage() {
 
   const handleMarkForDisposal = async (batchId) => {
     try {
+      // Warehouse staff can't write stock off themselves: against the API this
+      // raises an expired-stock damage report that Inventory/Manager review.
+      if (dataSourceMode === 'api') {
+        const row = data.recommendations.find(rec => rec.id === batchId)
+        if (row) await fefoApi.flagForDisposal(row)
+      }
+
       addNotification({
         type: 'warning',
         title: 'Marked for Disposal',
@@ -86,7 +93,7 @@ export default function FEFOPage() {
       addNotification({
         type: 'error',
         title: 'Update Error',
-        message: 'Failed to mark batch for disposal'
+        message: describeError(error, 'Failed to mark batch for disposal')
       })
     }
   }

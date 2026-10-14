@@ -10,14 +10,26 @@ import Modal, { ModalBody, ModalFooter } from '@/shared/components/common/Modal'
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { createResourceDataSource } from '@/shared/services/dataSource'
-// TODO: pass { api: inventoryApi } once the endpoint exists
-const stockTransactionsSource = createResourceDataSource('inventory/stock-in-out')
+import { useAuth } from '@/shared/contexts/AuthContext'
+import { createResourceDataSource, fetchData } from '@/shared/services/dataSource'
+import { mockStockLevels } from '@/shared/mocks/inventory/stock-levels'
+import { stockTransactionsApi, stockProductsApi, describeError } from '@/shared/api/inventoryMappers'
+
+// In API mode the rows are the backend's stock transactions and recording a
+// movement posts to the stock-in / stock-out endpoints (see stockTransactionsApi).
+const stockTransactionsSource = createResourceDataSource('inventory/stock-in-out', {
+  api: stockTransactionsApi
+})
 
 const EMPTY_FORM = {
   type: 'stock_in',
   product_id: '',
   quantity: 1,
+  unit_cost: '',
+  batch_choice: '',
+  batch_number: '',
+  manufacture_date: '',
+  expiry_date: '',
   reference_number: '',
   reason: '',
   notes: ''
@@ -42,6 +54,30 @@ const stockOutReasons = [
   'Other'
 ]
 
+// Local calendar date as yyyy-mm-dd (what <input type="date"> works with)
+const toDateInput = (date) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+  return local.toISOString().slice(0, 10)
+}
+const todayInput = () => toDateInput(new Date())
+const tomorrowInput = () => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return toDateInput(d)
+}
+
+// Product list for the form when running on mock data
+const mockProductOptions = () =>
+  mockStockLevels.map(item => ({
+    id: item.id,
+    name: item.product_name,
+    sku: item.product_sku,
+    unit_price: item.current_stock > 0 ? Math.round(item.total_value / item.current_stock) : 0,
+    quantity: item.current_stock,
+    available_quantity: item.available_stock,
+    batches: []
+  }))
+
 export default function StockInOutPage() {
   const [data, setData] = useState({
     transactions: [],
@@ -55,8 +91,14 @@ export default function StockInOutPage() {
   const [activeTab, setActiveTab] = useState('stock_in')
   const [transactionForm, setTransactionForm] = useState(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  // Products (with their batches) for the form; loaded the first time the modal opens
+  const [products, setProducts] = useState(null)
+  const [productsLoading, setProductsLoading] = useState(false)
 
   const { addNotification } = useNotifications()
+  const { user } = useAuth()
   const highlightRowId = useHighlightParam()
 
   useEffect(() => {
@@ -73,16 +115,35 @@ export default function StockInOutPage() {
       addNotification({
         type: 'error',
         title: 'Loading Error',
-        message: 'Failed to load stock transactions'
+        message: describeError(error, 'Failed to load stock transactions')
       })
       setData(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  const loadProducts = async () => {
+    try {
+      setProductsLoading(true)
+      const result = await fetchData(mockProductOptions, () => stockProductsApi.list())
+      setProducts(result)
+    } catch (error) {
+      console.error('Error loading products:', error)
+      addNotification({
+        type: 'error',
+        title: 'Loading Error',
+        message: describeError(error, 'Failed to load products')
+      })
+    } finally {
+      setProductsLoading(false)
     }
   }
 
   const openModal = (type = 'stock_in') => {
     setActiveTab(type)
     setTransactionForm({ ...EMPTY_FORM, type })
+    setFormError('')
     setModalOpen(true)
+    if (products === null && !productsLoading) loadProducts()
   }
 
   const closeModal = () => {
@@ -92,48 +153,80 @@ export default function StockInOutPage() {
 
   const handleTabChange = (type) => {
     setActiveTab(type)
+    setFormError('')
     setTransactionForm(prev => ({ ...prev, type, reason: '' }))
+  }
+
+  const selectedProduct = (products || []).find(p => String(p.id) === String(transactionForm.product_id)) || null
+
+  const handleProductChange = (productId) => {
+    const product = (products || []).find(p => String(p.id) === String(productId))
+    setTransactionForm(prev => ({
+      ...prev,
+      product_id: productId,
+      // Receipts default to the product's standard price and its earliest-expiring batch
+      unit_cost: product ? product.unit_price : '',
+      batch_choice: product ? (product.batches[0] ? String(product.batches[0].id) : 'new') : ''
+    }))
   }
 
   const handleSubmitTransaction = async (e) => {
     e.preventDefault()
     setSubmitting(true)
+    setFormError('')
 
     try {
-      const transactionNumber = `TXN-${transactionForm.type === 'stock_in' ? 'IN' : 'OUT'}-${String(data.transactions.length + 1).padStart(3, '0')}`
-      const newTransaction = await stockTransactionsSource.create({
-        transaction_number: transactionNumber,
-        type: transactionForm.type,
-        product_name: 'Sample Product',
-        product_sku: 'SAMPLE-SKU',
-        quantity: transactionForm.quantity,
-        reference_number: transactionForm.reference_number,
-        reason: transactionForm.reason,
-        batch_number: 'AUTO-BATCH',
-        performed_by: 'Current User',
-        notes: transactionForm.notes,
-        created_at: new Date().toISOString()
-      })
+      const isMock = stockTransactionsSource.isUsingMocks
+
+      // The mock store holds display rows; the API takes the form itself.
+      let payload = transactionForm
+      if (isMock) {
+        const transactionNumber = `TXN-${transactionForm.type === 'stock_in' ? 'IN' : 'OUT'}-${String(data.transactions.length + 1).padStart(3, '0')}`
+        payload = {
+          transaction_number: transactionNumber,
+          type: transactionForm.type,
+          product_id: selectedProduct?.id,
+          product_name: selectedProduct?.name || 'Unknown Product',
+          product_sku: selectedProduct?.sku || '',
+          quantity: transactionForm.quantity,
+          reference_number: transactionForm.reference_number,
+          reason: transactionForm.reason,
+          batch_number: transactionForm.batch_choice === 'new' ? transactionForm.batch_number : 'AUTO-BATCH',
+          performed_by: user?.name || 'Current User',
+          notes: transactionForm.notes,
+          created_at: new Date().toISOString()
+        }
+      }
+
+      const result = await stockTransactionsSource.create(payload)
+      const created = [].concat(result)
 
       setData(prev => ({
         ...prev,
-        transactions: [newTransaction, ...prev.transactions]
+        transactions: [...created.slice().reverse(), ...prev.transactions]
       }))
 
+      const label = transactionForm.type === 'stock_in' ? 'Stock In' : 'Stock Out'
       addNotification({
         type: 'success',
         title: 'Transaction Recorded',
-        message: `${transactionForm.type === 'stock_in' ? 'Stock In' : 'Stock Out'} transaction ${newTransaction.transaction_number} recorded successfully`
+        message: created.length > 1
+          ? `${label} recorded across ${created.length} batches (${created.map(t => t.transaction_number).join(', ')})`
+          : `${label} transaction ${created[0]?.transaction_number} recorded successfully`
       })
 
       setModalOpen(false)
       setTransactionForm(EMPTY_FORM)
+      // Stock on hand just changed, so the product/batch picker must be re-read
+      if (!isMock) setProducts(null)
     } catch (error) {
       console.error('Error submitting transaction:', error)
+      const message = describeError(error, 'Failed to record stock transaction')
+      setFormError(message)
       addNotification({
         type: 'error',
         title: 'Submission Error',
-        message: 'Failed to record stock transaction'
+        message
       })
     } finally {
       setSubmitting(false)
@@ -209,15 +302,18 @@ export default function StockInOutPage() {
 
   const typeOptions = ['all', 'stock_in', 'stock_out']
   const filteredTransactions = data.transactions.filter(txn => {
-    const matchesSearch = txn.transaction_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.product_sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         txn.reference_number.toLowerCase().includes(searchTerm.toLowerCase())
+    const term = searchTerm.toLowerCase()
+    const matchesSearch = (txn.transaction_number || '').toLowerCase().includes(term) ||
+                         (txn.product_name || '').toLowerCase().includes(term) ||
+                         (txn.product_sku || '').toLowerCase().includes(term) ||
+                         (txn.reference_number || '').toLowerCase().includes(term)
     const matchesType = typeFilter === 'all' || txn.type === typeFilter
     return matchesSearch && matchesType
   })
 
   const currentReasons = activeTab === 'stock_in' ? stockInReasons : stockOutReasons
+  const isStockIn = activeTab === 'stock_in'
+  const creatingBatch = isStockIn && transactionForm.batch_choice === 'new'
 
   if (data.loading) {
     return (
@@ -376,23 +472,101 @@ export default function StockInOutPage() {
             </div>
 
             <div className="space-y-4">
+              {formError && (
+                <p className="form-error" role="alert">{formError}</p>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input
+                <Select
                   label="Product / SKU"
                   value={transactionForm.product_id}
-                  onChange={(e) => setTransactionForm(prev => ({ ...prev, product_id: e.target.value }))}
-                  placeholder="Enter product SKU or name"
+                  onChange={(e) => handleProductChange(e.target.value)}
+                  disabled={productsLoading}
+                  helpText={
+                    productsLoading
+                      ? 'Loading products...'
+                      : selectedProduct
+                        ? `On hand: ${selectedProduct.quantity} | Available: ${selectedProduct.available_quantity}`
+                        : undefined
+                  }
                   required
-                />
+                >
+                  <option value="">Select product</option>
+                  {(products || []).map(product => (
+                    <option key={product.id} value={product.id}>
+                      {product.sku ? `${product.sku} - ${product.name}` : product.name}
+                    </option>
+                  ))}
+                </Select>
                 <Input
                   label="Quantity"
                   type="number"
                   min="1"
+                  step="1"
                   value={transactionForm.quantity}
                   onChange={(e) => setTransactionForm(prev => ({ ...prev, quantity: Number(e.target.value) }))}
                   required
                 />
               </div>
+
+              {isStockIn && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input
+                      label="Unit Cost (₱)"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={transactionForm.unit_cost}
+                      onChange={(e) => setTransactionForm(prev => ({ ...prev, unit_cost: e.target.value }))}
+                      required
+                    />
+                    <Select
+                      label="Batch"
+                      value={transactionForm.batch_choice}
+                      onChange={(e) => setTransactionForm(prev => ({ ...prev, batch_choice: e.target.value }))}
+                      disabled={!selectedProduct}
+                      required
+                    >
+                      <option value="">Select batch</option>
+                      {(selectedProduct?.batches || []).map(batch => (
+                        <option key={batch.id} value={batch.id}>
+                          {batch.batch_number}
+                          {batch.expiry_date ? ` - exp ${batch.expiry_date}` : ''} ({batch.quantity} on hand)
+                        </option>
+                      ))}
+                      <option value="new">+ New batch</option>
+                    </Select>
+                  </div>
+
+                  {creatingBatch && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <Input
+                        label="Batch Number"
+                        value={transactionForm.batch_number}
+                        onChange={(e) => setTransactionForm(prev => ({ ...prev, batch_number: e.target.value }))}
+                        placeholder="e.g. BTH-001"
+                        required
+                      />
+                      <Input
+                        label="Manufacture Date"
+                        type="date"
+                        max={todayInput()}
+                        value={transactionForm.manufacture_date}
+                        onChange={(e) => setTransactionForm(prev => ({ ...prev, manufacture_date: e.target.value }))}
+                        required
+                      />
+                      <Input
+                        label="Expiry Date (Optional)"
+                        type="date"
+                        min={tomorrowInput()}
+                        value={transactionForm.expiry_date}
+                        onChange={(e) => setTransactionForm(prev => ({ ...prev, expiry_date: e.target.value }))}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input

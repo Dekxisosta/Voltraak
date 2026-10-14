@@ -3,6 +3,7 @@
  * Shape must match the fields read by KPIDashboardPage.jsx:
  * metrics: { totalSKUs, stockValue, lowStockItems, shrinkageRate,
  *            inventoryAccuracy, turnoverRate, serviceLevel, fefoCompliance }
+ * changes: { newSkusThisMonth, stockValueChangePct }  (optional; hidden when absent/null)
  * trends.stockValue: [{ period, value }]
  * categoryBreakdown: [{ category, value, color }]
  * alerts: [{ id, type, title, message }]
@@ -24,6 +25,10 @@ export const mockKPIData = {
     turnoverRate: 8.2,
     serviceLevel: 96.5,
     fefoCompliance: 91.0,
+  },
+  changes: {
+    newSkusThisMonth: 5,
+    stockValueChangePct: 3.5,
   },
   trends: {
     stockValue: [

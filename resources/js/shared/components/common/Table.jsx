@@ -14,9 +14,9 @@
 
 import React from 'react'
 import { ChevronUp, ChevronDown, ArrowUpDown, List, LayoutGrid } from 'lucide-react'
-import { cn } from '@/utils'
-import { useBreakpoint } from '@/hooks/useBreakpoint'
-import { useLayoutPreference } from '@/contexts/LayoutPreferenceContext'
+import { cn } from '@/shared/utils'
+import { useBreakpoint } from '@/shared/hooks/useBreakpoint'
+import { useLayoutPreference } from '@/shared/contexts/LayoutPreferenceContext'
 import LoadingSpinner from './LoadingSpinner'
 
 const VIEW_STORAGE_PREFIX = 'voltraak:table-view:'

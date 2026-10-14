@@ -22,9 +22,10 @@ import {
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { fetchData } from '@/shared/services/dataSource'
+import { useAuth } from '@/shared/contexts/AuthContext'
+import { fetchData, mutateData } from '@/shared/services/dataSource'
 import { mockUsers } from '@/shared/mocks/manager/users'
-// TODO: import { usersApi } from '@/api'
+import { usersApi, fetchAllUsers, extractUser, normalizeUser } from '@/shared/api/users'
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrator' },
@@ -33,6 +34,23 @@ const ROLE_OPTIONS = [
   { value: 'warehouse', label: 'Warehouse Staff' },
 ]
 
+// Mirrors UpdateUserRequest's name rule so the user gets feedback before a round-trip.
+const NAME_RULE = /^[a-zA-Z\s\-'.]+$/
+
+// Backend validation errors arrive as { field: [messages] }; the form wants { field: 'message' }.
+const firstErrors = (errors = {}) =>
+  Object.fromEntries(
+    Object.entries(errors).map(([field, msgs]) => [field, Array.isArray(msgs) ? msgs[0] : String(msgs)])
+  )
+
+// Roles a managing user may assign / edit. Mirrors the backend rules
+// (UpdateUserRequest + User::canManageRole): admins manage every role,
+// managers manage warehouse and inventory staff only.
+const ASSIGNABLE_ROLES = {
+  admin: ['admin', 'manager', 'inventory_staff', 'warehouse'],
+  manager: ['inventory_staff', 'warehouse'],
+}
+
 const emptyForm = { name: '', email: '', role: 'warehouse' }
 
 export default function UserManagementPage() {
@@ -40,6 +58,7 @@ export default function UserManagementPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const { addNotification } = useNotifications()
+  const { user: currentUser } = useAuth()
   const highlightRowId = useHighlightParam()
 
   const [formOpen, setFormOpen] = useState(false)
@@ -55,16 +74,33 @@ export default function UserManagementPage() {
   const loadUsers = async () => {
     try {
       setData(prev => ({ ...prev, loading: true }))
-      const result = await fetchData(
+      // fetchAllUsers walks every page of the paginated { data: { items, pagination } }
+      // envelope and maps last_login_at -> last_login for the table.
+      const users = await fetchData(
         () => mockUsers,
-        () => null // TODO: usersApi.getUsers()
+        () => fetchAllUsers()
       )
-      setData({ users: result, loading: false })
+      setData({ users: Array.isArray(users) ? users.map(normalizeUser) : [], loading: false })
     } catch {
       addNotification({ type: 'error', title: 'Error', message: 'Failed to load users' })
       setData(prev => ({ ...prev, loading: false }))
     }
   }
+
+  const isSelf = (user) => user && currentUser && String(user.id) === String(currentUser.id)
+
+  // Whether the signed-in user may edit this row. The backend rejects edits of
+  // roles the actor cannot manage, so hide the action rather than 403 on save.
+  // A user may always edit their own name/email.
+  const canEditUser = (user) => {
+    if (isSelf(user)) return true
+    const allowed = ASSIGNABLE_ROLES[currentUser?.role] || []
+    return allowed.includes(user.role)
+  }
+
+  const roleOptions = ROLE_OPTIONS.filter(r =>
+    (ASSIGNABLE_ROLES[currentUser?.role] || []).includes(r.value) || r.value === editingUser?.role
+  )
 
   const openEditModal = (user) => {
     setEditingUser(user)
@@ -81,12 +117,13 @@ export default function UserManagementPage() {
   const validateForm = () => {
     const errors = {}
     if (!form.name.trim()) errors.name = 'Name is required'
+    else if (!NAME_RULE.test(form.name.trim())) errors.name = 'Name can only contain letters, spaces, hyphens, apostrophes and periods'
     if (!form.email.trim()) {
       errors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       errors.email = 'Enter a valid email address'
     } else {
-      const duplicate = data.users.find(
+      const duplicate = (data.users || []).find(
         u => u.email.toLowerCase() === form.email.trim().toLowerCase() && u.id !== editingUser?.id
       )
       if (duplicate) errors.email = 'A user with this email already exists'
@@ -101,16 +138,27 @@ export default function UserManagementPage() {
     setSaving(true)
     try {
       const roleLabel = ROLE_OPTIONS.find(r => r.value === form.role)?.label || form.role
+      const name = form.name.trim()
+      const email = form.email.trim().toLowerCase()
+
+      // The backend ignores role on self-edits (and rejects unlisted keys), so only send name/email.
+      const payload = isSelf(editingUser) ? { name, email } : { name, email, role: form.role }
+
+      const updated = await mutateData(
+        () => ({ ...editingUser, ...payload, role_display: roleLabel }),
+        async () => normalizeUser(extractUser(await usersApi.updateUser(editingUser.id, payload)))
+      )
       setData(prev => ({
         ...prev,
-        users: prev.users.map(u =>
-          u.id === editingUser.id
-            ? { ...u, name: form.name.trim(), email: form.email.trim(), role: form.role, role_display: roleLabel }
-            : u
-        ),
+        users: prev.users.map(u => (u.id === editingUser.id ? { ...u, ...updated } : u)),
       }))
-      addNotification({ type: 'success', title: 'User Updated', message: `${form.name} has been updated` })
+      addNotification({ type: 'success', title: 'User Updated', message: `${name} has been updated` })
       setFormOpen(false)
+    } catch (error) {
+      if (error?.errors) {
+        setFormErrors(firstErrors(error.errors))
+      }
+      addNotification({ type: 'error', title: 'Update Failed', message: error?.message || 'Failed to update user' })
     } finally {
       setSaving(false)
     }
@@ -144,19 +192,20 @@ export default function UserManagementPage() {
     {
       key: 'actions',
       label: 'Actions',
-      render: (_, row) => (
-        <Button size="sm" variant="secondary" icon={Edit} onClick={() => openEditModal(row)}>
-          Edit
-        </Button>
-      ),
+      render: (_, row) =>
+        canEditUser(row) ? (
+          <Button size="sm" variant="secondary" icon={Edit} onClick={() => openEditModal(row)}>
+            Edit
+          </Button>
+        ) : null,
     },
   ]
 
-  const filteredUsers = data.users
+  const filteredUsers = (data.users || [])
     .filter(u => roleFilter === 'all' || u.role === roleFilter)
     .filter(u =>
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     )
 
   if (data.loading) {
@@ -179,7 +228,7 @@ export default function UserManagementPage() {
         <Card>
           <Card.Body>
             <div className="text-center">
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{data.users.length}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-gray-100">{(data.users || []).length}</p>
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Users</p>
             </div>
           </Card.Body>
@@ -188,7 +237,7 @@ export default function UserManagementPage() {
           <Card.Body>
             <div className="text-center">
               <p className="text-3xl font-bold text-gray-600 dark:text-gray-400">
-                {data.users.filter(u => u.is_active).length}
+                {(data.users || []).filter(u => u.is_active).length}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">Active</p>
             </div>
@@ -198,7 +247,7 @@ export default function UserManagementPage() {
           <Card.Body>
             <div className="text-center">
               <p className="text-3xl font-bold text-gray-600 dark:text-gray-400">
-                {data.users.filter(u => u.role === 'manager').length}
+                {(data.users || []).filter(u => u.role === 'manager').length}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-400">Managers</p>
             </div>
@@ -267,7 +316,8 @@ export default function UserManagementPage() {
                 required
                 value={form.role}
                 onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))}
-                options={ROLE_OPTIONS}
+                options={roleOptions}
+                disabled={isSelf(editingUser)}
               />
             </div>
           </ModalBody>

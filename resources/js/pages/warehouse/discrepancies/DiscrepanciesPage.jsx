@@ -9,12 +9,10 @@ import { Card, Table, StatusBadge, Button, Input, Modal, SearchBar, LoadingSpinn
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { createResourceDataSource } from '@/shared/services/dataSource'
-// TODO: pass { api: inventoryApi } once the endpoint exists
-const discrepanciesSource = createResourceDataSource('warehouse/discrepancies')
-
-
-
+import { createResourceDataSource, dataSourceMode } from '@/shared/services/dataSource'
+import { discrepancyApi, describeError } from '@/shared/api/inventoryMappers'
+// In API mode the rows are the backend's discrepancy reports (see discrepancyApi)
+const discrepanciesSource = createResourceDataSource('inventory/discrepancies', { api: discrepancyApi })
 
 export default function DiscrepanciesPage() {
   const [data, setData] = useState({
@@ -52,7 +50,7 @@ export default function DiscrepanciesPage() {
       addNotification({
         type: 'error',
         title: 'Loading Error',
-        message: 'Failed to load discrepancy reports'
+        message: describeError(error, 'Failed to load discrepancy reports')
       })
       setData(prev => ({ ...prev, loading: false }))
     }
@@ -63,15 +61,19 @@ export default function DiscrepanciesPage() {
     setSubmitting(true)
 
     try {
-      const reportNumber = `DISC-2024-${String(data.discrepancies.length + 1).padStart(3, '0')}`
+      // The backend assigns the report number; only mock mode numbers it here.
+      const reportNumber = dataSourceMode === 'api'
+        ? undefined
+        : `DISC-2024-${String(data.discrepancies.length + 1).padStart(3, '0')}`
+      const expected = newDiscrepancyForm.expected_quantity
       const newDiscrepancy = await discrepanciesSource.create({
         report_number: reportNumber,
-        product_name: 'Sample Product',
-        product_sku: 'SAMPLE-SKU',
+        product_name: newDiscrepancyForm.product_id,
+        product_sku: newDiscrepancyForm.product_id,
         expected_quantity: newDiscrepancyForm.expected_quantity,
         actual_quantity: newDiscrepancyForm.actual_quantity,
         variance: newDiscrepancyForm.actual_quantity - newDiscrepancyForm.expected_quantity,
-        variance_percentage: ((newDiscrepancyForm.actual_quantity - newDiscrepancyForm.expected_quantity) / newDiscrepancyForm.expected_quantity) * 100,
+        variance_percentage: expected > 0 ? ((newDiscrepancyForm.actual_quantity - expected) / expected) * 100 : 0,
         discrepancy_type: newDiscrepancyForm.discrepancy_type,
         location: newDiscrepancyForm.location,
         reported_by: 'Current User',
@@ -79,7 +81,12 @@ export default function DiscrepanciesPage() {
         priority: Math.abs(newDiscrepancyForm.actual_quantity - newDiscrepancyForm.expected_quantity) > 2 ? 'high' : 'medium',
         notes: newDiscrepancyForm.notes,
         created_at: new Date().toISOString(),
-        resolved_at: null
+        resolved_at: null,
+        requires_approval: Math.abs(newDiscrepancyForm.actual_quantity - newDiscrepancyForm.expected_quantity) / (newDiscrepancyForm.expected_quantity || 1) * 100 > 5,
+        approval_status: null,
+        write_off_amount: null,
+        approved_by: null,
+        approved_at: null
       })
 
       setData(prev => ({
@@ -107,7 +114,7 @@ export default function DiscrepanciesPage() {
       addNotification({
         type: 'error',
         title: 'Submission Error',
-        message: 'Failed to create discrepancy report'
+        message: describeError(error, 'Failed to create discrepancy report')
       })
     } finally {
       setSubmitting(false)
@@ -129,7 +136,7 @@ export default function DiscrepanciesPage() {
         message: `${discrepancy.report_number} moved to ${newStatus}`
       })
     } catch (error) {
-      addNotification({ type: 'error', title: 'Update Error', message: 'Failed to update discrepancy status' })
+      addNotification({ type: 'error', title: 'Update Error', message: describeError(error, 'Failed to update discrepancy status') })
     }
   }
 

@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from '@inertiajs/react'
 import { ArrowLeft, Mail } from 'lucide-react'
 import { authApi } from '@/shared/api/auth'
 import { useFormNotifications } from '@/shared/hooks/useNotifications'

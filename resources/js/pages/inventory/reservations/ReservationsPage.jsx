@@ -9,9 +9,12 @@ import { Card, Table, StatusBadge, Button, SearchBar, LoadingSpinner, ConfirmMod
 import { PageHeader } from '@/shared/components/layout'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
-import { fetchData } from '@/shared/services/dataSource'
-import { mockReservations } from '@/shared/mocks/inventory/reservations'
-// TODO: import { inventoryApi } from '@/api'
+import { createResourceDataSource } from '@/shared/services/dataSource'
+import { reservationApi, describeError } from '@/shared/api/inventoryMappers'
+
+// In API mode the rows are the backend's reservations (see reservationApi)
+const reservationSource = createResourceDataSource('inventory/reservations', { api: reservationApi })
+const isMock = reservationSource.isUsingMocks
 
 export default function ReservationsPage() {
   const [data, setData] = useState({ reservations: [], loading: true })
@@ -34,32 +37,49 @@ export default function ReservationsPage() {
   const loadReservations = async () => {
     try {
       setData(prev => ({ ...prev, loading: true }))
-      const result = await fetchData(
-        () => mockReservations,
-        () => null // TODO: inventoryApi.getReservations()
-      )
+      const result = await reservationSource.list()
       setData({ reservations: result, loading: false })
     } catch (error) {
-      addNotification({ type: 'error', title: 'Error', message: 'Failed to load reservations' })
+      addNotification({ type: 'error', title: 'Error', message: describeError(error, 'Failed to load reservations') })
       setData(prev => ({ ...prev, loading: false }))
     }
+  }
+
+  // The backend fulfils a whole customer order at once, which also changes
+  // sibling reservations, so re-read the list after a real mutation.
+  const refreshReservations = async () => {
+    const result = await reservationSource.list()
+    setData({ reservations: result, loading: false })
   }
 
   const handleConfirmFulfill = async () => {
     if (!fulfillTarget) return
     setFulfilling(true)
     try {
-      setData(prev => ({
-        ...prev,
-        reservations: prev.reservations.map(r =>
-          r.id === fulfillTarget.id ? { ...r, status: 'fulfilled' } : r
-        )
-      }))
+      await reservationSource.update(fulfillTarget.id, {
+        status: 'fulfilled',
+        customer_order_id: fulfillTarget.customer_order_id,
+      })
+      if (isMock) {
+        setData(prev => ({
+          ...prev,
+          reservations: prev.reservations.map(r =>
+            r.id === fulfillTarget.id ? { ...r, status: 'fulfilled' } : r
+          )
+        }))
+      } else {
+        await refreshReservations()
+      }
       addNotification({
         type: 'success',
         title: 'Fulfilled',
-        message: `Reservation ${fulfillTarget.order_number} marked as fulfilled`
+        message: isMock
+          ? `Reservation ${fulfillTarget.order_number} marked as fulfilled`
+          : `Order ${fulfillTarget.order_number} fulfilled and stock issued`
       })
+      setFulfillTarget(null)
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: describeError(error, 'Failed to fulfill reservation') })
       setFulfillTarget(null)
     } finally {
       setFulfilling(false)
@@ -70,22 +90,32 @@ export default function ReservationsPage() {
     if (!cancelTarget) return
     setCancelling(true)
     try {
-      setData(prev => ({
-        ...prev,
-        reservations: prev.reservations.map(r =>
-          r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r
-        )
-      }))
+      await reservationSource.update(cancelTarget.id, { status: 'cancelled' })
+      if (isMock) {
+        setData(prev => ({
+          ...prev,
+          reservations: prev.reservations.map(r =>
+            r.id === cancelTarget.id ? { ...r, status: 'cancelled' } : r
+          )
+        }))
+      } else {
+        await refreshReservations()
+      }
       addNotification({
         type: 'warning',
         title: 'Cancelled',
         message: `Reservation ${cancelTarget.order_number} cancelled, stock released`
       })
       setCancelTarget(null)
+    } catch (error) {
+      addNotification({ type: 'error', title: 'Error', message: describeError(error, 'Failed to cancel reservation') })
+      setCancelTarget(null)
     } finally {
       setCancelling(false)
     }
   }
+
+  const formatDate = (val) => (val ? new Date(val).toLocaleDateString() : '—')
 
   const getStatusBadge = (status) => {
     const map = {
@@ -103,29 +133,42 @@ export default function ReservationsPage() {
     { key: 'customer_name', label: 'Customer' },
     { key: 'product_name', label: 'Product' },
     { key: 'quantity', label: 'Qty' },
-    { key: 'reserved_at', label: 'Reserved', render: (val) => new Date(val).toLocaleDateString() },
-    { key: 'expires_at', label: 'Expires', render: (val) => new Date(val).toLocaleDateString() },
+    { key: 'reserved_at', label: 'Reserved', render: (val) => formatDate(val) },
+    { key: 'expires_at', label: 'Expires', render: (val) => formatDate(val) },
     { key: 'status', label: 'Status', render: (val) => getStatusBadge(val) },
     {
       key: 'actions',
       label: 'Actions',
-      render: (_, row) => row.status === 'active' ? (
-        <div className="flex gap-2">
-          <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => setFulfillTarget(row)}>
-            Fulfill
-          </Button>
-          <Button size="sm" variant="danger" icon={XCircle} onClick={() => setCancelTarget(row)}>
-            Cancel
-          </Button>
-        </div>
-      ) : null
+      render: (_, row) => {
+        // Mock rows carry no capability flags: active rows allow both actions.
+        // API rows say what the backend will accept: only an allocated line on
+        // a confirmed order can be fulfilled, and any still-held line (even an
+        // expired one) can be released.
+        const canFulfill = row.status === 'active' && (isMock || row.can_fulfill)
+        const canCancel = isMock ? row.status === 'active' : row.can_cancel
+        if (!canFulfill && !canCancel) return null
+        return (
+          <div className="flex gap-2">
+            {canFulfill && (
+              <Button size="sm" variant="primary" icon={CheckCircle} onClick={() => setFulfillTarget(row)}>
+                Fulfill
+              </Button>
+            )}
+            {canCancel && (
+              <Button size="sm" variant="danger" icon={XCircle} onClick={() => setCancelTarget(row)}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        )
+      }
     },
   ]
 
   const filteredReservations = data.reservations.filter(r =>
-    r.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+    (r.order_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.product_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   if (data.loading) {
@@ -188,7 +231,9 @@ export default function ReservationsPage() {
         onConfirm={handleConfirmFulfill}
         title="Fulfill Reservation"
         message={fulfillTarget
-          ? `Mark reservation ${fulfillTarget.order_number} for ${fulfillTarget.customer_name} (${fulfillTarget.quantity}× ${fulfillTarget.product_name}) as fulfilled? This will release it from active stock reservations.`
+          ? (isMock
+            ? `Mark reservation ${fulfillTarget.order_number} for ${fulfillTarget.customer_name} (${fulfillTarget.quantity}× ${fulfillTarget.product_name}) as fulfilled? This will release it from active stock reservations.`
+            : `Fulfill order ${fulfillTarget.order_number} for ${fulfillTarget.customer_name}? Stock will be issued for every allocated reservation on this order, including ${fulfillTarget.quantity}× ${fulfillTarget.product_name}.`)
           : ''}
         confirmText="Fulfill"
         cancelText="Cancel"

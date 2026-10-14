@@ -7,9 +7,9 @@
 
 import { useState, useRef } from 'react'
 import { Menu, Search, User, LogOut, Settings, Sun, Moon, Bell } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/shared/contexts/AuthContext'
 import { useTheme } from '@/shared/contexts/ThemeContext'
-import { ProfileModal, PreferencesModal, GlobalSearchBar } from '@/components/common'
+import { ProfileModal, PreferencesModal, GlobalSearchBar } from '@/shared/components/common'
 import { useNotifications } from '@/shared/hooks/useNotifications'
 import NotificationPanel from '@/shared/components/common/NotificationPanel'
 import LiveClock from './LiveClock'

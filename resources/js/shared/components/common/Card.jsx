@@ -2,7 +2,7 @@
  * Reusable card component with consistent styling
  */
 
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 const paddingStyles = {
   none: '',

@@ -6,7 +6,7 @@
  */
 
 import { Sun, CloudSun, Cloud, CloudFog, CloudRain, CloudSnow, CloudLightning } from 'lucide-react'
-import { useWeather } from '@/hooks/useWeather'
+import { useWeather } from '@/shared/hooks/useWeather'
 
 const CONDITION_ICON = {
   clear: Sun,

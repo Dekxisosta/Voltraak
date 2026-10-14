@@ -4,7 +4,7 @@
 
 import { ChevronRight, Home } from 'lucide-react'
 import { Link } from '@inertiajs/react'
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 export default function PageHeader({
   title,

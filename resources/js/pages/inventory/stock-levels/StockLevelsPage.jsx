@@ -11,8 +11,21 @@ import { useNotifications } from '@/shared/hooks/useNotifications'
 import { useHighlightParam } from '@/shared/hooks/useHighlightParam'
 import { fetchData } from '@/shared/services/dataSource'
 import { mockStockLevels } from '@/shared/mocks/inventory/stock-levels'
-// TODO: import { inventoryApi } from '@/api'
+import { stockLevelsApi, describeError } from '@/shared/api/inventoryMappers'
 
+
+const formatPeso = (amount) => {
+  const value = Number(amount) || 0
+  return value >= 1000000
+    ? `₱${(value / 1000000).toFixed(1)}M`
+    : `₱${value.toLocaleString()}`
+}
+
+const formatDate = (value) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString()
+}
 
 export default function StockLevelsPage() {
   const [data, setData] = useState({
@@ -35,7 +48,7 @@ export default function StockLevelsPage() {
       
       const result = await fetchData(
         () => mockStockLevels,
-        () => null // TODO: inventoryApi.getProducts()
+        () => stockLevelsApi.list()
       )
       setData({ stockLevels: result, loading: false })
     } catch (error) {
@@ -43,7 +56,7 @@ export default function StockLevelsPage() {
       addNotification({
         type: 'error',
         title: 'Loading Error',
-        message: 'Failed to load stock levels'
+        message: describeError(error, 'Failed to load stock levels')
       })
       setData(prev => ({ ...prev, loading: false }))
     }
@@ -65,7 +78,7 @@ export default function StockLevelsPage() {
   }
 
   const getStockBar = (current, minimum, reorder, maximum) => {
-    const percentage = (current / maximum) * 100
+    const percentage = maximum > 0 ? (current / maximum) * 100 : 0
     let barColor = 'bg-green-500'
     
     if (current <= 0) {
@@ -155,7 +168,7 @@ export default function StockLevelsPage() {
     {
       key: 'total_value',
       label: 'Value',
-      render: (value) => `₱${value.toLocaleString()}`
+      render: (value) => `₱${(Number(value) || 0).toLocaleString()}`
     },
     {
       key: 'turnover_rate',
@@ -170,7 +183,7 @@ export default function StockLevelsPage() {
     {
       key: 'last_restock_date',
       label: 'Last Restock',
-      render: (value) => new Date(value).toLocaleDateString()
+      render: formatDate
     }
   ]
 
@@ -232,7 +245,7 @@ export default function StockLevelsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  ₱{(totalValue / 1000000).toFixed(1)}M
+                  {formatPeso(totalValue)}
                 </p>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Stock Value</p>
               </div>

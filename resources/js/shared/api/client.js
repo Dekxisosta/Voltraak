@@ -12,24 +12,45 @@ class ApiError extends Error {
 }
 
 class ApiClient {
-  constructor(baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api') {
-    this.baseURL = baseURL.replace(/\/+$/, '') // Remove trailing slash
+  constructor() {
     this.defaultHeaders = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     }
   }
 
-  getAuthToken() {
-    return localStorage.getItem('auth_token')
+  getCSRFToken() {
+    // Extract XSRF-TOKEN from cookie and decode
+    const cookies = document.cookie.split(';')
+    const xsrfCookie = cookies.find(cookie => cookie.trim().startsWith('XSRF-TOKEN='))
+    if (xsrfCookie) {
+      const token = xsrfCookie.split('=')[1]
+      
+      // Validate token format before decoding
+      if (!token) {
+        return null
+      }
+      
+      try {
+        return decodeURIComponent(token)
+      } catch (error) {
+        // Handle malformed cookie values gracefully
+        console.warn('Failed to decode CSRF token from cookie:', error)
+        return null
+      }
+    }
+    return null
   }
 
-  getHeaders(config) {
+  getHeaders(config, method = 'GET') {
     const headers = { ...this.defaultHeaders, ...config?.headers }
     
-    const token = this.getAuthToken()
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
+    // Add CSRF token for mutating requests
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
+      const csrfToken = this.getCSRFToken()
+      if (csrfToken) {
+        headers['X-XSRF-TOKEN'] = csrfToken
+      }
     }
 
     return headers
@@ -47,22 +68,52 @@ class ApiClient {
     }
 
     if (!response.ok) {
+      // The backend uses two error envelopes:
+      //   Laravel/controller:  { message, errors }
+      //   Core exception handler (FormRequest validation, 403/404 ...):
+      //                        { error: { code, message, context: { errors } } }
+      // Read both so messages and per-field validation errors always surface.
+      const body = data && typeof data === 'object' ? data : {}
+      const message = body.message || body.error?.message
+      const rawErrors = body.errors ?? body.error?.context?.errors
+      const errors =
+        rawErrors && typeof rawErrors === 'object' && Object.keys(rawErrors).length > 0
+          ? rawErrors
+          : undefined
+
       // Handle authentication errors
       if (response.status === 401) {
-        localStorage.removeItem('auth_token')
         window.location.href = '/login'
         throw new ApiError(401, 'Authentication required')
       }
 
       // Handle validation errors
-      if (response.status === 422 && data.errors) {
-        throw new ApiError(response.status, data.message || 'Validation failed', data.errors)
+      if (response.status === 422 && errors) {
+        throw new ApiError(response.status, message || 'Validation failed', errors)
+      }
+
+      // Handle server errors
+      if (response.status >= 500) {
+        // Show toast notification for server errors
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('notification', {
+            detail: {
+              type: 'error',
+              title: 'Server Error',
+              message: message || `HTTP ${response.status}: ${response.statusText}`
+            }
+          }))
+        }
+        throw new ApiError(
+          response.status,
+          message || `HTTP ${response.status}: ${response.statusText}`
+        )
       }
 
       // Handle other errors
       throw new ApiError(
         response.status,
-        data.message || `HTTP ${response.status}: ${response.statusText}`
+        message || `HTTP ${response.status}: ${response.statusText}`
       )
     }
 
@@ -70,7 +121,8 @@ class ApiClient {
   }
 
   buildUrl(endpoint, params) {
-    const url = new URL(`${this.baseURL}${endpoint}`)
+    // Use relative URLs for all API calls
+    const url = new URL(endpoint, window.location.origin)
     
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -88,7 +140,7 @@ class ApiClient {
     
     const response = await fetch(url, {
       method: 'GET',
-      headers: this.getHeaders(config),
+      headers: this.getHeaders(config, 'GET'),
       signal: config?.timeout ? AbortSignal.timeout(config.timeout) : undefined,
     })
 
@@ -100,7 +152,7 @@ class ApiClient {
     
     const response = await fetch(url, {
       method: 'POST',
-      headers: this.getHeaders(config),
+      headers: this.getHeaders(config, 'POST'),
       body: data ? JSON.stringify(data) : undefined,
       signal: config?.timeout ? AbortSignal.timeout(config.timeout) : undefined,
     })
@@ -113,7 +165,7 @@ class ApiClient {
     
     const response = await fetch(url, {
       method: 'PUT',
-      headers: this.getHeaders(config),
+      headers: this.getHeaders(config, 'PUT'),
       body: data ? JSON.stringify(data) : undefined,
       signal: config?.timeout ? AbortSignal.timeout(config.timeout) : undefined,
     })
@@ -126,7 +178,7 @@ class ApiClient {
     
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: this.getHeaders(config),
+      headers: this.getHeaders(config, 'PATCH'),
       body: data ? JSON.stringify(data) : undefined,
       signal: config?.timeout ? AbortSignal.timeout(config.timeout) : undefined,
     })
@@ -139,7 +191,7 @@ class ApiClient {
     
     const response = await fetch(url, {
       method: 'DELETE',
-      headers: this.getHeaders(config),
+      headers: this.getHeaders(config, 'DELETE'),
       signal: config?.timeout ? AbortSignal.timeout(config.timeout) : undefined,
     })
 
@@ -151,9 +203,10 @@ class ApiClient {
     const url = this.buildUrl(endpoint)
     const headers = { ...config?.headers }
     
-    const token = this.getAuthToken()
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
+    // Add CSRF token for uploads
+    const csrfToken = this.getCSRFToken()
+    if (csrfToken) {
+      headers['X-XSRF-TOKEN'] = csrfToken
     }
 
     // Don't set Content-Type for FormData - let browser set it with boundary

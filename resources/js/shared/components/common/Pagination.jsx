@@ -4,7 +4,7 @@
 
 import React from 'react'
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react'
-import { cn } from '@/utils'
+import { cn } from '@/shared/utils'
 
 
 

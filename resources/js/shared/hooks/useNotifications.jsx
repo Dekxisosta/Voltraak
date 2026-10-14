@@ -4,7 +4,7 @@
  */
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
-import { generateId } from '@/utils'
+import { generateId } from '@/shared/utils'
 
 const STORAGE_KEY = 'voltraak_notifications'
 

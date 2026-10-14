@@ -19,6 +19,7 @@
  *     full table) can both react to a mutation via subscribe().
  *   - Optional simulated latency/error-rate, same as you'd configure in an
  *     MSW handler, for exercising loading and error states.
+ *   - Consistent stock operations that update related collections automatically
  *
  * Usage — most pages won't touch this module directly; go through
  * createResourceDataSource() in dataSource.js instead, which also handles
@@ -115,6 +116,170 @@ function nextId(records) {
 }
 
 /**
+ * Stock Operation Helpers - Update related collections when stock operations occur
+ */
+function updateRelatedStockCollections(operation, data) {
+  try {
+    switch (operation) {
+      case 'stock_receive':
+        handleStockReceive(data)
+        break
+      case 'stock_issue':
+        handleStockIssue(data)
+        break
+      case 'stock_adjust':
+        handleStockAdjust(data)
+        break
+      case 'order_fulfill':
+        handleOrderFulfill(data)
+        break
+      case 'damage_writeoff':
+        handleDamageWriteoff(data)
+        break
+    }
+  } catch (error) {
+    console.warn('[mock-store] Failed to update related collections:', error)
+  }
+}
+
+function handleStockReceive(data) {
+  // Update product quantities
+  if (data.product_id && data.quantity) {
+    updateProductQuantity(data.product_id, data.quantity, 'add')
+  }
+  
+  // Create stock transaction
+  createStockTransaction({
+    type: 'receive',
+    product_id: data.product_id,
+    quantity: data.quantity,
+    batch_number: data.batch_number,
+    reference: data.po_number,
+    created_at: new Date().toISOString()
+  })
+}
+
+function handleStockIssue(data) {
+  // Update product quantities
+  if (data.product_id && data.quantity) {
+    updateProductQuantity(data.product_id, data.quantity, 'subtract')
+  }
+  
+  // Update reservations
+  if (data.reservation_id) {
+    updateReservationStatus(data.reservation_id, 'fulfilled')
+  }
+  
+  // Create stock transaction
+  createStockTransaction({
+    type: 'issue',
+    product_id: data.product_id,
+    quantity: -Math.abs(data.quantity), // Negative for issues
+    batch_number: data.batch_number,
+    reference: data.order_number,
+    created_at: new Date().toISOString()
+  })
+}
+
+function handleOrderFulfill(data) {
+  // Update multiple reservations for the order
+  if (data.order_id) {
+    const reservations = ensureLoaded('inventory/reservations')
+    const orderReservations = reservations.filter(r => r.order_id === data.order_id)
+    
+    orderReservations.forEach(reservation => {
+      updateProductQuantity(reservation.product_id, reservation.quantity_reserved, 'subtract')
+      updateReservationStatus(reservation.id, 'fulfilled')
+      
+      createStockTransaction({
+        type: 'issue',
+        product_id: reservation.product_id,
+        quantity: -Math.abs(reservation.quantity_reserved),
+        batch_number: reservation.batch_number,
+        reference: data.order_number,
+        created_at: new Date().toISOString()
+      })
+    })
+  }
+}
+
+function handleStockAdjust(data) {
+  if (data.product_id && data.quantity_change) {
+    const operation = data.quantity_change > 0 ? 'add' : 'subtract'
+    updateProductQuantity(data.product_id, Math.abs(data.quantity_change), operation)
+    
+    createStockTransaction({
+      type: 'adjust',
+      product_id: data.product_id,
+      quantity: data.quantity_change,
+      batch_number: data.batch_number,
+      reference: data.adjustment_reason,
+      created_at: new Date().toISOString()
+    })
+  }
+}
+
+function handleDamageWriteoff(data) {
+  if (data.product_id && data.quantity_written_off) {
+    updateProductQuantity(data.product_id, data.quantity_written_off, 'subtract')
+    
+    createStockTransaction({
+      type: 'writeoff',
+      product_id: data.product_id,
+      quantity: -Math.abs(data.quantity_written_off),
+      batch_number: data.batch_number,
+      reference: `Damage Report ${data.damage_report_id}`,
+      created_at: new Date().toISOString()
+    })
+  }
+}
+
+function updateProductQuantity(productId, quantity, operation) {
+  const products = ensureLoaded('inventory/item-update')
+  const productIndex = products.findIndex(p => p.id === productId)
+  
+  if (productIndex >= 0) {
+    const change = operation === 'add' ? quantity : -quantity
+    const updatedProduct = {
+      ...products[productIndex],
+      stock_on_hand: Math.max(0, products[productIndex].stock_on_hand + change)
+    }
+    
+    cache['inventory/item-update'][productIndex] = updatedProduct
+    persistCollection('inventory/item-update')
+    notify('inventory/item-update')
+  }
+}
+
+function updateReservationStatus(reservationId, status) {
+  const reservations = ensureLoaded('inventory/reservations')
+  const reservationIndex = reservations.findIndex(r => r.id === reservationId)
+  
+  if (reservationIndex >= 0) {
+    cache['inventory/reservations'][reservationIndex] = {
+      ...reservations[reservationIndex],
+      status,
+      updated_at: new Date().toISOString()
+    }
+    persistCollection('inventory/reservations')
+    notify('inventory/reservations')
+  }
+}
+
+function createStockTransaction(transactionData) {
+  const transactions = ensureLoaded('inventory/stock-in-out')
+  const transaction = {
+    id: nextId(transactions),
+    ...transactionData,
+    created_at: transactionData.created_at || new Date().toISOString()
+  }
+  
+  cache['inventory/stock-in-out'] = [transaction, ...transactions]
+  persistCollection('inventory/stock-in-out')
+  notify('inventory/stock-in-out')
+}
+
+/**
  * Subscribe to changes on a collection. Returns an unsubscribe function.
  * Fires immediately with the current snapshot, then again on every mutation.
  */
@@ -146,8 +311,10 @@ export async function getRecord(key, id, { delayMs = MOCK_DELAY } = {}) {
  * Create a record. Assigns an auto-incrementing numeric `id` when the
  * caller doesn't supply one. New records are prepended (most-recent-first),
  * matching the convention already used across the app's pages.
+ * 
+ * Also handles stock operation side effects.
  */
-export async function createRecord(key, partialRecord, { delayMs = MOCK_DELAY } = {}) {
+export async function createRecord(key, partialRecord, { delayMs = MOCK_DELAY, stockOperation } = {}) {
   await delay(delayMs)
   maybeFail('create', key)
 
@@ -159,11 +326,17 @@ export async function createRecord(key, partialRecord, { delayMs = MOCK_DELAY } 
   cache[key] = [record, ...records]
   persistCollection(key)
   notify(key)
+  
+  // Handle stock operation side effects
+  if (stockOperation) {
+    updateRelatedStockCollections(stockOperation, record)
+  }
+  
   return structuredCloneSafe(record)
 }
 
 /** Merge `patch` into the record matching `id`. Throws if not found. */
-export async function updateRecord(key, id, patch, { delayMs = MOCK_DELAY } = {}) {
+export async function updateRecord(key, id, patch, { delayMs = MOCK_DELAY, stockOperation } = {}) {
   await delay(delayMs)
   maybeFail('update', key)
 
@@ -179,6 +352,12 @@ export async function updateRecord(key, id, patch, { delayMs = MOCK_DELAY } = {}
   cache[key] = next
   persistCollection(key)
   notify(key)
+  
+  // Handle stock operation side effects
+  if (stockOperation) {
+    updateRelatedStockCollections(stockOperation, updated)
+  }
+  
   return structuredCloneSafe(updated)
 }
 
@@ -218,6 +397,50 @@ export function hasPersistedMutations() {
   return Object.keys(stored).length > 0
 }
 
+/**
+ * Stock Operation Helpers - Exported for direct use by pages
+ */
+export function fulfillCustomerOrder(orderId, orderNumber) {
+  updateRelatedStockCollections('order_fulfill', { order_id: orderId, order_number: orderNumber })
+}
+
+export function receiveStock(productId, quantity, batchNumber, poNumber) {
+  updateRelatedStockCollections('stock_receive', { 
+    product_id: productId, 
+    quantity, 
+    batch_number: batchNumber, 
+    po_number: poNumber 
+  })
+}
+
+export function issueStock(productId, quantity, batchNumber, orderNumber, reservationId) {
+  updateRelatedStockCollections('stock_issue', { 
+    product_id: productId, 
+    quantity, 
+    batch_number: batchNumber, 
+    order_number: orderNumber,
+    reservation_id: reservationId
+  })
+}
+
+export function adjustStock(productId, quantityChange, batchNumber, reason) {
+  updateRelatedStockCollections('stock_adjust', { 
+    product_id: productId, 
+    quantity_change: quantityChange, 
+    batch_number: batchNumber, 
+    adjustment_reason: reason 
+  })
+}
+
+export function writeDamagedStock(productId, quantityWrittenOff, batchNumber, damageReportId) {
+  updateRelatedStockCollections('damage_writeoff', { 
+    product_id: productId, 
+    quantity_written_off: quantityWrittenOff, 
+    batch_number: batchNumber, 
+    damage_report_id: damageReportId 
+  })
+}
+
 // Dev-only debugging hook, mirrors the kind of visibility MSW's devtools
 // give you into intercepted requests — lets you poke at the store from the
 // browser console during development.
@@ -230,5 +453,9 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') {
     removeRecord,
     resetCollection,
     resetAllCollections,
+    // Stock operation helpers for testing
+    updateRelatedStockCollections,
+    updateProductQuantity: (productId, quantity, operation) => updateProductQuantity(productId, quantity, operation),
+    cache: () => structuredCloneSafe(cache),
   }
 }
