@@ -22,12 +22,11 @@ import {
   LogOut,
   X,
 } from 'lucide-react'
-import { useAuth } from '@/contexts/AuthContext'
-import { cn } from '@/utils'
+import { useAuth } from '@/shared/contexts/AuthContext'
+import { cn } from '@/shared/utils'
 import PreferencesModal from '../common/PreferencesModal'
 
 const warehouseNavItems = [
-  { label: 'Work Queue',         href: '/warehouse?tab=work-queue',          icon: ListTodo },
   { label: 'Receiving',          href: '/warehouse?tab=receiving',            icon: Truck },
   { label: 'Picking Lists',      href: '/warehouse?tab=picking',              icon: Package },
   { label: 'FEFO Management',    href: '/warehouse?tab=fefo',                 icon: Calendar },
@@ -35,7 +34,6 @@ const warehouseNavItems = [
 ]
 
 const inventoryNavItems = [
-  { label: 'Work Queue',     href: '/inventory?tab=work-queue',    icon: ListTodo },
   { label: 'Stock In/Out',   href: '/inventory?tab=stock-in-out',  icon: ArrowUpDown },
   { label: 'Stock Levels',   href: '/inventory?tab=stock-levels',  icon: BarChart3 },
   { label: 'Damage Reports', href: '/inventory?tab=damage-report', icon: AlertCircle },
@@ -46,7 +44,6 @@ const inventoryNavItems = [
 ]
 
 const managerNavItems = [
-  { label: 'Work Queue',          href: '/manager?tab=work-queue',            icon: ListTodo },
   { label: 'KPI Dashboard',       href: '/manager?tab=kpi',                   icon: TrendingUp },
   { label: 'Forecast Reports',    href: '/manager?tab=forecast',              icon: FileBarChart },
   { label: 'Inventory Reports',   href: '/manager?tab=reports',               icon: BarChart3 },
@@ -56,7 +53,6 @@ const managerNavItems = [
 ]
 
 const adminNavItems = [
-  { label: 'Work Queue',      href: '/admin?tab=work-queue', icon: ListTodo },
   { label: 'User Management', href: '/admin?tab=users',      icon: Users },
 ]
 
@@ -138,7 +134,8 @@ export default function Sidebar({ onClose }) {
             )}
             <div className="space-y-0.5">
               {group.items.map((item) => {
-                const isActive = url === item.href || url.startsWith(item.href.split('?')[0] + '?')
+                // Exact match for the full URL including query params
+                const isActive = url === item.href
 
                 return (
                   <NavItem
