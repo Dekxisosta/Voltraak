@@ -25,7 +25,7 @@ class AuthService
      * carried by the session cookie going forward, with CSRF protection
      * handled via Sanctum's stateful middleware.
      */
-    public function login(string $email, string $password): array
+    public function login(string $email, string $password, bool $remember = false): array
     {
         $user = User::where('email', $email)->first();
 
@@ -56,7 +56,7 @@ class AuthService
 
         // Establish the session for the "web" guard and rotate the session
         // ID to guard against session fixation on login.
-        Auth::guard('web')->login($user);
+        Auth::guard('web')->login($user, $remember);
         request()->session()->regenerate();
 
         $this->activityLogger->logActivity(
@@ -94,9 +94,11 @@ class AuthService
      */
     public function register(array $userData): array
     {
-        // Validate role assignment permissions
-        $currentUser = Auth::user();
-        if ($currentUser && !$this->canAssignRole($currentUser, $userData['role'])) {
+        // Registration is manager-only (defence in depth - RegisterRequest and
+        // the route middleware already enforce this). There is no public
+        // self-signup path, so never create an account without an actor.
+        $currentUser = Auth::user() ?? request()->user('sanctum');
+        if (!$currentUser || !$this->canAssignRole($currentUser, $userData['role'])) {
             throw new ValidationException([], 'You do not have permission to assign this role');
         }
 
@@ -120,11 +122,6 @@ class AuthService
                 'role' => $user->role->value
             ]
         );
-
-        // If registering themselves (public self-signup), log them in
-        if (!$currentUser) {
-            return $this->login($user->email, $userData['password']);
-        }
 
         return [
             'user' => $this->formatUserData($user),
@@ -173,6 +170,10 @@ class AuthService
                     'remember_token' => Str::random(60),
                 ])->save();
 
+                // AuthenticateSession compares the session's stored password
+                // hash to the user's, so changing it ends every old session.
+                $user->revokeAllTokens();
+
                 event(new PasswordReset($user));
 
                 $this->activityLogger->logActivity(
@@ -201,6 +202,13 @@ class AuthService
         }
 
         $user->update(['password' => $newPassword]);
+
+        // Kill every other session / API token for this account. Rehashes the
+        // password hash stored in the current session so this one survives.
+        $user->revokeAllTokens();
+        if (Auth::guard('web')->check() && Auth::guard('web')->id() === $user->id) {
+            Auth::guard('web')->logoutOtherDevices($newPassword);
+        }
 
         $this->activityLogger->logActivity(
             'auth.password_changed',

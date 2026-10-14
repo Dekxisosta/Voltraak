@@ -6,69 +6,56 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Support\Enums\UserRole;
+use Inertia\Inertia;
 
 class RoleMiddleware
 {
-    /**
-     * Handle an incoming request.
-     */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
         $user = $request->user();
-        
+
         if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Authentication required',
-                'error_code' => 'UNAUTHENTICATED'
-            ], 401);
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Authentication required'], 401);
+            }
+            return redirect()->route('login');
         }
 
-        // Check if user has any of the required roles
-        $hasRequiredRole = false;
-        
-        foreach ($roles as $role) {
-            if ($this->userHasRole($user, $role)) {
-                $hasRequiredRole = true;
-                break;
-            }
-        }
+        $hasRequiredRole = collect($roles)->contains(
+            fn ($role) => $this->userHasRole($user, $role)
+        );
 
         if (!$hasRequiredRole) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Insufficient permissions. Required roles: ' . implode(', ', $roles),
-                'error_code' => 'INSUFFICIENT_PERMISSIONS',
-                'data' => [
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Insufficient permissions.',
+                    'required_roles' => $roles,
                     'user_role' => $user->role->value,
-                    'required_roles' => $roles
-                ]
-            ], 403);
+                ], 403);
+            }
+
+            // For Inertia web requests, redirect to dashboard with error
+            return redirect()->route('dashboard')->with(
+                'error', 'You do not have permission to access that page.'
+            );
         }
 
         return $next($request);
     }
 
-    /**
-     * Check if user has the specified role.
-     */
     private function userHasRole($user, string $role): bool
     {
         $userRole = $user->role;
-        
-        // Handle role hierarchy - higher roles inherit lower role permissions
-        return match($role) {
-            'warehouse' => in_array($userRole, [
-                UserRole::WAREHOUSE, 
-                UserRole::INVENTORY, 
-                UserRole::MANAGER
-            ]),
-            'inventory_staff' => in_array($userRole, [
-                UserRole::INVENTORY, 
-                UserRole::MANAGER
-            ]),
-            'manager' => $userRole === UserRole::MANAGER,
-            default => $userRole->value === $role
+
+        // Admin always has access everywhere
+        if ($userRole === UserRole::ADMIN) return true;
+
+        return match ($role) {
+            'warehouse'       => $userRole === UserRole::WAREHOUSE,
+            'inventory_staff' => $userRole === UserRole::INVENTORY_STAFF,
+            'manager'         => $userRole === UserRole::MANAGER,
+            'admin'           => $userRole === UserRole::ADMIN,
+            default           => $userRole->value === $role,
         };
     }
 }

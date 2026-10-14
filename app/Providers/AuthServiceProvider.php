@@ -57,6 +57,33 @@ class AuthServiceProvider extends ServiceProvider
         'physical_count.delete' => ['manage_products'],
         'physical_count.approve' => ['manage_products', 'configure_reorder_points'],
 
+        // Inventory: Damage Report
+        'damage_report.read' => ['view_stock_transactions', 'create_damage_reports'],
+        'damage_report.create' => ['create_damage_reports', 'create_physical_counts'],
+        'damage_report.update' => ['create_damage_reports', 'manage_products'],
+        'damage_report.delete' => ['manage_products'],
+        'damage_report.investigate' => ['manage_products', 'approve_purchase_orders'],
+        'damage_report.approve' => ['approve_purchase_orders', 'configure_reorder_points'],
+
+        // Inventory: Discrepancy Report (investigation is inventory staff and
+        // up; warehouse staff may only raise one)
+        'discrepancy_report.read' => ['manage_stock_transactions'],
+        'discrepancy_report.create' => ['create_discrepancy_reports'],
+        'discrepancy_report.update' => ['manage_stock_transactions'],
+        'discrepancy_report.approve' => ['manage_products', 'approve_purchase_orders'],
+
+        // Inventory: Reservation (inventory staff and up)
+        'reservation.read' => ['manage_reservations'],
+        'reservation.cancel' => ['manage_reservations'],
+
+        // Inventory: Customer Order
+        'customer_order.read' => ['view_stock_transactions', 'manage_customer_orders'],
+        'customer_order.create' => ['manage_customer_orders'],
+        'customer_order.update' => ['manage_customer_orders'],
+        'customer_order.delete' => ['manage_customer_orders'],
+        'customer_order.fulfill' => ['receive_stock', 'view_stock_transactions'],
+        'customer_order.cancel' => ['manage_customer_orders'],
+
         // Procurement: Supplier
         'supplier.read' => ['view_suppliers'],
         'supplier.create' => ['manage_suppliers'],
@@ -64,7 +91,7 @@ class AuthServiceProvider extends ServiceProvider
         'supplier.delete' => ['manage_suppliers'],
 
         // Procurement: Purchase Order
-        'purchase_order.read' => ['view_suppliers'],
+        'purchase_order.read' => ['view_suppliers', 'receive_stock'],
         'purchase_order.create' => ['manage_suppliers'],
         'purchase_order.update' => ['manage_suppliers'],
         'purchase_order.delete' => ['manage_suppliers'],
@@ -98,6 +125,8 @@ class AuthServiceProvider extends ServiceProvider
         'report.accuracy' => ['view_reports'],
         'report.procurement' => ['view_suppliers', 'view_all_reports'],
         'report.analytics' => ['view_reports'],
+        'report.forecast' => ['view_all_reports'],
+        'report.low_stock' => ['view_all_reports'],
     ];
 
     /**
@@ -107,15 +136,19 @@ class AuthServiceProvider extends ServiceProvider
     {
         // Define role-based gates
         Gate::define('warehouse-access', function (User $user) {
-            return in_array($user->role, [UserRole::WAREHOUSE, UserRole::INVENTORY, UserRole::MANAGER]);
+            return in_array($user->role, [UserRole::WAREHOUSE, UserRole::INVENTORY_STAFF, UserRole::MANAGER]);
         });
 
         Gate::define('inventory-access', function (User $user) {
-            return in_array($user->role, [UserRole::INVENTORY, UserRole::MANAGER]);
+            return in_array($user->role, [UserRole::INVENTORY_STAFF, UserRole::MANAGER]);
         });
 
         Gate::define('manager-access', function (User $user) {
-            return $user->role === UserRole::MANAGER;
+            return in_array($user->role, [UserRole::MANAGER, UserRole::ADMIN]);
+        });
+
+        Gate::define('admin-access', function (User $user) {
+            return $user->role === UserRole::ADMIN;
         });
 
         // Resolve all the dot-notation abilities used by the Inventory and
@@ -123,6 +156,11 @@ class AuthServiceProvider extends ServiceProvider
         // against the existing role/permission model. Returning null lets
         // any other gate/policy still decide abilities not in this map.
         Gate::before(function (User $user, string $ability) {
+            // Admin has all permissions
+            if ($user->role === UserRole::ADMIN) {
+                return true;
+            }
+            
             if (!isset(self::ABILITY_PERMISSIONS[$ability])) {
                 return null;
             }

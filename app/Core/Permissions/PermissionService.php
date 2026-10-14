@@ -15,8 +15,9 @@ class PermissionService
      */
     private const ROLE_HIERARCHY = [
         UserRole::WAREHOUSE->value => 1,
-        UserRole::INVENTORY->value => 2,
+        UserRole::INVENTORY_STAFF->value => 2,
         UserRole::MANAGER->value => 3,
+        UserRole::ADMIN->value => 4,
     ];
 
     /**
@@ -32,7 +33,7 @@ class PermissionService
             'view_batches',
             'view_stock_transactions',
         ],
-        UserRole::INVENTORY->value => [
+        UserRole::INVENTORY_STAFF->value => [
             'manage_products',
             'manage_stock_transactions',
             'manage_reservations',
@@ -51,6 +52,23 @@ class PermissionService
             'override_business_rules',
             'view_dashboard_kpis',
             'export_reports',
+        ],
+        UserRole::ADMIN->value => [
+            // Admin gets all permissions from all roles plus admin-specific ones
+            'manage_users',
+            'manage_suppliers',
+            'approve_purchase_orders', 
+            'view_all_reports',
+            'configure_reorder_points',
+            'override_business_rules',
+            'view_dashboard_kpis',
+            'export_reports',
+            'manage_system_settings',
+            'manage_roles',
+            'manage_permissions',
+            'system_maintenance',
+            'audit_logs',
+            'backup_restore',
         ],
     ];
 
@@ -119,8 +137,15 @@ class PermissionService
      */
     public function getUserPermissions(UserRole $role): array
     {
+        // Admin sits outside the warehouse < inventory < manager hierarchy
+        // and holds every permission. Without this the hierarchy lookup below
+        // hits an undefined key and every Gate check by an admin errors out.
+        if ($role === UserRole::ADMIN) {
+            return $this->getAllPermissions();
+        }
+
         $permissions = [];
-        $roleLevel = self::ROLE_HIERARCHY[$role->value];
+        $roleLevel = self::ROLE_HIERARCHY[$role->value] ?? 0;
 
         // Collect permissions from current role and all lower roles
         foreach (self::ROLE_HIERARCHY as $roleName => $level) {
@@ -236,6 +261,10 @@ class PermissionService
      */
     public function getUserRoleLevel(User $user): int
     {
+        if ($user->role === UserRole::ADMIN) {
+            return PHP_INT_MAX;
+        }
+
         return self::ROLE_HIERARCHY[$user->role->value] ?? 0;
     }
 

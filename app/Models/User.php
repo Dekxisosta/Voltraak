@@ -129,7 +129,7 @@ class User extends Authenticatable
      */
     public function scopeInventoryStaff($query)
     {
-        return $query->where('role', UserRole::INVENTORY);
+        return $query->where('role', UserRole::INVENTORY_STAFF);
     }
 
     /**
@@ -176,7 +176,25 @@ class User extends Authenticatable
      */
     public function isManager(): bool
     {
-        return $this->role === UserRole::MANAGER;
+        return in_array($this->role, [UserRole::MANAGER, UserRole::ADMIN]);
+    }
+
+    /**
+     * Whether this user may create / edit / deactivate / delete / reset the
+     * password of an account holding the given role.
+     *
+     * Admins manage every role. Managers manage operational staff only
+     * (warehouse + inventory staff) - never other managers and never admins.
+     */
+    public function canManageRole(UserRole|string $targetRole): bool
+    {
+        $targetRole = $targetRole instanceof UserRole ? $targetRole : UserRole::from($targetRole);
+
+        return match ($this->role) {
+            UserRole::ADMIN   => true,
+            UserRole::MANAGER => in_array($targetRole, [UserRole::WAREHOUSE, UserRole::INVENTORY_STAFF], true),
+            default           => false,
+        };
     }
 
     /**
@@ -184,7 +202,7 @@ class User extends Authenticatable
      */
     public function isInventoryStaff(): bool
     {
-        return in_array($this->role, [UserRole::INVENTORY, UserRole::MANAGER]);
+        return in_array($this->role, [UserRole::INVENTORY_STAFF, UserRole::MANAGER, UserRole::ADMIN]);
     }
 
     /**
@@ -192,7 +210,7 @@ class User extends Authenticatable
      */
     public function isWarehouseStaff(): bool
     {
-        return in_array($this->role, [UserRole::WAREHOUSE, UserRole::INVENTORY, UserRole::MANAGER]);
+        return in_array($this->role, [UserRole::WAREHOUSE, UserRole::INVENTORY_STAFF, UserRole::MANAGER, UserRole::ADMIN]);
     }
 
     /*
@@ -380,8 +398,9 @@ class User extends Authenticatable
     {
         return match($this->role) {
             UserRole::WAREHOUSE => 'Warehouse Staff',
-            UserRole::INVENTORY => 'Inventory Staff',
+            UserRole::INVENTORY_STAFF => 'Inventory Staff',
             UserRole::MANAGER => 'Manager',
+            UserRole::ADMIN => 'Administrator',
             default => 'Unknown'
         };
     }
@@ -444,8 +463,9 @@ class User extends Authenticatable
             'unverified_users' => static::whereNull('email_verified_at')->count(),
             'by_role' => [
                 'warehouse' => static::where('role', UserRole::WAREHOUSE)->count(),
-                'inventory_staff' => static::where('role', UserRole::INVENTORY)->count(),
+                'inventory_staff' => static::where('role', UserRole::INVENTORY_STAFF)->count(),
                 'managers' => static::where('role', UserRole::MANAGER)->count(),
+                'admins' => static::where('role', UserRole::ADMIN)->count(),
             ],
             'recent_logins' => static::where('last_login_at', '>=', now()->subDays(7))->count(),
             'users_needing_attention' => static::getUsersRequiringAttention()->count()
