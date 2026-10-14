@@ -17,8 +17,16 @@ $app = Application::configure(basePath: dirname(__DIR__))
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
 
+        // End sessions of deactivated users, and drop sessions whose password
+        // hash no longer matches (password change / reset on another device).
         $middleware->web(append: [
+            \Illuminate\Session\Middleware\AuthenticateSession::class,
+            \App\Http\Middleware\EnsureUserIsActive::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
+        ]);
+
+        $middleware->api(append: [
+            \App\Http\Middleware\EnsureUserIsActive::class,
         ]);
 
         $middleware->alias([

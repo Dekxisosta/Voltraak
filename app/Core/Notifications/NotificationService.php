@@ -16,25 +16,30 @@ class NotificationService
         'low_stock' => [
             'title' => 'Low Stock Alert',
             'priority' => 'high',
-            'roles' => [UserRole::INVENTORY->value, UserRole::MANAGER->value],
+            'roles' => [UserRole::INVENTORY_STAFF->value, UserRole::MANAGER->value],
         ],
         'expiry_warning' => [
             'title' => 'Expiry Warning',
             'priority' => 'medium',
-            'roles' => [UserRole::INVENTORY->value, UserRole::MANAGER->value],
+            'roles' => [UserRole::INVENTORY_STAFF->value, UserRole::MANAGER->value],
         ],
         'variance_alert' => [
             'title' => 'Variance Alert',
             'priority' => 'high',
-            'roles' => [UserRole::INVENTORY->value, UserRole::MANAGER->value],
+            'roles' => [UserRole::INVENTORY_STAFF->value, UserRole::MANAGER->value],
         ],
         'fefo_violation' => [
             'title' => 'FEFO Violation',
             'priority' => 'high',
-            'roles' => [UserRole::WAREHOUSE->value, UserRole::INVENTORY->value, UserRole::MANAGER->value],
+            'roles' => [UserRole::WAREHOUSE->value, UserRole::INVENTORY_STAFF->value, UserRole::MANAGER->value],
         ],
         'po_approval' => [
             'title' => 'Purchase Order Approval Required',
+            'priority' => 'medium',
+            'roles' => [UserRole::MANAGER->value],
+        ],
+        'damage_report_created' => [
+            'title' => 'Damage Report Created',
             'priority' => 'medium',
             'roles' => [UserRole::MANAGER->value],
         ],

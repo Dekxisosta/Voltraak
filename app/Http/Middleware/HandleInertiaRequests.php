@@ -43,7 +43,48 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user
                     ? app(\App\Modules\UserManagement\Services\AuthService::class)->formatUserData($user)
                     : null,
+                'permissions' => $user
+                    ? $this->getUserPermissions($user)
+                    : [],
             ],
         ];
+    }
+
+    /**
+     * Get user permissions for the frontend
+     */
+    private function getUserPermissions($user): array
+    {
+        if (!$user) return [];
+
+        // For admin/manager roles, grant all permissions
+        if (in_array($user->role->value, ['admin', 'manager'])) {
+            return [
+                'view_dashboard',
+                'manage_inventory',
+                'manage_warehouse',
+                'manage_users',
+                'view_reports',
+                'approve_orders',
+                'manage_products',
+                'view_analytics'
+            ];
+        }
+
+        // Role-based permissions for other roles
+        return match ($user->role->value) {
+            'inventory_staff' => [
+                'view_dashboard',
+                'manage_inventory',
+                'view_reports',
+                'manage_products'
+            ],
+            'warehouse' => [
+                'view_dashboard',
+                'manage_warehouse',
+                'view_reports'
+            ],
+            default => ['view_dashboard']
+        };
     }
 }

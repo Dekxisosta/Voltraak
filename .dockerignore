@@ -36,9 +36,9 @@ coverage
 .DS_Store
 Thumbs.db
 
-# Docker itself
+# Docker itself (only ignore the compose file, not the config dir)
 Dockerfile
-docker
+docker-compose.yml
 .dockerignore
 
 # Docs / repo assets (not needed in image)

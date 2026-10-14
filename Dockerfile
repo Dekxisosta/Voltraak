@@ -116,9 +116,11 @@ FROM base AS development
 # Reinstall with dev dependencies
 RUN composer install --prefer-dist
 
-# Xdebug
-RUN pecl install xdebug \
-    && docker-php-ext-enable xdebug
+# Build deps needed to compile Xdebug from source (Alpine doesn't ship them)
+RUN apk add --no-cache autoconf g++ make linux-headers \
+    && pecl install xdebug \
+    && docker-php-ext-enable xdebug \
+    && apk del autoconf g++ make linux-headers
 
 COPY docker/php/php-dev.ini       /usr/local/etc/php/php.ini
 COPY docker/php/xdebug.ini        /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini

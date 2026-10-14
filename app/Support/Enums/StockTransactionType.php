@@ -35,7 +35,21 @@ enum StockTransactionType: string
     }
 
     /**
-     * Check if transaction type increases stock.
+     * Whether the direction is carried by the sign of the stored quantity
+     * rather than by the type. Only ADJUSTMENT is signed: a positive quantity
+     * is an increase, a negative one a decrease. All other types store a
+     * positive magnitude and the type gives the direction.
+     */
+    public function isSigned(): bool
+    {
+        return $this === self::ADJUSTMENT;
+    }
+
+    /**
+     * Check if the type always increases stock.
+     *
+     * Always false for ADJUSTMENT: its direction depends on the sign of the
+     * quantity, so ask the StockTransaction instead.
      */
     public function increasesStock(): bool
     {
@@ -43,10 +57,13 @@ enum StockTransactionType: string
     }
 
     /**
-     * Check if transaction type decreases stock.
+     * Check if the type always decreases stock.
+     *
+     * Always false for ADJUSTMENT: its direction depends on the sign of the
+     * quantity, so ask the StockTransaction instead.
      */
     public function decreasesStock(): bool
     {
-        return in_array($this, [self::OUT, self::ADJUSTMENT]);
+        return $this === self::OUT;
     }
 }

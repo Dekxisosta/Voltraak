@@ -109,6 +109,15 @@ class Handler extends ExceptionHandler
 
         // Handle database connection errors
         if ($this->isDatabaseException($exception)) {
+            // Temporary debug logging
+            Log::error('Database Exception Details', [
+                'exception_class' => get_class($exception),
+                'message' => $exception->getMessage(),
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
+                'trace' => $exception->getTraceAsString(),
+            ]);
+            
             return $statusCodeService->serviceUnavailable(
                 'Database temporarily unavailable. Please try again later.',
                 'database'
