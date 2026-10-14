@@ -12,18 +12,42 @@ use Illuminate\Http\Request;
 
 class PurchaseOrderController extends BaseController
 {
+    /** Statuses warehouse staff may list/open (those that can be received against). */
+    private const RECEIVABLE_STATUSES = ['approved', 'sent', 'received'];
+
     public function __construct(
         private PurchaseOrderService $poService
     ) {}
+
+    /**
+     * True when the caller's only procurement access is the receiving workflow
+     * (warehouse role); inventory staff, managers and admins keep full read access.
+     */
+    private function isWarehouseOnly(Request $request): bool
+    {
+        return $request->user()?->role === \App\Support\Enums\UserRole::WAREHOUSE;
+    }
 
     public function index(Request $request)
     {
         $this->authorize('purchase_order.read');
 
+        $status = $request->status;
+
+        // Warehouse staff only need purchase orders they can receive against.
+        if ($this->isWarehouseOnly($request)) {
+            $requested = array_filter(array_map('trim', explode(',', (string) $status)));
+            $allowed = array_values(array_intersect(
+                $requested ?: self::RECEIVABLE_STATUSES,
+                self::RECEIVABLE_STATUSES
+            ));
+            $status = $allowed ?: self::RECEIVABLE_STATUSES;
+        }
+
         $orders = $this->poService->paginate(
             filters: [
                 'search' => $request->search,
-                'status' => $request->status,
+                'status' => $status,
                 'supplier_id' => $request->supplier_id,
                 'date_from' => $request->date_from,
                 'date_to' => $request->date_to,
@@ -55,6 +79,11 @@ class PurchaseOrderController extends BaseController
     public function show(PurchaseOrder $purchaseOrder)
     {
         $this->authorize('purchase_order.read');
+
+        if ($this->isWarehouseOnly(request())
+            && !in_array($purchaseOrder->status->value, self::RECEIVABLE_STATUSES, true)) {
+            return $this->errorResponse('This purchase order is not available for receiving', 403);
+        }
 
         $purchaseOrder->load(['supplier', 'items.product', 'creator']);
 
@@ -110,13 +139,68 @@ class PurchaseOrderController extends BaseController
             return $this->errorResponse('Can only approve pending purchase orders', 409);
         }
 
-        $this->poService->approve($purchaseOrder, auth()->id());
+        try {
+            $this->poService->approve($purchaseOrder, auth()->id());
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 409);
+        }
 
         $this->logActivity('purchase_order.approved', null, ['po_id' => $purchaseOrder->id, 'po_number' => $purchaseOrder->po_number]);
 
         return $this->successResponse(
             new PurchaseOrderResource($purchaseOrder->refresh()->load(['supplier', 'items.product'])),
             'Purchase order approved successfully'
+        );
+    }
+
+    public function reject(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $this->authorize('purchase_order.approve');
+
+        $validated = $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        if ($purchaseOrder->status->value !== 'pending') {
+            return $this->errorResponse('Can only reject pending purchase orders', 409);
+        }
+
+        try {
+            $this->poService->reject($purchaseOrder, auth()->id(), $validated['reason'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            return $this->errorResponse($e->getMessage(), 409);
+        }
+
+        $this->logActivity('purchase_order.rejected', null, [
+            'po_id' => $purchaseOrder->id,
+            'po_number' => $purchaseOrder->po_number,
+            'reason' => $validated['reason'] ?? null,
+        ]);
+
+        return $this->successResponse(
+            new PurchaseOrderResource($purchaseOrder->refresh()->load(['supplier', 'items.product', 'creator'])),
+            'Purchase order rejected successfully'
+        );
+    }
+
+    public function send(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        $this->authorize('purchase_order.update');
+
+        if ($purchaseOrder->status->value !== 'approved') {
+            return $this->errorResponse('Can only send approved purchase orders to suppliers', 409);
+        }
+
+        $this->poService->send($purchaseOrder);
+
+        $this->logActivity('purchase_order.sent', null, [
+            'po_id' => $purchaseOrder->id,
+            'po_number' => $purchaseOrder->po_number
+        ]);
+
+        return $this->successResponse(
+            new PurchaseOrderResource($purchaseOrder->refresh()->load(['supplier', 'items.product'])),
+            'Purchase order sent to supplier successfully'
         );
     }
 
@@ -127,17 +211,20 @@ class PurchaseOrderController extends BaseController
         $request->validate([
             'items' => 'required|array',
             'items.*.purchase_order_item_id' => 'required|exists:purchase_order_items,id',
-            'items.*.received_quantity' => 'required|integer|min:0',
-            'received_date' => 'required|date',
+            'items.*.quantity_received' => 'required|integer|min:0',
+            'items.*.batches' => 'required|array|min:1',
+            'items.*.batches.*.batch_number' => 'required|string|max:100',
+            'items.*.batches.*.quantity' => 'required|integer|min:1',
+            'items.*.batches.*.manufacture_date' => 'nullable|date',
+            'items.*.batches.*.expiry_date' => 'nullable|date|after_or_equal:items.*.batches.*.manufacture_date',
             'notes' => 'nullable|string|max:1000'
         ]);
 
         try {
-            $receivingReport = $this->poService->receive($purchaseOrder, $request->all(), auth()->id());
+            $purchaseOrder = $this->poService->receive($purchaseOrder, $request->all(), auth()->id());
 
             $this->logActivity('purchase_order.received', null, [
                 'po_id' => $purchaseOrder->id,
-                'report_id' => $receivingReport->id
             ]);
 
             return $this->successResponse(

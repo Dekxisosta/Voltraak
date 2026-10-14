@@ -6,12 +6,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Support\Enums\BatchStatus;
 use Carbon\Carbon;
 
 class Batch extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'product_id',
@@ -21,6 +22,7 @@ class Batch extends Model
         'manufacture_date',
         'expiry_date',
         'status',
+        'is_prioritized',
         'unit_cost',
         'supplier_batch_number',
         'notes',
@@ -33,6 +35,7 @@ class Batch extends Model
         'expiry_date' => 'date',
         'unit_cost' => 'decimal:2',
         'status' => BatchStatus::class,
+        'is_prioritized' => 'boolean',
     ];
 
     /**
@@ -121,6 +124,19 @@ class Batch extends Model
     }
 
     /**
+     * Get available quantity for specific order (excluding other orders' reservations)
+     */
+    public function availableForOrder(int $excludeOrderId): int
+    {
+        $reservedQuantity = $this->reservations()
+            ->whereIn('status', ['pending', 'confirmed', 'allocated'])
+            ->where('customer_order_id', '!=', $excludeOrderId)
+            ->sum('quantity');
+        
+        return max(0, $this->quantity - $reservedQuantity);
+    }
+
+    /**
      * Update batch status based on expiry date
      */
     public function updateStatus(): bool
@@ -176,27 +192,7 @@ class Batch extends Model
         return min(100, ($usedDays / $totalShelfLife) * 100);
     }
 
-    /**
-     * Reduce batch quantity
-     */
-    public function reduceQuantity(int $amount): bool
-    {
-        if ($amount > $this->quantity) {
-            return false;
-        }
-
-        $this->quantity -= $amount;
-        return $this->save();
-    }
-
-    /**
-     * Increase batch quantity
-     */
-    public function increaseQuantity(int $amount): bool
-    {
-        $this->quantity += $amount;
-        return $this->save();
-    }
+    // Quantities change only through InventoryService::applyStockChange().
 
     /**
      * Check if batch has sufficient quantity
@@ -290,19 +286,5 @@ class Batch extends Model
     {
         return $query->where('expiry_date', '<=', now()->addDays($days))
                     ->where('expiry_date', '>', now());
-    }
-
-    /**
-     * Boot method to automatically update status
-     */
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::saving(function ($batch) {
-            if ($batch->expiry_date) {
-                $batch->updateStatus();
-            }
-        });
     }
 }

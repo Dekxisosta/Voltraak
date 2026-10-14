@@ -63,7 +63,7 @@ class AnalyticsService
         })->count();
 
         $totalVarianceValue = $physicalCounts->sum(function ($count) {
-            return abs($count->variance * ($count->product->unit_cost ?? 0));
+            return abs($count->variance * ($count->product->unit_price ?? 0));
         });
 
         return [
@@ -85,19 +85,24 @@ class AnalyticsService
             ->whereBetween('created_at', [$startDate, $endDate])
             ->sum(\DB::raw('quantity * unit_cost'));
 
-        // Average inventory value
+        // Current inventory value
         $currentInventoryValue = Product::sum(\DB::raw('quantity * unit_price'));
         
-        // Simplified average inventory (would need more historical data for precise calculation)
-        $averageInventoryValue = $currentInventoryValue;
+        // Use average inventory (simplified - would need opening inventory for precision)
+        $averageInventoryValue = $currentInventoryValue; // TODO: Implement historical average
 
-        $turnoverRate = $averageInventoryValue > 0 ? $cogs / $averageInventoryValue : 0;
+        // Annualise the turnover calculation
+        $periodDays = $startDate->diffInDays($endDate);
+        $annualizedCogs = $periodDays > 0 ? $cogs * (365 / $periodDays) : 0;
+
+        $turnoverRate = $averageInventoryValue > 0 ? $annualizedCogs / $averageInventoryValue : 0;
         $daysSalesInventory = $turnoverRate > 0 ? 365 / $turnoverRate : 0;
 
         return [
             'turnover_rate' => round($turnoverRate, 2),
             'days_sales_inventory' => round($daysSalesInventory, 1),
             'cogs' => $cogs,
+            'annualized_cogs' => $annualizedCogs,
             'average_inventory_value' => $averageInventoryValue,
             'target_turnover' => 12.0 // Target: 12x per year
         ];
@@ -108,10 +113,10 @@ class AnalyticsService
      */
     public function calculateShrinkageRate(Carbon $startDate, Carbon $endDate): array
     {
-        // Get adjustment transactions (shrinkage indicators)
+        // Get adjustment transactions (shrinkage indicators) - P1 made adjustments signed
         $shrinkageTransactions = StockTransaction::where('type', StockTransactionType::ADJUSTMENT)
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->where('quantity', '<', 0) // Negative adjustments indicate shrinkage
+            ->where('quantity', '<', 0) // Negative adjustments indicate shrinkage (signed values)
             ->get();
 
         $totalShrinkageQuantity = abs($shrinkageTransactions->sum('quantity'));
@@ -119,11 +124,13 @@ class AnalyticsService
             return abs($transaction->quantity * $transaction->unit_cost);
         });
 
-        // Total inventory value (for percentage calculation)
-        $totalInventoryValue = Product::sum(\DB::raw('quantity * unit_price'));
+        // Calculate period movement for denominator (not total inventory value)
+        $periodMovementValue = StockTransaction::where('type', StockTransactionType::OUT)
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum(\DB::raw('quantity * unit_cost'));
 
-        $shrinkageRate = $totalInventoryValue > 0 ? 
-            ($totalShrinkageValue / $totalInventoryValue) * 100 : 0;
+        $shrinkageRate = $periodMovementValue > 0 ? 
+            ($totalShrinkageValue / $periodMovementValue) * 100 : 0;
 
         return [
             'rate_percentage' => round($shrinkageRate, 2),
@@ -144,12 +151,14 @@ class AnalyticsService
             ->where('quantity', '<=', 0)
             ->count();
 
-        // Historical stockout events (products that went to zero during period)
+        // Historical stockout events - only count products that were denied/cancelled due to stock
+        // Do not count orders with status 'completed' as unmet demand
         $stockoutEvents = StockTransaction::where('type', StockTransactionType::OUT)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->whereHas('product', function ($query) {
                 $query->where('quantity', '<=', 0);
             })
+            ->where('reference_type', '!=', 'completed_sale') // Exclude completed sales
             ->distinct('product_id')
             ->count();
 
@@ -200,12 +209,13 @@ class AnalyticsService
             ->whereBetween('created_at', [$startDate, $endDate])
             ->sum('quantity');
 
-        // Approximation: stockout quantity as demand that couldn't be fulfilled
+        // Only count demand that was explicitly denied or cancelled due to stock, not completed sales
         $stockoutQuantity = StockTransaction::where('type', StockTransactionType::OUT)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->whereHas('product', function ($query) {
                 $query->where('quantity', '<=', 0);
             })
+            ->where('reference_type', '!=', 'completed_sale') // Exclude completed sales
             ->sum('quantity');
 
         $serviceLevel = $totalDemand > 0 ? 
@@ -225,11 +235,17 @@ class AnalyticsService
      */
     public function calculateFEFOCompliance(Carbon $startDate, Carbon $endDate): array
     {
-        // Get all stock out transactions in the period
+        // Get all stock out transactions in the period with batch info
         $outTransactions = StockTransaction::where('type', StockTransactionType::OUT)
             ->whereBetween('created_at', [$startDate, $endDate])
             ->whereNotNull('batch_id')
-            ->with(['batch'])
+            ->with(['batch.product', 'batch' => function($query) use ($startDate) {
+                // Eager load batch comparisons to avoid N+1 queries
+                $query->with(['product.batches' => function($batchQuery) use ($startDate) {
+                    $batchQuery->where('quantity', '>', 0)
+                           ->where('created_at', '<=', $startDate);
+                }]);
+            }])
             ->get();
 
         if ($outTransactions->isEmpty()) {
@@ -246,16 +262,17 @@ class AnalyticsService
 
         foreach ($outTransactions as $transaction) {
             $batch = $transaction->batch;
-            if (!$batch) continue;
+            if (!$batch || !$batch->product) continue;
 
-            // Check if there were older batches available at time of transaction
-            $olderBatches = Batch::where('product_id', $batch->product_id)
-                ->where('id', '!=', $batch->id)
-                ->where('expiry_date', '<', $batch->expiry_date)
-                ->where('quantity', '>', 0)
-                ->exists();
+            // Use eager loaded batches to check for older alternatives
+            $olderBatches = $batch->product->batches->filter(function($otherBatch) use ($batch, $transaction) {
+                return $otherBatch->id !== $batch->id 
+                    && $otherBatch->expiry_date < $batch->expiry_date
+                    && $otherBatch->quantity > 0
+                    && $otherBatch->created_at <= $transaction->created_at;
+            });
 
-            if ($olderBatches) {
+            if ($olderBatches->isNotEmpty()) {
                 $violations[] = [
                     'transaction_id' => $transaction->id,
                     'batch_code' => $batch->batch_number,
@@ -284,33 +301,34 @@ class AnalyticsService
      */
     public function calculateExpiryWaste(Carbon $startDate, Carbon $endDate): array
     {
-        // Get expired batches with remaining quantity
-        $expiredBatches = Batch::where('expiry_date', '<', now())
-            ->where('quantity', '>', 0)
+        // Get adjustment transactions with batch_expiry reference type (set by P1)
+        $expiryWasteTransactions = StockTransaction::where('type', StockTransactionType::ADJUSTMENT)
+            ->where('reference_type', 'batch_expiry')
             ->whereBetween('created_at', [$startDate, $endDate])
-            ->with('product')
+            ->with(['product', 'batch'])
             ->get();
 
-        $totalWasteQuantity = $expiredBatches->sum('quantity');
-        $totalWasteValue = $expiredBatches->sum(function ($batch) {
-            return $batch->quantity * $batch->unit_cost;
+        $totalWasteQuantity = abs($expiryWasteTransactions->sum('quantity'));
+        $totalWasteValue = $expiryWasteTransactions->sum(function ($transaction) {
+            return abs($transaction->quantity * $transaction->unit_cost);
         });
 
-        $wasteByProduct = $expiredBatches->groupBy('product_id')->map(function ($batches) {
+        $wasteByProduct = $expiryWasteTransactions->groupBy('product_id')->map(function ($transactions) {
+            $firstTransaction = $transactions->first();
             return [
-                'product_name' => $batches->first()->product->name ?? 'Unknown',
-                'total_quantity' => $batches->sum('quantity'),
-                'total_value' => $batches->sum(function ($batch) {
-                    return $batch->quantity * $batch->unit_cost;
+                'product_name' => $firstTransaction->product->name ?? 'Unknown',
+                'total_quantity' => abs($transactions->sum('quantity')),
+                'total_value' => $transactions->sum(function ($transaction) {
+                    return abs($transaction->quantity * $transaction->unit_cost);
                 }),
-                'batch_count' => $batches->count()
+                'transaction_count' => $transactions->count()
             ];
         });
 
         return [
             'total_waste_value' => $totalWasteValue,
             'total_waste_quantity' => $totalWasteQuantity,
-            'expired_batch_count' => $expiredBatches->count(),
+            'expired_transaction_count' => $expiryWasteTransactions->count(),
             'waste_by_product' => $wasteByProduct->values()->toArray(),
             'target' => 15000.0 // Target: <₱15,000 per incident
         ];
@@ -353,7 +371,7 @@ class AnalyticsService
         $performanceData = $suppliers->map(function ($supplier) {
             $orders = $supplier->purchaseOrders;
             $totalOrders = $orders->count();
-            $deliveredOrders = $orders->where('status', PurchaseOrderStatus::RECEIVED)->count();
+            $deliveredOrders = $orders->whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])->count();
             
             $onTimeDeliveries = $orders->filter(function ($order) {
                 return $order->actual_delivery_date && 
@@ -391,7 +409,7 @@ class AnalyticsService
      */
     public function calculatePOCycleTime(Carbon $startDate, Carbon $endDate): array
     {
-        $completedPOs = PurchaseOrder::where('status', PurchaseOrderStatus::RECEIVED)
+        $completedPOs = PurchaseOrder::whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->whereBetween('order_date', [$startDate, $endDate])
             ->whereNotNull('actual_delivery_date')
             ->get();
@@ -438,13 +456,13 @@ class AnalyticsService
      */
     public function calculateCostSavings(Carbon $startDate, Carbon $endDate): array
     {
-        // This would require historical pricing data to calculate actual savings
-        // For now, return structure for future implementation
+        // TODO: Implement with baseline pricing data to calculate actual savings
         return [
-            'total_savings' => 0,
-            'savings_percentage' => 0,
-            'savings_by_category' => [],
-            'negotiation_impact' => 0
+            'total_savings' => 0, // TODO: Implement with baseline pricing data
+            'savings_percentage' => 0, // TODO: Calculate vs historical pricing
+            'savings_by_category' => [], // TODO: Group by product categories  
+            'negotiation_impact' => 0, // TODO: Track negotiated vs list prices
+            'implementation_status' => 'not_implemented'
         ];
     }
 
@@ -453,7 +471,7 @@ class AnalyticsService
      */
     public function calculateDeliveryPerformance(Carbon $startDate, Carbon $endDate): array
     {
-        $deliveredOrders = PurchaseOrder::where('status', PurchaseOrderStatus::RECEIVED)
+        $deliveredOrders = PurchaseOrder::whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->whereBetween('order_date', [$startDate, $endDate])
             ->whereNotNull('actual_delivery_date')
             ->whereNotNull('expected_delivery_date')
@@ -505,11 +523,11 @@ class AnalyticsService
     public function calculateSupplierDiversity(Carbon $startDate, Carbon $endDate): array
     {
         $totalSpend = PurchaseOrder::whereBetween('order_date', [$startDate, $endDate])
-            ->whereIn('status', [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::SENT, PurchaseOrderStatus::RECEIVED])
+            ->whereIn('status', [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::SENT, PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->sum('total_amount');
 
         $spendBySupplier = PurchaseOrder::whereBetween('order_date', [$startDate, $endDate])
-            ->whereIn('status', [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::SENT, PurchaseOrderStatus::RECEIVED])
+            ->whereIn('status', [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::SENT, PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->groupBy('supplier_id')
             ->selectRaw('supplier_id, SUM(total_amount) as spend')
             ->with('supplier:id,name')
@@ -575,7 +593,7 @@ class AnalyticsService
                 'stock_in' => $stockIn,
                 'stock_out' => $stockOut,
                 'adjustments' => $adjustments,
-                'net_movement' => $stockIn - $stockOut + $adjustments,
+                'net_movement' => $stockIn - $stockOut + $adjustments, // Use signed quantity values
                 'transaction_count' => $movements->sum('transaction_count')
             ];
         }
@@ -593,7 +611,46 @@ class AnalyticsService
             ->orderBy('total_value', 'desc')
             ->get();
 
+        // Guard against empty products
+        if ($products->isEmpty()) {
+            return [
+                'total_products' => 0,
+                'total_value' => 0,
+                'category_breakdown' => [
+                    'A' => ['count' => 0, 'percentage' => 0, 'value_percentage' => 0],
+                    'B' => ['count' => 0, 'percentage' => 0, 'value_percentage' => 0],
+                    'C' => ['count' => 0, 'percentage' => 0, 'value_percentage' => 0]
+                ],
+                'products' => []
+            ];
+        }
+
         $totalValue = $products->sum('total_value');
+        
+        // Guard against zero total value
+        if ($totalValue == 0) {
+            // All products have zero value - assign evenly to C category
+            return [
+                'total_products' => $products->count(),
+                'total_value' => 0,
+                'category_breakdown' => [
+                    'A' => ['count' => 0, 'percentage' => 0, 'value_percentage' => 0],
+                    'B' => ['count' => 0, 'percentage' => 0, 'value_percentage' => 0],
+                    'C' => ['count' => $products->count(), 'percentage' => 100, 'value_percentage' => 0]
+                ],
+                'products' => $products->map(function ($product) {
+                    return [
+                        'product_id' => $product->id,
+                        'name' => $product->name,
+                        'sku' => $product->sku,
+                        'total_value' => 0,
+                        'cumulative_percentage' => 0,
+                        'category' => 'C'
+                    ];
+                })->toArray()
+            ];
+        }
+
         $runningValue = 0;
         
         $analysis = $products->map(function ($product) use ($totalValue, &$runningValue) {
@@ -628,18 +685,18 @@ class AnalyticsService
             'category_breakdown' => [
                 'A' => [
                     'count' => $categoryStats['A']->count(),
-                    'percentage' => round(($categoryStats['A']->count() / $products->count()) * 100, 2),
-                    'value_percentage' => round(($categoryStats['A']->sum('total_value') / $totalValue) * 100, 2)
+                    'percentage' => $products->count() > 0 ? round(($categoryStats['A']->count() / $products->count()) * 100, 2) : 0,
+                    'value_percentage' => $totalValue > 0 ? round(($categoryStats['A']->sum('total_value') / $totalValue) * 100, 2) : 0
                 ],
                 'B' => [
                     'count' => $categoryStats['B']->count(),
-                    'percentage' => round(($categoryStats['B']->count() / $products->count()) * 100, 2),
-                    'value_percentage' => round(($categoryStats['B']->sum('total_value') / $totalValue) * 100, 2)
+                    'percentage' => $products->count() > 0 ? round(($categoryStats['B']->count() / $products->count()) * 100, 2) : 0,
+                    'value_percentage' => $totalValue > 0 ? round(($categoryStats['B']->sum('total_value') / $totalValue) * 100, 2) : 0
                 ],
                 'C' => [
                     'count' => $categoryStats['C']->count(),
-                    'percentage' => round(($categoryStats['C']->count() / $products->count()) * 100, 2),
-                    'value_percentage' => round(($categoryStats['C']->sum('total_value') / $totalValue) * 100, 2)
+                    'percentage' => $products->count() > 0 ? round(($categoryStats['C']->count() / $products->count()) * 100, 2) : 0,
+                    'value_percentage' => $totalValue > 0 ? round(($categoryStats['C']->sum('total_value') / $totalValue) * 100, 2) : 0
                 ]
             ],
             'products' => $analysis->toArray()

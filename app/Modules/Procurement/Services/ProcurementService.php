@@ -143,6 +143,38 @@ class ProcurementService
     }
 
     /**
+     * Reject a pending purchase order.
+     */
+    public function rejectPurchaseOrder(PurchaseOrder $purchaseOrder, \App\Models\User $reviewer, ?string $reason = null): bool
+    {
+        if (!$purchaseOrder->canBeRejected()) {
+            throw new \InvalidArgumentException('Purchase order cannot be rejected in current state');
+        }
+
+        $success = $purchaseOrder->reject($reviewer, $reason);
+
+        if ($success) {
+            $this->activityLogger->logProcurementOperation(
+                'purchase_order.rejected',
+                $purchaseOrder->po_number,
+                $reviewer,
+                ['rejected_by' => $reviewer->id, 'reason' => $reason]
+            );
+
+            if ($purchaseOrder->created_by) {
+                $this->notificationService->sendNotification(
+                    'po_approval',
+                    "Purchase order {$purchaseOrder->po_number} has been rejected",
+                    [$purchaseOrder->created_by],
+                    ['purchase_order_id' => $purchaseOrder->id]
+                );
+            }
+        }
+
+        return $success;
+    }
+
+    /**
      * Send purchase order to supplier.
      */
     public function sendPurchaseOrderToSupplier(PurchaseOrder $purchaseOrder): bool
@@ -170,58 +202,12 @@ class ProcurementService
 
     /**
      * Mark purchase order as delivered/received and process stock.
+     * 
+     * @deprecated Use PurchaseOrderService::receive() instead, which properly handles batch data and stock-in processing.
      */
     public function deliverPurchaseOrder(PurchaseOrder $purchaseOrder, ?\Carbon\Carbon $deliveredAt = null): array
     {
-        if (!$purchaseOrder->canBeDelivered()) {
-            throw new \InvalidArgumentException('Purchase order cannot be marked as delivered in current state');
-        }
-
-        DB::beginTransaction();
-
-        try {
-            $deliveredAt = $deliveredAt ?? now();
-
-            // Mark PO as received
-            $purchaseOrder->markAsDelivered($deliveredAt);
-
-            // Process stock for each item
-            $stockTransactions = [];
-
-            foreach ($purchaseOrder->items as $item) {
-                // Here we would call the InventoryService to add stock
-                // For now, we simulate this
-                $stockTransactions[] = [
-                    'product_id' => $item->product_id,
-                    'quantity' => $item->quantity,
-                    'unit_cost' => $item->unit_cost,
-                    'reference_type' => 'purchase_order',
-                    'reference_id' => $purchaseOrder->id
-                ];
-            }
-
-            $this->activityLogger->logProcurementOperation(
-                'purchase_order.delivered',
-                $purchaseOrder->po_number,
-                auth()->user(),
-                [
-                    'delivered_at' => $deliveredAt,
-                    'items_count' => $purchaseOrder->items->count(),
-                    'total_quantity' => $purchaseOrder->total_quantity
-                ]
-            );
-
-            DB::commit();
-
-            return [
-                'purchase_order' => $purchaseOrder,
-                'stock_transactions' => $stockTransactions
-            ];
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        throw new \BadMethodCallException('Use PurchaseOrderService::receive() to receive a PO delivery.');
     }
 
     /*
@@ -292,6 +278,14 @@ class ProcurementService
         DB::beginTransaction();
 
         try {
+            // Re-fetch with a row lock to prevent double-click duplicates
+            $request = ProcurementRequest::lockForUpdate()->findOrFail($request->id);
+            
+            // Re-check status after acquiring lock
+            if ($request->status !== ProcurementRequestStatus::APPROVED) {
+                throw new \InvalidArgumentException('Request is no longer in approved status (possible duplicate submission).');
+            }
+            
             $product = $request->product;
 
             // Create purchase order
@@ -400,6 +394,55 @@ class ProcurementService
     }
 
     /**
+     * Update reorder points for products based on calculations.
+     */
+    public function updateReorderPointsForProducts(?Collection $products = null): array
+    {
+        $results = $this->calculateReorderPoints($products);
+        
+        $updated = 0;
+        $skipped = 0;
+        
+        foreach ($results as $result) {
+            $product = $result['product'];
+            $newReorderPoint = $result['calculated_reorder_point'];
+            
+            if ($product->reorder_level !== $newReorderPoint) {
+                $product->reorder_level = $newReorderPoint;
+                
+                // Update analytics columns if they exist
+                try {
+                    $demandAnalysis = $this->reorderCalculator->analyzeDemand($product);
+                    $leadTimeAnalysis = $this->reorderCalculator->analyzeLeadTime($product);
+                    
+                    if ($product->getConnection()->getSchemaBuilder()->hasColumn('products', 'avg_daily_usage')) {
+                        $product->avg_daily_usage = $demandAnalysis['average_daily_demand'];
+                    }
+                    
+                    if ($product->getConnection()->getSchemaBuilder()->hasColumn('products', 'lead_time_days')) {
+                        $product->lead_time_days = $leadTimeAnalysis['average_lead_time'];
+                    }
+                    
+                } catch (\Exception $e) {
+                    // Continue without analytics if calculation fails
+                }
+                
+                $product->save();
+                $updated++;
+            } else {
+                $skipped++;
+            }
+        }
+        
+        return [
+            'analyzed_products' => count($results),
+            'updated_products' => $updated,
+            'skipped_products' => $skipped,
+            'results' => $results
+        ];
+    }
+
+    /**
      * Get reorder point recommendation.
      */
     private function getReorderPointRecommendation(int $current, int $calculated): string
@@ -467,7 +510,7 @@ class ProcurementService
         // This would analyze variance in delivery times, order processing, etc.
         // For now, return a placeholder based on lead time reliability
         $recentOrders = $supplier->purchaseOrders()
-            ->where('status', PurchaseOrderStatus::RECEIVED)
+            ->whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->where('created_at', '>=', now()->subMonths(6))
             ->get();
 
@@ -545,7 +588,7 @@ class ProcurementService
     private function getTopSuppliersByValue(int $limit = 5): Collection
     {
         return Supplier::withSum(['purchaseOrders as total_orders_value' => function($query) {
-                $query->where('status', PurchaseOrderStatus::RECEIVED)
+                $query->whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
                       ->where('created_at', '>=', now()->subMonths(12));
             }], 'total_amount')
             ->orderBy('total_orders_value', 'desc')

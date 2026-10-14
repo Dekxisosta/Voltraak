@@ -156,6 +156,83 @@ class BatchController extends BaseController
     }
 
     /**
+     * FEFO recommendations across all products (warehouse FEFO page).
+     *
+     * One flat row per pickable batch, earliest expiry first, in the shape the
+     * page reads. Expired batches and batches without stock/expiry are left
+     * out - they cannot be picked.
+     */
+    public function fefoRecommendations(Request $request)
+    {
+        $this->authorize('batch.read');
+
+        $request->validate([
+            'product_id' => 'nullable|integer|exists:products,id',
+            'limit' => 'nullable|integer|min:1|max:1000',
+        ]);
+
+        $warningDays = (int) config('ims.expiry.warning_days', 60);
+        $today = now()->startOfDay();
+
+        $batches = Batch::query()
+            ->with('product')
+            ->withSum(['reservations as reserved_quantity' => function ($q) {
+                $q->whereIn('status', ['pending', 'confirmed', 'allocated']);
+            }], 'quantity')
+            ->where('quantity', '>', 0)
+            ->whereNotNull('expiry_date')
+            ->whereDate('expiry_date', '>=', $today)
+            ->where('status', '!=', \App\Support\Enums\BatchStatus::EXPIRED->value)
+            ->whereHas('product', fn ($q) => $q->where('is_active', true))
+            ->when($request->filled('product_id'), fn ($q) => $q->where('product_id', $request->product_id))
+            ->orderBy('expiry_date')
+            ->orderBy('manufacture_date')
+            ->limit((int) $request->input('limit', 500))
+            ->get();
+
+        $rows = $batches->map(function (Batch $batch) use ($today, $warningDays) {
+            $available = max(0, (int) $batch->quantity - (int) ($batch->reserved_quantity ?? 0));
+            if ($available <= 0) {
+                return null;
+            }
+
+            $daysLeft = (int) round(($batch->expiry_date->copy()->startOfDay()->getTimestamp() - $today->getTimestamp()) / 86400);
+            $urgency = $daysLeft <= 30 ? 'critical' : ($daysLeft <= $warningDays ? 'warning' : 'safe');
+
+            $action = match ($urgency) {
+                'critical' => 'immediate_sale',
+                'warning' => 'priority_sale',
+                default => $batch->is_prioritized ? 'priority_sale' : 'normal_rotation',
+            };
+
+            $unitValue = (float) ($batch->unit_cost ?? $batch->product->unit_price ?? 0);
+
+            return [
+                'id' => $batch->id,
+                'batch_id' => $batch->id,
+                'batch_number' => $batch->batch_number,
+                'product_id' => $batch->product_id,
+                'product_name' => $batch->product->name,
+                'product_sku' => $batch->product->sku,
+                'quantity_available' => $available,
+                'bin_location' => $batch->product->storage_bin ?? '',
+                'expiry_date' => $batch->expiry_date->toDateString(),
+                'days_until_expiry' => $daysLeft,
+                'urgency_level' => $urgency,
+                'total_value' => round($available * $unitValue, 2),
+                'recommended_action' => $action,
+                'is_prioritized' => (bool) $batch->is_prioritized,
+                'notes' => $batch->notes,
+            ];
+        })->filter()->values();
+
+        return $this->successResponse(
+            $rows,
+            'FEFO recommendations retrieved successfully'
+        );
+    }
+
+    /**
      * Get FEFO picking order for a product.
      */
     public function fefoOrder(Request $request)
@@ -255,6 +332,29 @@ class BatchController extends BaseController
         return $this->successResponse(
             $history,
             'Batch history retrieved successfully'
+        );
+    }
+
+    /**
+     * Flag a batch for priority FEFO picking.
+     */
+    public function prioritize(Batch $batch)
+    {
+        $this->authorize('batch.update');
+
+        if ($batch->isExpired() || $batch->quantity <= 0) {
+            return $this->errorResponse('Only unexpired batches with remaining stock can be prioritized', 409);
+        }
+
+        if (!$batch->is_prioritized) {
+            $batch->update(['is_prioritized' => true]);
+
+            $this->logActivity('batch.prioritized', $batch);
+        }
+
+        return $this->successResponse(
+            new BatchResource($batch->refresh()->load('product')),
+            'Batch flagged for priority FEFO picking'
         );
     }
 

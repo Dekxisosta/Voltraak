@@ -5,6 +5,7 @@ namespace App\Modules\Reporting\Controllers;
 use App\Core\Controllers\BaseController;
 use App\Modules\Reporting\Services\DashboardService;
 use App\Modules\Reporting\Services\AnalyticsService;
+use App\Modules\Reporting\Services\ManagerKpiService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
@@ -12,7 +13,8 @@ class DashboardController extends BaseController
 {
     public function __construct(
         private DashboardService $dashboardService,
-        private AnalyticsService $analyticsService
+        private AnalyticsService $analyticsService,
+        private ManagerKpiService $managerKpiService
     ) {}
 
     /**
@@ -116,6 +118,36 @@ class DashboardController extends BaseController
         } catch (\Exception $e) {
             return $this->errorResponse(
                 'Failed to calculate KPIs: ' . $e->getMessage(),
+                500
+            );
+        }
+    }
+
+    /**
+     * Get the manager KPI Dashboard payload.
+     *
+     * Unlike /kpis (raw analytics), this returns the structure the KPI page
+     * reads: { metrics, changes, trends, categoryBreakdown, alerts,
+     * pendingApprovals, movementSummary, topMovers, criticalStock }.
+     */
+    public function managerKpis(Request $request)
+    {
+        $this->authorize('dashboard.kpis');
+
+        $request->validate([
+            'timeframe' => 'nullable|in:7d,30d,90d',
+        ]);
+
+        try {
+            $days = ManagerKpiService::daysFromTimeframe($request->input('timeframe'));
+
+            return $this->successResponse(
+                $this->managerKpiService->getDashboard($days),
+                'Manager KPI dashboard retrieved successfully'
+            );
+        } catch (\Exception $e) {
+            return $this->errorResponse(
+                'Failed to load manager KPI dashboard: ' . $e->getMessage(),
                 500
             );
         }

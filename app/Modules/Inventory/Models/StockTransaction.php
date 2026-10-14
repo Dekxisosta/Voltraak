@@ -5,7 +5,8 @@ namespace App\Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Modules\UserManagement\Models\User;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\User;
 use App\Support\Enums\StockTransactionType;
 
 class StockTransaction extends Model
@@ -23,10 +24,12 @@ class StockTransaction extends Model
         'unit_cost',
         'total_cost',
         'reference_number',
+        'reason',
         'reference_type',
         'reference_id',
         'notes',
         'transaction_date',
+        'reverses_transaction_id',
     ];
 
     protected $casts = [
@@ -36,6 +39,7 @@ class StockTransaction extends Model
         'unit_cost' => 'decimal:2',
         'total_cost' => 'decimal:2',
         'reference_id' => 'integer',
+        'reverses_transaction_id' => 'integer',
         'transaction_date' => 'datetime',
         'type' => StockTransactionType::class,
     ];
@@ -65,6 +69,22 @@ class StockTransaction extends Model
     }
 
     /**
+     * The transaction this one reverses (set only on reversal rows)
+     */
+    public function reverses(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reverses_transaction_id');
+    }
+
+    /**
+     * The reversal of this transaction, if one exists
+     */
+    public function reversal(): HasOne
+    {
+        return $this->hasOne(self::class, 'reverses_transaction_id');
+    }
+
+    /**
      * Get the referenced model (polymorphic)
      */
     public function referenceable()
@@ -89,6 +109,11 @@ class StockTransaction extends Model
      */
     public function increasesStock(): bool
     {
+        // Adjustments are signed: the sign of the quantity is the direction.
+        if ($this->type->isSigned()) {
+            return $this->quantity > 0;
+        }
+
         return $this->type->increasesStock();
     }
 
@@ -97,6 +122,10 @@ class StockTransaction extends Model
      */
     public function decreasesStock(): bool
     {
+        if ($this->type->isSigned()) {
+            return $this->quantity < 0;
+        }
+
         return $this->type->decreasesStock();
     }
 
@@ -105,6 +134,16 @@ class StockTransaction extends Model
      */
     public function getImpactAttribute(): int
     {
+        // Signed already.
+        if ($this->type->isSigned()) {
+            return $this->quantity;
+        }
+
+        // Transfers move stock between bins; they never change the total.
+        if ($this->type === StockTransactionType::TRANSFER) {
+            return 0;
+        }
+
         return $this->increasesStock() ? $this->quantity : -$this->quantity;
     }
 

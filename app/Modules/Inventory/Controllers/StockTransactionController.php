@@ -10,6 +10,7 @@ use App\Modules\Inventory\Requests\StoreStockInRequest;
 use App\Modules\Inventory\Requests\StoreStockOutRequest;
 use App\Modules\Inventory\Resources\StockTransactionResource;
 use App\Support\Enums\StockTransactionType;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 
 class StockTransactionController extends BaseController
@@ -69,8 +70,10 @@ class StockTransactionController extends BaseController
         $this->authorize('stock_transaction.create');
 
         try {
+            // The service needs to know who performed the movement; it is not
+            // part of the request body, so take it from the authenticated user.
             $transaction = $this->inventoryService->recordStockIn(
-                $request->validated()
+                array_merge($request->validated(), ['user_id' => $request->user()->id])
             );
 
             $this->logActivity('stock.in', $transaction->product, [
@@ -98,7 +101,7 @@ class StockTransactionController extends BaseController
 
         try {
             $transactions = $this->inventoryService->recordStockOut(
-                $request->validated()
+                array_merge($request->validated(), ['user_id' => $request->user()->id])
             );
 
             $this->logActivity('stock.out', null, [
@@ -108,7 +111,11 @@ class StockTransactionController extends BaseController
             ]);
 
             return $this->successResponse(
-                StockTransactionResource::collection(collect($transactions)->load(['product', 'batch', 'user'])),
+                // Must be an Eloquent collection: load() does not exist on a
+                // plain Support collection (the stock was already moved by now).
+                StockTransactionResource::collection(
+                    (new EloquentCollection($transactions))->load(['product', 'batch', 'user'])
+                ),
                 'Stock out recorded successfully',
                 201
             );
@@ -224,7 +231,7 @@ class StockTransactionController extends BaseController
         $this->authorize('stock_transaction.create');
 
         try {
-            $reversedTransaction = $this->inventoryService->reverseTransaction($stockTransaction);
+            $reversedTransaction = $this->inventoryService->reverseTransaction($stockTransaction, auth()->user());
 
             $this->logActivity('stock.transaction_reversed', $stockTransaction->product, [
                 'original_transaction_id' => $stockTransaction->id,

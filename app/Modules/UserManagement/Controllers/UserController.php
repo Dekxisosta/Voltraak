@@ -9,6 +9,7 @@ use App\Modules\UserManagement\Requests\StoreUserRequest;
 use App\Modules\UserManagement\Requests\UpdateUserRequest;
 use App\Modules\UserManagement\Requests\BulkUpdateUsersRequest;
 use App\Modules\UserManagement\Requests\ResetUserPasswordRequest;
+use App\Core\Exceptions\ResourceNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -29,7 +30,7 @@ class UserController extends BaseController
                 'sort_by', 'sort_direction'
             ]);
             
-            $perPage = $request->integer('per_page', 15);
+            $perPage = max(1, min($request->integer('per_page', 15), 100));
             
             $users = $this->userService->getUsers($filters, $perPage);
             
@@ -54,6 +55,8 @@ class UserController extends BaseController
                 201
             );
             
+        } catch (ResourceNotFoundException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -87,6 +90,8 @@ class UserController extends BaseController
                 'User updated successfully'
             );
             
+        } catch (ResourceNotFoundException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -105,6 +110,8 @@ class UserController extends BaseController
                 'User status updated successfully'
             );
             
+        } catch (ResourceNotFoundException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -120,6 +127,8 @@ class UserController extends BaseController
             
             return $this->successResponse([], 'User deleted successfully');
             
+        } catch (ResourceNotFoundException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -174,6 +183,8 @@ class UserController extends BaseController
                 'Password reset successfully'
             );
             
+        } catch (ResourceNotFoundException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -199,6 +210,8 @@ class UserController extends BaseController
                 ]
             ], 'Bulk update completed');
             
+        } catch (ResourceNotFoundException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }
@@ -256,6 +269,8 @@ class UserController extends BaseController
                 'Profile updated successfully'
             );
             
+        } catch (ResourceNotFoundException $e) {
+            return $this->errorResponse($e->getMessage(), 404);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

@@ -93,9 +93,9 @@ class UserResource extends JsonResource
      */
     private function canBeEditedBy($user): bool
     {
-        // Users can edit themselves, managers can edit subordinates
-        return $user->id === $this->id || 
-               ($user->isManager() && $this->role !== \App\Support\Enums\UserRole::MANAGER);
+        // Users can edit themselves; admins/managers can edit the roles they manage
+        return $user->id === $this->id ||
+               ($user->isManager() && $user->canManageRole($this->role));
     }
 
     /**
@@ -108,7 +108,7 @@ class UserResource extends JsonResource
             return false;
         }
         
-        if (!$user->isManager() || $this->role === \App\Support\Enums\UserRole::MANAGER) {
+        if (!$user->isManager() || !$user->canManageRole($this->role)) {
             return false;
         }
         

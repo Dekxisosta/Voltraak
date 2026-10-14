@@ -278,6 +278,31 @@ class PhysicalCountRepository
             $query->where('variance', '!=', 0);
         }
 
+        if (!empty($filters['requires_approval'])) {
+            $query->whereRaw('counted_quantity != system_quantity')
+                ->where(function ($q) {
+                    $q->where('exceeds_threshold', true)
+                      ->orWhere('variance_approved', true)
+                      ->orWhereNotNull('rejected_at');
+                });
+        }
+
+        if (!empty($filters['approval_status'])) {
+            switch ($filters['approval_status']) {
+                case 'approved':
+                    $query->where('variance_approved', true);
+                    break;
+                case 'rejected':
+                    $query->where('variance_approved', false)->whereNotNull('rejected_at');
+                    break;
+                case 'pending':
+                    $query->where('variance_approved', false)
+                        ->whereNull('rejected_at')
+                        ->whereRaw('counted_quantity != system_quantity');
+                    break;
+            }
+        }
+
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function($q) use ($search) {

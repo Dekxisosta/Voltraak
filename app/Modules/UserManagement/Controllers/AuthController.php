@@ -26,7 +26,8 @@ class AuthController extends BaseController
         try {
             $result = $this->authService->login(
                 $request->validated('email'),
-                $request->validated('password')
+                $request->validated('password'),
+                $request->boolean('remember')
             );
 
             return $this->successResponse($result, 'Login successful');

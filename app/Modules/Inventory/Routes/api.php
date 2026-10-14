@@ -5,6 +5,8 @@ use App\Modules\Inventory\Controllers\ProductController;
 use App\Modules\Inventory\Controllers\BatchController;
 use App\Modules\Inventory\Controllers\StockTransactionController;
 use App\Modules\Inventory\Controllers\PhysicalCountController;
+use App\Modules\Inventory\Controllers\ReservationController;
+use App\Modules\Inventory\Controllers\DashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -58,12 +60,14 @@ Route::middleware(['auth:sanctum'])->prefix('inventory')->name('inventory.')->gr
         Route::post('/{batch}/reserve', [BatchController::class, 'reserve'])->name('reserve');
         Route::delete('/{batch}/reservation', [BatchController::class, 'releaseReservation'])->name('release-reservation');
         Route::patch('/{batch}/mark-expired', [BatchController::class, 'markExpired'])->name('mark-expired');
+        Route::patch('/{batch}/prioritize', [BatchController::class, 'prioritize'])->name('prioritize');
         
         // Batch collections
         Route::get('/status/expiring-soon', [BatchController::class, 'expiringSoon'])->name('expiring-soon');
         Route::get('/status/expired', [BatchController::class, 'expired'])->name('expired');
         
         // FEFO operations
+        Route::get('/fefo/recommendations', [BatchController::class, 'fefoRecommendations'])->name('fefo-recommendations');
         Route::get('/fefo/picking-order', [BatchController::class, 'fefoOrder'])->name('fefo-order');
     });
     
@@ -109,7 +113,12 @@ Route::middleware(['auth:sanctum'])->prefix('inventory')->name('inventory.')->gr
         Route::delete('/{physicalCount}', [PhysicalCountController::class, 'destroy'])->name('destroy');
         
         // Count-specific operations
-        Route::post('/{physicalCount}/approve-variance', [PhysicalCountController::class, 'approveVariance'])->name('approve-variance');
+        Route::post('/{physicalCount}/approve-variance', [PhysicalCountController::class, 'approveVariance'])
+            ->middleware('role:manager,admin')
+            ->name('approve-variance');
+        Route::post('/{physicalCount}/reject-variance', [PhysicalCountController::class, 'rejectVariance'])
+            ->middleware('role:manager,admin')
+            ->name('reject-variance');
         
         // Count collections
         Route::get('/status/with-variance', [PhysicalCountController::class, 'withVariance'])->name('with-variance');
@@ -126,19 +135,114 @@ Route::middleware(['auth:sanctum'])->prefix('inventory')->name('inventory.')->gr
     
     /*
     |--------------------------------------------------------------------------
+    | Customer Order / Fulfillment Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('customer-orders')->name('customer-orders.')->group(function () {
+        // Standard CRUD
+        Route::get('/', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'index'])->name('index');
+        Route::post('/', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'store'])->name('store');
+        Route::get('/{customerOrder}', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'show'])->name('show');
+        Route::put('/{customerOrder}', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'update'])->name('update');
+        Route::delete('/{customerOrder}', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'destroy'])->name('destroy');
+        
+        // Fulfillment operations
+        Route::post('/{customerOrder}/confirm', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'confirm'])->name('confirm');
+        Route::post('/{customerOrder}/fulfill', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'fulfill'])
+            ->middleware('role:warehouse,inventory_staff,admin')
+            ->name('fulfill');
+        Route::post('/{customerOrder}/cancel', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'cancel'])->name('cancel');
+        
+        // Picking list for warehouse
+        Route::get('/picking/list', [\App\Modules\Inventory\Controllers\CustomerOrderController::class, 'pickingList'])
+            ->middleware('role:warehouse,inventory_staff,admin')
+            ->name('picking-list');
+    });
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Reservation Routes
+    |--------------------------------------------------------------------------
+    | Reservations are created through customer orders; this exposes them for
+    | the inventory staff reservations page (list + release).
+    */
+    Route::prefix('reservations')->name('reservations.')->group(function () {
+        Route::get('/', [ReservationController::class, 'index'])->name('index');
+        Route::post('/{reservation}/cancel', [ReservationController::class, 'cancel'])->name('cancel');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Damage Report Routes
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('damage-reports')->name('damage-reports.')->group(function () {
+        // Standard CRUD
+        Route::get('/', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'index'])->name('index');
+        Route::post('/', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'store'])->name('store');
+        Route::get('/{damageReport}', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'show'])->name('show');
+        Route::put('/{damageReport}', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'update'])->name('update');
+        Route::delete('/{damageReport}', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'destroy'])->name('destroy');
+        
+        // Investigation workflow
+        Route::post('/{damageReport}/assign-investigator', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'assignInvestigator'])
+            ->middleware('role:manager,inventory_staff,admin')
+            ->name('assign-investigator');
+        Route::post('/{damageReport}/complete-investigation', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'completeInvestigation'])
+            ->middleware('role:manager,inventory_staff,admin')
+            ->name('complete-investigation');
+        
+        // Approval workflow
+        Route::post('/{damageReport}/approve', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'approve'])
+            ->middleware('role:manager,admin')
+            ->name('approve');
+        Route::post('/{damageReport}/reject', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'reject'])
+            ->middleware('role:manager,admin')
+            ->name('reject');
+        
+        // Collections
+        Route::get('/status/pending-review', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'pendingReview'])->name('pending-review');
+        
+        // Analytics
+        Route::get('/analytics/statistics', [\App\Modules\Inventory\Controllers\DamageReportController::class, 'statistics'])->name('statistics');
+    });
+    
+    /*
+    |--------------------------------------------------------------------------
+    | Discrepancy Report Routes  
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('discrepancy-reports')->name('discrepancy-reports.')->group(function () {
+        // Standard CRUD
+        Route::get('/', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'index'])->name('index');
+        Route::post('/', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'store'])->name('store');
+        Route::get('/{discrepancyReport}', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'show'])->name('show');
+
+        // Investigation workflow (inventory staff)
+        Route::patch('/{discrepancyReport}/status', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'updateStatus'])->name('update-status');
+        Route::post('/{discrepancyReport}/send-for-approval', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'sendForApproval'])->name('send-for-approval');
+        
+        // Approval workflow
+        Route::post('/{discrepancyReport}/approve', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'approve'])
+            ->middleware('role:manager,admin')
+            ->name('approve');
+        Route::post('/{discrepancyReport}/reject', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'reject'])
+            ->middleware('role:manager,admin')
+            ->name('reject');
+        
+        // Analytics
+        Route::get('/analytics/statistics', [\App\Modules\Inventory\Controllers\DiscrepancyReportController::class, 'statistics'])->name('statistics');
+    });
+    
+    /*
+    |--------------------------------------------------------------------------
     | Cross-Module Routes
     |--------------------------------------------------------------------------
     */
     
     // Dashboard data (aggregated inventory metrics)
     Route::prefix('dashboard')->name('dashboard.')->group(function () {
-        Route::get('/summary', function () {
-            // This would aggregate data from multiple controllers
-            // Implementation would be in a dedicated DashboardController
-            return response()->json([
-                'message' => 'Dashboard summary endpoint - to be implemented in DashboardController'
-            ]);
-        })->name('summary');
+        Route::get('/stats', [DashboardController::class, 'stats'])->name('stats');
         
         Route::get('/alerts', function () {
             // Critical alerts: low stock, expiring batches, large variances

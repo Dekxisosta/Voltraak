@@ -4,6 +4,9 @@ namespace App\Modules\Reporting\Controllers;
 
 use App\Core\Controllers\BaseController;
 use App\Modules\Reporting\Services\AnalyticsService;
+use App\Modules\Reporting\Services\ForecastService;
+use App\Modules\Reporting\Services\LowStockService;
+use App\Modules\Reporting\Services\ManagerKpiService;
 use App\Modules\Inventory\Models\Product;
 use App\Modules\Inventory\Models\StockTransaction;
 use App\Modules\Inventory\Models\PhysicalCount;
@@ -15,7 +18,9 @@ use Carbon\Carbon;
 class ReportController extends BaseController
 {
     public function __construct(
-        private AnalyticsService $analyticsService
+        private AnalyticsService $analyticsService,
+        private ForecastService $forecastService,
+        private LowStockService $lowStockService
     ) {}
 
     /**
@@ -28,11 +33,16 @@ class ReportController extends BaseController
         $request->validate([
             'date' => 'nullable|date',
             'category' => 'nullable|string',
-            'include_inactive' => 'nullable|boolean'
+            'include_inactive' => 'nullable|boolean',
+            // Reporting window for movement / top movers / turnover ("7d", "30d", "90d")
+            'period' => ['nullable', 'regex:/^\d{1,3}d$/'],
         ]);
 
         try {
             $date = $request->date ? Carbon::parse($request->date) : Carbon::now();
+            $days = ManagerKpiService::daysFromTimeframe($request->input('period'));
+            $periodEnd = Carbon::now();
+            $periodStart = $periodEnd->copy()->subDays($days);
             $includeInactive = $request->boolean('include_inactive', false);
 
             $query = Product::query();
@@ -75,11 +85,98 @@ class ReportController extends BaseController
                 ]
             ];
 
+            // Shape consumed by the manager Reports page (additive to the keys above).
+            $totalValue = (float) $summary['total_inventory_value'];
+            $turnover = $this->analyticsService->calculateInventoryTurnover($periodStart, $periodEnd);
+
+            $summary['period'] = ['days' => $days, 'start' => $periodStart->toDateString(), 'end' => $periodEnd->toDateString()];
+            $summary['summary'] = [
+                'total_inventory_value' => round($totalValue, 2),
+                'total_skus' => $products->count(),
+                'total_units' => (int) $products->sum('quantity'),
+                'avg_turnover_rate' => (float) ($turnover['turnover_rate'] ?? 0),
+            ];
+            $summary['category_breakdown'] = $products
+                ->groupBy(fn ($p) => $p->category ?: 'Uncategorized')
+                ->map(function ($group, $category) use ($totalValue) {
+                    $value = (float) $group->sum(fn ($p) => $p->quantity * $p->unit_price);
+
+                    return [
+                        'category' => $category,
+                        'value' => round($value, 2),
+                        'units' => (int) $group->sum('quantity'),
+                        'percentage' => $totalValue > 0 ? (int) round($value / $totalValue * 100) : 0,
+                    ];
+                })
+                ->sortByDesc('value')
+                ->values()
+                ->all();
+            $summary['movement_summary'] = $this->movementSummaryFor($products->pluck('id'), $periodStart, $periodEnd);
+            $summary['top_movers'] = $this->topMoversFor($products->pluck('id'), $periodStart, $periodEnd);
+
             return $this->successResponse($summary, 'Inventory summary report generated successfully');
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to generate inventory summary: ' . $e->getMessage(), 500);
         }
     }
+    /**
+     * Units moved in the window. Adjustments are signed in the ledger, so
+     * total_adjustments is the magnitude of the net adjustment and net_change
+     * is the true net movement (can be negative).
+     */
+    private function movementSummaryFor($productIds, Carbon $start, Carbon $end): array
+    {
+        $totals = StockTransaction::query()
+            ->whereIn('product_id', $productIds)
+            ->whereBetween('created_at', [$start, $end])
+            ->selectRaw('type, SUM(quantity) as qty')
+            ->groupBy('type')
+            ->get()
+            // Raw value: the model casts `type` to an enum.
+            ->mapWithKeys(fn ($row) => [$row->getRawOriginal('type') => (int) $row->qty]);
+
+        $in = (int) ($totals['in'] ?? 0) + (int) ($totals['return'] ?? 0);
+        $out = (int) ($totals['out'] ?? 0);
+        $adjustment = (int) ($totals['adjustment'] ?? 0);
+
+        return [
+            'total_stock_in' => $in,
+            'total_stock_out' => $out,
+            'total_adjustments' => abs($adjustment),
+            'net_change' => $in - $out + $adjustment,
+        ];
+    }
+
+    /**
+     * Best-selling products by revenue (units out x current unit price),
+     * ignoring stock-outs that were later reversed.
+     */
+    private function topMoversFor($productIds, Carbon $start, Carbon $end): array
+    {
+        return StockTransaction::query()
+            ->join('products', 'products.id', '=', 'stock_transactions.product_id')
+            ->whereIn('stock_transactions.product_id', $productIds)
+            ->where('stock_transactions.type', 'out')
+            ->whereBetween('stock_transactions.created_at', [$start, $end])
+            ->whereNotIn('stock_transactions.id', function ($q) {
+                $q->select('reverses_transaction_id')
+                    ->from('stock_transactions')
+                    ->whereNotNull('reverses_transaction_id');
+            })
+            ->groupBy('products.id', 'products.name')
+            ->selectRaw('products.name as name, SUM(stock_transactions.quantity) as units_sold, SUM(stock_transactions.quantity * products.unit_price) as revenue')
+            ->orderByDesc('revenue')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->name,
+                'units_sold' => (int) $row->units_sold,
+                'revenue' => round((float) $row->revenue, 2),
+            ])
+            ->values()
+            ->all();
+    }
+
     /**
      * Get stock movement report.
      */
@@ -436,6 +533,66 @@ class ReportController extends BaseController
             return $this->successResponse($analysis, 'ABC analysis report generated successfully');
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to generate ABC analysis: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Demand forecast per product (manager Forecast page).
+     * Returns a flat array of forecast rows.
+     */
+    public function forecast()
+    {
+        $this->authorize('report.forecast');
+
+        try {
+            return $this->successResponse(
+                $this->forecastService->getProductForecasts(),
+                'Demand forecast generated successfully'
+            );
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to generate demand forecast: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Combined weekly demand: recent actuals plus the forecast window.
+     * Returns a flat array of { period, actual?, forecast? } points.
+     */
+    public function demandTrend(Request $request)
+    {
+        $this->authorize('report.forecast');
+
+        $request->validate([
+            'timeframe' => ['nullable', 'string', 'regex:/^\d{1,3}[wd]?$/'],
+        ]);
+
+        try {
+            $weeks = ForecastService::weeksFromTimeframe($request->input('timeframe'));
+
+            return $this->successResponse(
+                $this->forecastService->getDemandTrend($weeks),
+                'Demand trend generated successfully'
+            );
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to generate demand trend: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Low stock alerts (manager Low Stock page).
+     * Returns a flat array of alert rows, most urgent first.
+     */
+    public function lowStock()
+    {
+        $this->authorize('report.low_stock');
+
+        try {
+            return $this->successResponse(
+                $this->lowStockService->getAlerts(),
+                'Low stock alerts retrieved successfully'
+            );
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to load low stock alerts: ' . $e->getMessage(), 500);
         }
     }
 }

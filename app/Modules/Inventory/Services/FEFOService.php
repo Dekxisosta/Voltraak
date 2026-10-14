@@ -33,6 +33,34 @@ class FEFOService
     }
 
     /**
+     * Select batches for picking using FEFO logic with multi-batch allocation
+     * Returns an ordered list of (batch, quantity) pairs to fulfill the required quantity
+     */
+    public function selectBatchesForPick(Product $product, int $requiredQuantity): array
+    {
+        $batches = $product->getBatchesFefoOrder();
+        $allocation = [];
+        $remainingQuantity = $requiredQuantity;
+
+        foreach ($batches as $batch) {
+            if ($remainingQuantity <= 0) {
+                break;
+            }
+
+            $availableInBatch = min($batch->available_quantity, $remainingQuantity);
+            if ($availableInBatch > 0) {
+                $allocation[] = [
+                    'batch' => $batch,
+                    'quantity' => $availableInBatch
+                ];
+                $remainingQuantity -= $availableInBatch;
+            }
+        }
+
+        return $allocation;
+    }
+
+    /**
      * Get pick order for all available batches of a product
      * Sorted by expiry date ascending (FEFO order)
      */
@@ -76,15 +104,19 @@ class FEFOService
     /**
      * Validate FEFO compliance for a specific batch pick
      */
-    public function validateFefoCompliance(Batch $selectedBatch, int $quantity): bool
+    public function validateFefoCompliance(Batch $selectedBatch, int $quantity, ?int $excludeOrderId = null): bool
     {
         // Can't pick from expired batches
         if ($selectedBatch->status === BatchStatus::EXPIRED) {
             return false;
         }
 
-        // Can't pick more than available
-        if ($selectedBatch->available_quantity < $quantity) {
+        // Can't pick more than available (considering order exclusion)
+        $availableQuantity = $excludeOrderId 
+            ? $selectedBatch->availableForOrder($excludeOrderId) 
+            : $selectedBatch->available_quantity;
+            
+        if ($availableQuantity < $quantity) {
             return false;
         }
 
@@ -92,6 +124,34 @@ class FEFOService
         $earlierBatch = $this->getEarlierAvailableBatch($selectedBatch->product, $selectedBatch);
         
         return $earlierBatch === null;
+    }
+
+    /**
+     * Validate FEFO compliance for a multi-batch allocation plan
+     */
+    public function validateFefoAllocationPlan(array $allocationPlan): bool
+    {
+        foreach ($allocationPlan as $i => $allocation) {
+            $batch = $allocation['batch'];
+            $quantity = $allocation['quantity'];
+
+            // Each batch must be usable
+            if (!$this->validateFefoCompliance($batch, $quantity)) {
+                return false;
+            }
+
+            // Verify order: each subsequent batch should expire later
+            if ($i > 0) {
+                $previousBatch = $allocationPlan[$i - 1]['batch'];
+                if ($batch->expiry_date && $previousBatch->expiry_date) {
+                    if ($batch->expiry_date < $previousBatch->expiry_date) {
+                        return false; // Wrong order
+                    }
+                }
+            }
+        }
+
+        return true;
     }
 
     /**

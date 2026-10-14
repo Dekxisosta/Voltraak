@@ -25,6 +25,7 @@ class BatchResource extends JsonResource
             'available_quantity' => $this->available_quantity,
             'unit_cost' => $this->unit_cost,
             'status' => $this->status,
+            'is_prioritized' => (bool) $this->is_prioritized,
             'supplier_batch_number' => $this->supplier_batch_number,
             'notes' => $this->notes,
             'created_at' => $this->created_at,

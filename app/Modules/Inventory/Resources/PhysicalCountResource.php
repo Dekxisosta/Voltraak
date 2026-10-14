@@ -21,15 +21,32 @@ class PhysicalCountResource extends JsonResource
             'system_quantity' => $this->system_quantity,
             'counted_quantity' => $this->counted_quantity,
             'variance' => $this->variance,
-            'variance_percentage' => $this->variance_percentage,
-            'accuracy_percentage' => $this->accuracy_percentage,
+            // decimal:2 casts serialise as strings; clients do arithmetic on these.
+            'variance_percentage' => $this->variance_percentage !== null ? (float) $this->variance_percentage : null,
+            'accuracy_percentage' => $this->accuracy_percentage !== null ? (float) $this->accuracy_percentage : null,
             'exceeds_threshold' => $this->exceeds_threshold,
-            'threshold_used' => $this->threshold_used,
+            'threshold_used' => $this->threshold_used !== null ? (float) $this->threshold_used : null,
             'count_reference' => $this->count_reference,
             'count_date' => $this->count_date,
             'notes' => $this->notes,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
+
+            // Manager adjustment-approval view (flat fields the approvals
+            // page reads directly)
+            'report_number' => $this->count_reference ?: sprintf('PC-%05d', $this->id),
+            'product_name' => $this->relationLoaded('product') ? $this->product?->name : null,
+            'product_sku' => $this->relationLoaded('product') ? $this->product?->sku : null,
+            'reported_by' => $this->relationLoaded('counter') ? $this->counter?->name : null,
+            'priority' => $this->getApprovalPriority(),
+            'requires_approval' => $this->requiresManagerApproval(),
+            'approval_status' => $this->approval_status,
+            'approved_by' => $this->relationLoaded('approver') ? ($this->approver?->name ?? $this->approved_by) : $this->approved_by,
+            'approved_at' => $this->approved_at,
+            'approval_notes' => $this->approval_notes,
+            'rejected_at' => $this->rejected_at,
+            'rejection_reason' => $this->rejection_notes,
+            'write_off_amount' => $this->getWriteOffAmount(),
             
             // Variance analysis
             'variance_analysis' => [
@@ -84,6 +101,32 @@ class PhysicalCountResource extends JsonResource
         ];
     }
     
+    /**
+     * Collapse variance severity into the high/medium/low scale used by the
+     * approvals queue.
+     */
+    private function getApprovalPriority(): string
+    {
+        return match ($this->getVarianceSeverity()) {
+            'critical', 'high' => 'high',
+            'medium' => 'medium',
+            default => 'low',
+        };
+    }
+
+    /**
+     * Value of stock that would be written off. Only shortages are write-offs;
+     * overages add stock and so are 0.
+     */
+    private function getWriteOffAmount(): float
+    {
+        if ($this->variance >= 0 || !$this->relationLoaded('product') || !$this->product) {
+            return 0.0;
+        }
+
+        return round(abs($this->variance) * (float) $this->product->unit_price, 2);
+    }
+
     /**
      * Get variance type (over/under).
      */

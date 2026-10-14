@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\Controllers;
 
 use App\Core\Controllers\BaseController;
+use App\Core\Exceptions\ApiException;
 use App\Modules\Inventory\Models\PhysicalCount;
 use App\Modules\Inventory\Services\InventoryService;
 use App\Modules\Inventory\Repositories\PhysicalCountRepository;
@@ -32,10 +33,12 @@ class PhysicalCountController extends BaseController
                 'date_from' => $request->date_from,
                 'date_to' => $request->date_to,
                 'has_variance' => $request->boolean('has_variance'),
+                'requires_approval' => $request->boolean('requires_approval'),
+                'approval_status' => $request->input('approval_status'),
                 'search' => $request->search
             ],
-            perPage: $request->per_page ?? 15,
-            with: ['product', 'counter']
+            perPage: min(max((int) ($request->per_page ?? 15), 1), 100),
+            with: ['product', 'counter', 'approver']
         );
 
         return $this->successResponse(
@@ -278,10 +281,50 @@ class PhysicalCountController extends BaseController
                 'adjustment_type' => $adjustment['type']
             ]);
 
+            $adjustment['physical_count'] = new PhysicalCountResource(
+                $physicalCount->fresh(['product', 'counter', 'approver'])
+            );
+
             return $this->successResponse(
                 $adjustment,
                 'Variance adjustment approved and processed successfully'
             );
+        } catch (ApiException $e) {
+            return $this->errorResponse($e->getMessage(), $e->getStatusCode(), $e->getContext());
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        }
+    }
+
+    /**
+     * Reject variance adjustment (stock is not changed).
+     */
+    public function rejectVariance(Request $request, PhysicalCount $physicalCount)
+    {
+        $this->authorize('physical_count.approve');
+
+        $validated = $request->validate([
+            'rejection_reason' => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $result = $this->inventoryService->rejectVarianceAdjustment(
+                $physicalCount,
+                $validated['rejection_reason'] ?? null
+            );
+
+            $this->logActivity('physical_count.variance_rejected', $physicalCount->product, [
+                'physical_count_id' => $physicalCount->id,
+                'rejection_reason' => $validated['rejection_reason'] ?? null,
+            ]);
+
+            $result['physical_count'] = new PhysicalCountResource(
+                $physicalCount->fresh(['product', 'counter', 'approver'])
+            );
+
+            return $this->successResponse($result, 'Variance adjustment rejected');
+        } catch (ApiException $e) {
+            return $this->errorResponse($e->getMessage(), $e->getStatusCode(), $e->getContext());
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage(), 422);
         }

@@ -18,10 +18,14 @@ class PurchaseOrderResource extends JsonResource
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
             'actual_delivery_date' => $this->actual_delivery_date?->toDateString(),
             'status' => $this->status->value,
-            'status_label' => $this->status->label(),
+            'status_label' => $this->status->getDisplayName(),
             'total_amount' => $this->total_amount,
             'total_items' => $this->items->count(),
             'notes' => $this->notes,
+            'rejection_reason' => $this->rejection_reason,
+            // Display-only urgency, derived from order value (same threshold the
+            // manager KPI dashboard uses for its pending-approvals list).
+            'priority' => (float) $this->total_amount >= 500000 ? 'high' : 'medium',
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toISOString(),
             'created_by' => $this->created_by,

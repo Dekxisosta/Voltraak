@@ -29,6 +29,10 @@ Route::middleware(['auth:sanctum'])->prefix('reporting')->name('reporting.')->gr
         
         // Dashboard components
         Route::get('/kpis', [DashboardController::class, 'kpis'])->name('kpis');
+        // Manager KPI page payload (manager/admin only)
+        Route::get('/manager-kpis', [DashboardController::class, 'managerKpis'])
+            ->middleware('role:manager,admin')
+            ->name('manager-kpis');
         Route::get('/trends', [DashboardController::class, 'inventoryTrends'])->name('trends');
         Route::get('/alerts', [DashboardController::class, 'alerts'])->name('alerts');
         Route::get('/accuracy', [DashboardController::class, 'accuracy'])->name('accuracy');
@@ -56,6 +60,19 @@ Route::middleware(['auth:sanctum'])->prefix('reporting')->name('reporting.')->gr
         
         // Analytics reports
         Route::get('/abc-analysis', [ReportController::class, 'abcAnalysis'])->name('abc-analysis');
+
+        // Demand forecasting (manager Forecast page)
+        Route::get('/forecast', [ReportController::class, 'forecast'])
+            ->middleware('role:manager,admin')
+            ->name('forecast');
+        Route::get('/demand-trend', [ReportController::class, 'demandTrend'])
+            ->middleware('role:manager,admin')
+            ->name('demand-trend');
+
+        // Low stock alerts (manager Low Stock page)
+        Route::get('/low-stock', [ReportController::class, 'lowStock'])
+            ->middleware('role:manager,admin')
+            ->name('low-stock');
     });
     
     /*

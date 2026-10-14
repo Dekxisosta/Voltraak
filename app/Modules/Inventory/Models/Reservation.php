@@ -5,6 +5,8 @@ namespace App\Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
+use App\Modules\Inventory\Services\FEFOService;
 use App\Models\User;
 
 class Reservation extends Model
@@ -130,29 +132,9 @@ class Reservation extends Model
         return false;
     }
 
-    /**
-     * Fulfill the reservation
-     */
-    public function fulfill(): bool
-    {
-        if ($this->canBeFulfilled()) {
-            // Reduce batch quantity
-            if (!$this->batch->reduceQuantity($this->quantity)) {
-                return false;
-            }
-            
-            // Update product quantity
-            $this->product->updateStock($this->quantity, 'subtract');
-            
-            // Mark as fulfilled
-            $this->status = 'fulfilled';
-            $this->fulfilled_at = now();
-            
-            return $this->save();
-        }
-        
-        return false;
-    }
+    // Fulfilment is done by FulfillmentService::fulfillOrder(), which issues the
+    // stock through InventoryService::issueStock() and then marks the
+    // reservation fulfilled. The model must not change quantities itself.
 
     /**
      * Cancel the reservation
@@ -261,7 +243,7 @@ class Reservation extends Model
     }
 
     /**
-     * Auto-allocate to best available batch (FEFO)
+     * Auto-allocate to best available batch (FEFO) with multi-batch support
      */
     public function autoAllocate(): bool
     {
@@ -269,11 +251,55 @@ class Reservation extends Model
             return false;
         }
 
+        $fefoService = app(FEFOService::class);
+        
+        // Try single-batch allocation first
         $batch = $this->product->getBatchesFefoOrder()
             ->where('quantity', '>=', $this->quantity)
             ->first();
 
-        return $batch ? $this->allocate($batch) : false;
+        if ($batch) {
+            return $this->allocate($batch);
+        }
+
+        // If no single batch can fulfill, try multi-batch allocation
+        $allocationPlan = $fefoService->selectBatchesForPick($this->product, $this->quantity);
+        
+        if (empty($allocationPlan)) {
+            return false;
+        }
+
+        // Validate the allocation plan
+        if (!$fefoService->validateFefoAllocationPlan($allocationPlan)) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($allocationPlan) {
+            // Update current reservation for first batch
+            $firstAllocation = array_shift($allocationPlan);
+            $this->batch_id = $firstAllocation['batch']->id;
+            $this->quantity = $firstAllocation['quantity'];
+            $this->status = 'allocated';
+            $this->save();
+
+            // Create new reservations for additional batches
+            foreach ($allocationPlan as $allocation) {
+                Reservation::create([
+                    'product_id' => $this->product_id,
+                    'customer_order_id' => $this->customer_order_id,
+                    'batch_id' => $allocation['batch']->id,
+                    'quantity' => $allocation['quantity'],
+                    'unit_price' => $this->unit_price,
+                    'status' => 'allocated',
+                    'reserved_at' => now(),
+                    'expires_at' => $this->expires_at,
+                    'reserved_by' => $this->reserved_by,
+                    'notes' => $this->notes . ' (Split from reservation #' . $this->id . ')',
+                ]);
+            }
+
+            return true;
+        });
     }
 
     /**

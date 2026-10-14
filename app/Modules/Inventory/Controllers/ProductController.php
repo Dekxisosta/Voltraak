@@ -106,19 +106,56 @@ class ProductController extends BaseController
     {
         $this->authorize('product.delete');
 
-        // Check if product has active batches
-        if ($product->batches()->where('quantity', '>', 0)->exists()) {
-            return $this->errorResponse('Cannot delete product with active stock', 409);
+        // Check if product has any stock remaining
+        if ($product->quantity > 0) {
+            return $this->errorResponse(
+                "Cannot delete product with remaining stock (quantity: {$product->quantity})",
+                409
+            );
         }
 
-        $this->productRepository->delete($product);
+        // Check if product has active reservations
+        $activeReservations = $product->reservations()
+            ->whereIn('status', ['pending', 'confirmed', 'allocated'])
+            ->count();
 
-        $this->logActivity('product.deleted', $product);
+        if ($activeReservations > 0) {
+            return $this->errorResponse(
+                "Cannot delete product with active reservations (count: {$activeReservations})",
+                409
+            );
+        }
 
-        return $this->successResponse(
-            null,
-            'Product deleted successfully'
-        );
+        // Check if product has active batches (with quantity > 0)
+        if ($product->batches()->where('quantity', '>', 0)->exists()) {
+            return $this->errorResponse('Cannot delete product with active stock in batches', 409);
+        }
+
+        // Use soft delete (will throw FK constraint error if there are related records)
+        try {
+            $product->delete(); // Soft delete due to SoftDeletes trait
+
+            $this->logActivity('product.deleted', $product, [
+                'product_id' => $product->id,
+                'sku' => $product->sku,
+                'name' => $product->name,
+            ]);
+
+            return $this->successResponse(
+                null,
+                'Product deleted successfully'
+            );
+        } catch (\Illuminate\Database\QueryException $e) {
+            // FK constraint violation (RESTRICT)
+            if (str_contains($e->getMessage(), 'foreign key constraint')) {
+                return $this->errorResponse(
+                    'Cannot delete product due to existing transaction history or references',
+                    409
+                );
+            }
+            
+            throw $e; // Re-throw if it's not a FK constraint issue
+        }
     }
 
     /**

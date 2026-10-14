@@ -5,11 +5,12 @@ namespace App\Modules\Inventory\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Support\Enums\BatchStatus;
 
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -130,6 +131,19 @@ class Product extends Model
     }
 
     /**
+     * Get available quantity for specific order (excluding other orders' reservations)
+     */
+    public function availableForOrder(int $excludeOrderId): int
+    {
+        $reservedQuantity = $this->reservations()
+            ->whereIn('status', ['pending', 'confirmed', 'allocated'])
+            ->where('customer_order_id', '!=', $excludeOrderId)
+            ->sum('quantity');
+        
+        return max(0, $this->quantity - $reservedQuantity);
+    }
+
+    /**
      * Get stock status
      */
     public function getStockStatusAttribute(): string
@@ -230,26 +244,7 @@ class Product extends Model
         });
     }
 
-    /**
-     * Update stock quantity
-     */
-    public function updateStock(int $quantity, string $operation = 'set'): bool
-    {
-        switch ($operation) {
-            case 'add':
-                $this->quantity += $quantity;
-                break;
-            case 'subtract':
-                $this->quantity = max(0, $this->quantity - $quantity);
-                break;
-            case 'set':
-            default:
-                $this->quantity = max(0, $quantity);
-                break;
-        }
-        
-        return $this->save();
-    }
+    // Quantities change only through InventoryService::applyStockChange().
 
     /**
      * Check if sufficient quantity is available for operation

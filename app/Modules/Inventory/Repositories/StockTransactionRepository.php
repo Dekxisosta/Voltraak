@@ -305,6 +305,8 @@ class StockTransactionRepository
             $search = $filters['search'];
             $query->where(function($q) use ($search) {
                 $q->where('notes', 'like', "%{$search}%")
+                  ->orWhere('reference_number', 'like', "%{$search}%")
+                  ->orWhere('reason', 'like', "%{$search}%")
                   ->orWhere('reference_type', 'like', "%{$search}%")
                   ->orWhere('reference_id', 'like', "%{$search}%")
                   ->orWhereHas('product', function($pq) use ($search) {

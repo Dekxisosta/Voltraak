@@ -14,13 +14,16 @@ class DiscrepancyReport extends Model
     protected $fillable = [
         'product_id',
         'batch_id',
+        'location',
         'type',
+        'discrepancy_type',
         'expected_quantity',
         'actual_quantity',
         'description',
         'status',
         'reported_by',
         'assigned_to',
+        'physical_count_id',
         'reported_at',
         'resolved_at',
         'investigation_notes',
@@ -49,6 +52,14 @@ class DiscrepancyReport extends Model
     public function batch(): BelongsTo
     {
         return $this->belongsTo(Batch::class);
+    }
+
+    /**
+     * Physical count raised when this report was sent for manager approval
+     */
+    public function physicalCount(): BelongsTo
+    {
+        return $this->belongsTo(PhysicalCount::class);
     }
 
     /**
@@ -195,30 +206,23 @@ class DiscrepancyReport extends Model
      */
     protected function createCorrectionTransaction(): void
     {
-        $correctionQuantity = abs($this->discrepancy);
-        $transactionType = $this->discrepancy > 0 ? 'in' : 'adjustment';
-        
-        StockTransaction::create([
+        $delta = $this->actual_quantity - $this->expected_quantity;
+
+        if ($delta === 0) {
+            return;
+        }
+
+        $user = User::find($this->assigned_to ?? $this->reported_by);
+
+        // All quantity changes go through the inventory service (T8).
+        app(\App\Modules\Inventory\Services\InventoryService::class)->adjustStock([
             'product_id' => $this->product_id,
             'batch_id' => $this->batch_id,
-            'user_id' => $this->assigned_to ?? $this->reported_by,
-            'type' => $transactionType,
-            'quantity' => $correctionQuantity,
-            'quantity_before' => $this->expected_quantity,
-            'quantity_after' => $this->actual_quantity,
+            'adjustment_quantity' => $delta,
             'reference_type' => 'discrepancy_report',
             'reference_id' => $this->id,
             'notes' => "Correction for {$this->type} discrepancy: {$this->description}",
-        ]);
-
-        // Update quantities to match actual
-        if ($this->batch) {
-            $this->batch->quantity = $this->actual_quantity;
-            $this->batch->save();
-        } else {
-            $this->product->quantity = $this->actual_quantity;
-            $this->product->save();
-        }
+        ], $user);
     }
 
     /**

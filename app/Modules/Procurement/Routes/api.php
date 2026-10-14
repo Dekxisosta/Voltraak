@@ -24,8 +24,18 @@ Route::prefix('procurement')->middleware(['auth:sanctum'])->group(function () {
         Route::get('/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('show');
         Route::put('/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('update');
         Route::delete('/{purchaseOrder}', [PurchaseOrderController::class, 'destroy'])->name('destroy');
-        Route::post('/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])->name('approve');
-        Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('receive');
+        Route::post('/{purchaseOrder}/approve', [PurchaseOrderController::class, 'approve'])
+            ->middleware('role:manager,admin')
+            ->name('approve');
+        Route::post('/{purchaseOrder}/reject', [PurchaseOrderController::class, 'reject'])
+            ->middleware('role:manager,admin')
+            ->name('reject');
+        Route::post('/{purchaseOrder}/send', [PurchaseOrderController::class, 'send'])
+            ->middleware('role:manager,admin')
+            ->name('send');
+        Route::post('/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])
+            ->middleware('role:warehouse,inventory_staff,admin')
+            ->name('receive');
         Route::post('/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('cancel');
     });
 

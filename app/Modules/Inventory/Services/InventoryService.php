@@ -4,6 +4,7 @@ namespace App\Modules\Inventory\Services;
 
 use App\Modules\Inventory\Models\Product;
 use App\Modules\Inventory\Models\Batch;
+use App\Modules\Inventory\Models\DamageReport;
 use App\Modules\Inventory\Models\PhysicalCount;
 use App\Modules\Inventory\Models\Reservation;
 use App\Modules\Inventory\Models\StockTransaction;
@@ -29,39 +30,157 @@ class InventoryService
     ) {}
 
     /**
+     * The single writer for stock quantities.
+     *
+     * Every change to products.quantity or batches.quantity goes through here
+     * (receive, issue, adjust, write-off, reversal), so the batch, the product
+     * and the ledger row are always updated together, in one database
+     * transaction, under row locks taken in a fixed order (product, then
+     * batch) so concurrent callers queue instead of overwriting each other.
+     *
+     * Direction: $delta is signed (+ adds stock, - removes it). It must agree
+     * with $type: IN/RETURN need a positive delta, OUT a negative one,
+     * ADJUSTMENT either. The ledger stores a positive magnitude for IN, OUT
+     * and RETURN and the signed delta for ADJUSTMENT. TRANSFER moves nothing
+     * and is rejected.
+     *
+     * Quantities are never silently clamped: a change that would take the
+     * product or the batch below zero throws ConflictException.
+     *
+     * @param array{unit_cost?: mixed, reference_number?: ?string, reason?: ?string, reference_type?: ?string, reference_id?: ?int, notes?: ?string, reverses_transaction_id?: ?int} $meta
+     * @param bool $touchReceivedQuantity Also move batches.received_quantity
+     *        (true for receipts and for reversing a receipt).
+     */
+    public function applyStockChange(
+        int $productId,
+        ?int $batchId,
+        int $delta,
+        StockTransactionType $type,
+        User $user,
+        array $meta = [],
+        bool $touchReceivedQuantity = false
+    ): StockTransaction {
+        if ($delta === 0) {
+            throw new \InvalidArgumentException('A stock change must be non-zero.');
+        }
+
+        $directionOk = match ($type) {
+            StockTransactionType::IN, StockTransactionType::RETURN => $delta > 0,
+            StockTransactionType::OUT => $delta < 0,
+            StockTransactionType::ADJUSTMENT => true,
+            StockTransactionType::TRANSFER => throw new \InvalidArgumentException(
+                'Transfers do not change quantity and cannot go through applyStockChange().'
+            ),
+        };
+
+        if (!$directionOk) {
+            throw new \InvalidArgumentException(
+                "A {$type->value} transaction cannot have a stock change of {$delta}."
+            );
+        }
+
+        return DB::transaction(function () use ($productId, $batchId, $delta, $type, $user, $meta, $touchReceivedQuantity) {
+            $product = Product::whereKey($productId)->lockForUpdate()->firstOrFail();
+
+            $batch = null;
+            if ($batchId !== null) {
+                $batch = Batch::whereKey($batchId)->lockForUpdate()->firstOrFail();
+
+                if ((int) $batch->product_id !== (int) $product->id) {
+                    throw new ConflictException('Batch does not belong to the specified product');
+                }
+            }
+
+            $quantityBefore = (int) $product->quantity;
+            $quantityAfter = $quantityBefore + $delta;
+
+            if ($quantityAfter < 0) {
+                throw ConflictException::insufficientInventory($quantityBefore, abs($delta), $product->sku);
+            }
+
+            if ($batch) {
+                $batchAfter = (int) $batch->quantity + $delta;
+
+                if ($batchAfter < 0) {
+                    throw ConflictException::insufficientInventory(
+                        (int) $batch->quantity,
+                        abs($delta),
+                        "{$product->sku} / batch {$batch->batch_number}"
+                    );
+                }
+
+                $batch->quantity = $batchAfter;
+
+                if ($touchReceivedQuantity) {
+                    $batch->received_quantity = max(0, (int) $batch->received_quantity + $delta);
+                }
+
+                $batch->save();
+            }
+
+            $product->quantity = $quantityAfter;
+            $product->save();
+
+            // Cost matters for anything that removes stock or corrects it
+            // (write-offs, shrinkage). Receipts only carry a cost if given.
+            $unitCost = $meta['unit_cost'] ?? (
+                in_array($type, [StockTransactionType::OUT, StockTransactionType::ADJUSTMENT], true)
+                    ? ($batch?->unit_cost ?? $product->unit_price)
+                    : null
+            );
+
+            return StockTransaction::create([
+                'product_id' => $product->id,
+                'batch_id' => $batch?->id,
+                'user_id' => $user->id,
+                'type' => $type,
+                'quantity' => $type->isSigned() ? $delta : abs($delta),
+                'quantity_before' => $quantityBefore,
+                'quantity_after' => $quantityAfter,
+                'unit_cost' => $unitCost,
+                'reference_number' => $meta['reference_number'] ?? null,
+                'reason' => $meta['reason'] ?? null,
+                'reference_type' => $meta['reference_type'] ?? null,
+                'reference_id' => $meta['reference_id'] ?? null,
+                'reverses_transaction_id' => $meta['reverses_transaction_id'] ?? null,
+                'notes' => $meta['notes'] ?? null,
+            ]);
+        });
+    }
+
+    /**
      * Receive stock into inventory
      */
     public function receiveStock(array $data, User $user): StockTransaction
     {
         return DB::transaction(function () use ($data, $user) {
             $product = Product::findOrFail($data['product_id']);
-            $quantityBefore = $product->quantity;
 
-            // Create or find batch
-            $batch = null;
-            if (isset($data['batch_data'])) {
-                $batch = $this->createOrUpdateBatch($product, $data['batch_data'], $data['quantity']);
-            }
+            // Find or create the batch (at zero); the quantity itself is
+            // added by applyStockChange so batch and product stay in step.
+            // An explicit existing batch (batch_id) is honoured too; before,
+            // only batch_data was looked at, so stock received "into" an
+            // existing batch never reached that batch.
+            $batch = isset($data['batch_data'])
+                ? $this->findOrCreateBatch($product, $data['batch_data'])
+                : (!empty($data['batch_id']) ? Batch::findOrFail((int) $data['batch_id']) : null);
 
-            // Update product quantity
-            $product->updateStock($data['quantity'], 'add');
-            $quantityAfter = $product->quantity;
-
-            // Create stock transaction
-            $transaction = StockTransaction::create([
-                'product_id' => $product->id,
-                'batch_id' => $batch?->id,
-                'user_id' => $user->id,
-                'type' => StockTransactionType::IN,
-                'quantity' => $data['quantity'],
-                'quantity_before' => $quantityBefore,
-                'quantity_after' => $quantityAfter,
-                'unit_cost' => $data['unit_cost'] ?? null,
-                'reference_number' => $data['reference_number'] ?? null,
-                'reference_type' => $data['reference_type'] ?? null,
-                'reference_id' => $data['reference_id'] ?? null,
-                'notes' => $data['notes'] ?? null,
-            ]);
+            $transaction = $this->applyStockChange(
+                $product->id,
+                $batch?->id,
+                (int) $data['quantity'],
+                StockTransactionType::IN,
+                $user,
+                [
+                    'unit_cost' => $data['unit_cost'] ?? null,
+                    'reference_number' => $data['reference_number'] ?? null,
+                    'reason' => $data['reason'] ?? null,
+                    'reference_type' => $data['reference_type'] ?? null,
+                    'reference_id' => $data['reference_id'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                ],
+                true
+            );
 
             // Log activity
             $this->activityLogger->logInventoryOperation(
@@ -73,12 +192,13 @@ class InventoryService
             );
 
             // Fire event
-            event(new InventoryEvents\StockReceived(
-                $product->id,
-                $data['quantity'],
-                $batch?->id,
-                $user->id
-            ));
+            // TODO: Implement StockReceived event
+            // event(new InventoryEvents\StockReceived(
+            //     $product->id,
+            //     $data['quantity'],
+            //     $batch?->id,
+            //     $user->id
+            // ));
 
             return $transaction;
         });
@@ -87,68 +207,62 @@ class InventoryService
     /**
      * Issue stock from inventory with FEFO enforcement
      */
-    public function issueStock(array $data, User $user): StockTransaction
+    public function issueStock(array $data, User $user, ?int $excludeOrderId = null): StockTransaction
     {
-        return DB::transaction(function () use ($data, $user) {
-            $product = Product::findOrFail($data['product_id']);
-            
+        return DB::transaction(function () use ($data, $user, $excludeOrderId) {
+            // Lock the product before checking availability so the checks
+            // below run against numbers no other writer can change.
+            $product = Product::whereKey($data['product_id'])->lockForUpdate()->firstOrFail();
+
             // Check sufficient quantity
-            if (!$product->hasSufficientQuantity($data['quantity'])) {
+            $availableQuantity = $excludeOrderId 
+                ? $product->availableForOrder($excludeOrderId)
+                : $product->available_quantity;
+            
+            if ($availableQuantity < $data['quantity']) {
                 throw ConflictException::insufficientInventory(
-                    $product->available_quantity,
+                    $availableQuantity,
                     $data['quantity'],
                     $product->sku
                 );
             }
-
-            $quantityBefore = $product->quantity;
 
             // Get batch using FEFO if not specified
             $batch = null;
             if (isset($data['batch_id'])) {
                 $batch = Batch::findOrFail($data['batch_id']);
-                
+
                 // Validate FEFO compliance
-                if (!$this->fefoService->validateFefoCompliance($batch, $data['quantity'])) {
+                if (!$this->fefoService->validateFefoCompliance($batch, $data['quantity'], $excludeOrderId)) {
                     $earlierBatch = $this->fefoService->getEarlierAvailableBatch($product);
                     throw ConflictException::fefoViolation($batch->id, $earlierBatch?->id);
                 }
             } else {
                 $batch = $this->fefoService->selectBatchForPick($product, $data['quantity']);
-                
+
                 if (!$batch) {
                     throw ConflictException::insufficientInventory(0, $data['quantity'], $product->sku);
                 }
             }
 
-            // Reduce batch quantity
-            if (!$batch->reduceQuantity($data['quantity'])) {
-                throw ConflictException::insufficientInventory(
-                    $batch->quantity,
-                    $data['quantity'],
-                    $product->sku
-                );
-            }
+            // Batch, product and ledger row are updated together.
+            $transaction = $this->applyStockChange(
+                $product->id,
+                $batch->id,
+                -(int) $data['quantity'],
+                StockTransactionType::OUT,
+                $user,
+                [
+                    'unit_cost' => $batch->unit_cost ?? $product->unit_price,
+                    'reference_number' => $data['reference_number'] ?? null,
+                    'reason' => $data['reason'] ?? null,
+                    'reference_type' => $data['reference_type'] ?? null,
+                    'reference_id' => $data['reference_id'] ?? null,
+                    'notes' => $data['notes'] ?? null,
+                ]
+            );
 
-            // Update product quantity
-            $product->updateStock($data['quantity'], 'subtract');
-            $quantityAfter = $product->quantity;
-
-            // Create stock transaction
-            $transaction = StockTransaction::create([
-                'product_id' => $product->id,
-                'batch_id' => $batch->id,
-                'user_id' => $user->id,
-                'type' => StockTransactionType::OUT,
-                'quantity' => $data['quantity'],
-                'quantity_before' => $quantityBefore,
-                'quantity_after' => $quantityAfter,
-                'unit_cost' => $batch->unit_cost ?? $product->unit_price,
-                'reference_number' => $data['reference_number'] ?? null,
-                'reference_type' => $data['reference_type'] ?? null,
-                'reference_id' => $data['reference_id'] ?? null,
-                'notes' => $data['notes'] ?? null,
-            ]);
+            $product->refresh();
 
             // Log activity
             $this->activityLogger->logInventoryOperation(
@@ -230,35 +344,32 @@ class InventoryService
     }
 
     /**
-     * Adjust stock quantity
+     * Adjust stock quantity.
+     *
+     * `adjustment_quantity` is signed: positive adds stock, negative removes
+     * it. The ledger row keeps that sign. Pass `batch_id` to move the batch
+     * as well; without it only the product total changes.
      */
     public function adjustStock(array $data, User $user): StockTransaction
     {
-        return DB::transaction(function () use ($data, $user) {
-            $product = Product::findOrFail($data['product_id']);
-            $quantityBefore = $product->quantity;
-            
-            $adjustmentQuantity = $data['adjustment_quantity'];
-            $newQuantity = max(0, $quantityBefore + $adjustmentQuantity);
-            
-            // Update product quantity
-            $product->quantity = $newQuantity;
-            $product->save();
+        $adjustmentQuantity = (int) $data['adjustment_quantity'];
 
-            // Create stock transaction
-            $transaction = StockTransaction::create([
-                'product_id' => $product->id,
-                'batch_id' => $data['batch_id'] ?? null,
-                'user_id' => $user->id,
-                'type' => StockTransactionType::ADJUSTMENT,
-                'quantity' => abs($adjustmentQuantity),
-                'quantity_before' => $quantityBefore,
-                'quantity_after' => $newQuantity,
-                'reference_number' => $data['reference_number'] ?? null,
-                'reference_type' => $data['reference_type'] ?? 'manual_adjustment',
-                'reference_id' => $data['reference_id'] ?? null,
-                'notes' => $data['notes'] ?? 'Manual stock adjustment',
-            ]);
+        return DB::transaction(function () use ($data, $user, $adjustmentQuantity) {
+            $product = Product::findOrFail($data['product_id']);
+
+            $transaction = $this->applyStockChange(
+                $product->id,
+                !empty($data['batch_id']) ? (int) $data['batch_id'] : null,
+                $adjustmentQuantity,
+                StockTransactionType::ADJUSTMENT,
+                $user,
+                [
+                    'reference_number' => $data['reference_number'] ?? null,
+                    'reference_type' => $data['reference_type'] ?? 'manual_adjustment',
+                    'reference_id' => $data['reference_id'] ?? null,
+                    'notes' => $data['notes'] ?? 'Manual stock adjustment',
+                ]
+            );
 
             // Log activity
             $this->activityLogger->logInventoryOperation(
@@ -268,8 +379,9 @@ class InventoryService
                 $user,
                 [
                     'adjustment_type' => $adjustmentQuantity > 0 ? 'increase' : 'decrease',
-                    'quantity_before' => $quantityBefore,
-                    'quantity_after' => $newQuantity,
+                    'quantity_before' => $transaction->quantity_before,
+                    'quantity_after' => $transaction->quantity_after,
+                    'batch_id' => $transaction->batch_id,
                     'transaction_id' => $transaction->id
                 ]
             );
@@ -279,36 +391,28 @@ class InventoryService
     }
 
     /**
-     * Create or update batch
+     * Find the batch for a receipt, or create it empty.
+     *
+     * Never touches quantity: the receipt quantity is added afterwards by
+     * applyStockChange().
      */
-    public function createOrUpdateBatch(Product $product, array $batchData, int $additionalQuantity = 0): Batch
+    public function findOrCreateBatch(Product $product, array $batchData): Batch
     {
-        $existingBatch = null;
-        
-        if (isset($batchData['batch_number'])) {
-            $existingBatch = Batch::where('product_id', $product->id)
-                ->where('batch_number', $batchData['batch_number'])
-                ->first();
-        }
-
-        if ($existingBatch) {
-            // Update existing batch quantity
-            $existingBatch->increaseQuantity($additionalQuantity);
-            return $existingBatch;
-        }
-
-        // Create new batch
-        return Batch::create([
-            'product_id' => $product->id,
-            'batch_number' => $batchData['batch_number'] ?? $this->generateBatchNumber($product),
-            'quantity' => $batchData['quantity'] ?? $additionalQuantity,
-            'received_quantity' => $batchData['quantity'] ?? $additionalQuantity,
-            'manufacture_date' => $batchData['manufacture_date'] ?? null,
-            'expiry_date' => $batchData['expiry_date'] ?? null,
-            'unit_cost' => $batchData['unit_cost'] ?? null,
-            'supplier_batch_number' => $batchData['supplier_batch_number'] ?? null,
-            'notes' => $batchData['notes'] ?? null,
-        ]);
+        return Batch::firstOrCreate(
+            [
+                'product_id' => $product->id,
+                'batch_number' => $batchData['batch_number'] ?? $this->generateBatchNumber($product),
+            ],
+            [
+                'quantity' => 0,
+                'received_quantity' => 0,
+                'manufacture_date' => $batchData['manufacture_date'] ?? null,
+                'expiry_date' => $batchData['expiry_date'] ?? null,
+                'unit_cost' => $batchData['unit_cost'] ?? null,
+                'supplier_batch_number' => $batchData['supplier_batch_number'] ?? null,
+                'notes' => $batchData['notes'] ?? null,
+            ]
+        );
     }
 
     /**
@@ -356,9 +460,7 @@ class InventoryService
             'total_stock_out' => $transactions->where('type', StockTransactionType::OUT->value)->sum('quantity'),
             'total_transfers' => $transactions->where('type', StockTransactionType::TRANSFER->value)->count(),
             'total_adjustments' => $transactions->where('type', StockTransactionType::ADJUSTMENT->value)->count(),
-            'net_movement' => $transactions->sum(function ($transaction) {
-                return $transaction->increasesStock() ? $transaction->quantity : -$transaction->quantity;
-            }),
+            'net_movement' => $transactions->sum('impact'),
             'daily_averages' => [
                 'transactions_per_day' => round($transactions->count() / max(1, $days), 2),
                 'stock_in_per_day' => round($transactions->where('type', StockTransactionType::IN->value)->sum('quantity') / max(1, $days), 2),
@@ -381,27 +483,37 @@ class InventoryService
     }
 
     /**
-     * Process expired batches
+     * Process expired batches: every batch past its expiry date has its
+     * remaining quantity written off (see markBatchExpired).
+     *
+     * @param User|null $user Who the write-offs are recorded against. Needed
+     *        when there is no logged-in user, e.g. from a scheduled job.
      */
-    public function processExpiredBatches(): array
+    public function processExpiredBatches(?User $user = null): array
     {
+        $user ??= auth()->user();
+
+        if (!$user) {
+            throw new \InvalidArgumentException('A user is required to write off expired batches.');
+        }
+
         $expiredBatches = Batch::where('expiry_date', '<', now())
-            ->where('status', '!=', 'expired')
+            ->where('status', '!=', \App\Support\Enums\BatchStatus::EXPIRED->value)
             ->get();
 
         $processed = [];
-        
+
         foreach ($expiredBatches as $batch) {
-            $batch->updateStatus(); // This will set status to expired
-            
+            $writtenOff = (int) $batch->quantity;
+
+            $processed[] = $this->markBatchExpired($batch, $user);
+
             // Fire expiry event
             event(new InventoryEvents\BatchExpired(
                 $batch->id,
                 $batch->product_id,
-                $batch->quantity
+                $writtenOff
             ));
-            
-            $processed[] = $batch;
         }
 
         return $processed;
@@ -492,6 +604,7 @@ class InventoryService
                     'batch_id' => $allocation['batch_id'],
                     'quantity' => $allocation['quantity'],
                     'reference_number' => $data['reference_number'] ?? null,
+                    'reason' => $data['reason'] ?? null,
                     'reference_type' => $data['reference_type'] ?? null,
                     'reference_id' => $data['reference_id'] ?? null,
                     'notes' => $data['notes'] ?? null,
@@ -503,6 +616,7 @@ class InventoryService
                 'product_id' => $data['product_id'],
                 'quantity' => $data['quantity'],
                 'reference_number' => $data['reference_number'] ?? null,
+                'reason' => $data['reason'] ?? null,
                 'reference_type' => $data['reference_type'] ?? null,
                 'reference_id' => $data['reference_id'] ?? null,
                 'notes' => $data['notes'] ?? null,
@@ -514,46 +628,96 @@ class InventoryService
 
     /**
      * Reverse a previous stock transaction by creating the inverse movement.
+     *
+     * The reversal is a signed ADJUSTMENT linked to the original through
+     * `reverses_transaction_id` (unique, so a transaction can be reversed
+     * once even under concurrent requests). If the original came from an
+     * approved physical count or damage report, that document is reopened.
+     *
+     * @throws ConflictException when the transaction is a transfer, is itself
+     *         a reversal, was already reversed, or the stock is no longer
+     *         there to take back.
      */
-    public function reverseTransaction(StockTransaction $transaction): StockTransaction
+    public function reverseTransaction(StockTransaction $transaction, ?User $user = null): StockTransaction
     {
-        return DB::transaction(function () use ($transaction) {
-            $product = Product::findOrFail($transaction->product_id);
-            $quantityBefore = $product->quantity;
+        $user ??= auth()->user();
 
-            // Reverse the stock effect: if the original increased stock,
-            // the reversal decreases it, and vice versa.
-            $reversesIncrease = $transaction->increasesStock();
-            $product->updateStock($transaction->quantity, $reversesIncrease ? 'subtract' : 'add');
-            $quantityAfter = $product->quantity;
+        if (!$user) {
+            throw new \InvalidArgumentException('A user is required to reverse a transaction.');
+        }
 
-            if ($transaction->batch_id) {
-                $batch = Batch::find($transaction->batch_id);
-                if ($batch) {
-                    if ($reversesIncrease) {
-                        $batch->reduceQuantity($transaction->quantity);
-                    } else {
-                        $batch->increaseQuantity($transaction->quantity);
-                    }
-                }
+        return DB::transaction(function () use ($transaction, $user) {
+            // Serialise concurrent reversals of the same row.
+            $original = StockTransaction::whereKey($transaction->id)->lockForUpdate()->firstOrFail();
+
+            if ($original->type === StockTransactionType::TRANSFER) {
+                throw new ConflictException('Transfers do not change quantity and cannot be reversed.');
             }
 
-            $reversal = StockTransaction::create([
-                'product_id' => $product->id,
-                'batch_id' => $transaction->batch_id,
-                'user_id' => $transaction->user_id,
-                'type' => StockTransactionType::ADJUSTMENT,
-                'quantity' => $transaction->quantity,
-                'quantity_before' => $quantityBefore,
-                'quantity_after' => $quantityAfter,
-                'unit_cost' => $transaction->unit_cost,
-                'reference_type' => 'transaction_reversal',
-                'reference_id' => $transaction->id,
-                'notes' => "Reversal of transaction #{$transaction->id}",
-            ]);
+            if ($original->reverses_transaction_id !== null) {
+                throw new ConflictException('A reversal cannot itself be reversed. Record a new adjustment instead.');
+            }
+
+            if (StockTransaction::where('reverses_transaction_id', $original->id)->exists()) {
+                throw new ConflictException("Transaction #{$original->id} has already been reversed.");
+            }
+
+            $reversal = $this->applyStockChange(
+                (int) $original->product_id,
+                $original->batch_id !== null ? (int) $original->batch_id : null,
+                -$original->impact,
+                StockTransactionType::ADJUSTMENT,
+                $user,
+                [
+                    'unit_cost' => $original->unit_cost,
+                    'reference_type' => 'transaction_reversal',
+                    'reference_id' => $original->id,
+                    'reverses_transaction_id' => $original->id,
+                    'notes' => "Reversal of transaction #{$original->id}",
+                ],
+                $original->type === StockTransactionType::IN
+            );
+
+            $this->reopenSourceDocument($original);
 
             return $reversal;
         });
+    }
+
+    /**
+     * Undo the approval that produced a transaction, so the physical count or
+     * damage report can be reviewed again instead of staying "approved" with
+     * no stock effect behind it.
+     */
+    private function reopenSourceDocument(StockTransaction $original): void
+    {
+        if (!$original->reference_id) {
+            return;
+        }
+
+        switch ($original->reference_type) {
+            case 'physical_count':
+                $count = PhysicalCount::whereKey($original->reference_id)->lockForUpdate()->first();
+
+                if ($count && (int) $count->adjustment_transaction_id === (int) $original->id) {
+                    $count->update([
+                        'variance_approved' => false,
+                        'approved_by' => null,
+                        'approved_at' => null,
+                        'adjustment_transaction_id' => null,
+                        'approval_notes' => null,
+                    ]);
+                }
+                break;
+
+            case 'damage_report':
+                $report = DamageReport::whereKey($original->reference_id)->lockForUpdate()->first();
+
+                if ($report && in_array($report->status, ['approved', 'written_off'], true)) {
+                    $report->update(['status' => 'investigated']);
+                }
+                break;
+        }
     }
 
     /**
@@ -665,35 +829,168 @@ class InventoryService
     /**
      * Approve a physical count's variance and apply the resulting stock
      * adjustment so the system quantity matches the counted quantity.
+     * 
+     * This is idempotent - calling it multiple times on the same count
+     * will not create duplicate adjustments.
      */
     public function approveVarianceAdjustment(PhysicalCount $physicalCount): array
     {
-        $product = Product::findOrFail($physicalCount->product_id);
-        $adjustmentQuantity = $physicalCount->counted_quantity - $product->quantity;
-
-        if ($adjustmentQuantity === 0) {
+        // Idempotency check: if already approved, return existing transaction
+        if ($physicalCount->isApproved()) {
             return [
-                'quantity' => 0,
-                'type' => 'none',
+                'quantity' => abs($physicalCount->variance),
+                'type' => $physicalCount->variance > 0 ? 'increase' : ($physicalCount->variance < 0 ? 'decrease' : 'none'),
                 'physical_count_id' => $physicalCount->id,
+                'already_approved' => true,
+                'approved_at' => $physicalCount->approved_at,
+                'approved_by' => $physicalCount->approved_by,
+                'transaction_id' => $physicalCount->adjustment_transaction_id,
             ];
         }
 
-        $user = auth()->user();
+        if ($physicalCount->isRejected()) {
+            throw new ConflictException('This variance adjustment was rejected and can no longer be approved. Record a new count instead.');
+        }
 
-        $this->adjustStock([
-            'product_id' => $product->id,
-            'adjustment_quantity' => $adjustmentQuantity,
-            'reference_type' => 'physical_count',
-            'reference_id' => $physicalCount->id,
-            'notes' => "Variance adjustment from physical count #{$physicalCount->id}",
-        ], $user);
+        // Check if variance can be approved
+        if (!$physicalCount->canApproveVariance()) {
+            throw new \InvalidArgumentException(
+                $physicalCount->variance === 0 
+                    ? 'Cannot approve variance: count matches system quantity exactly'
+                    : 'Variance has already been approved'
+            );
+        }
 
-        return [
-            'quantity' => abs($adjustmentQuantity),
-            'type' => $adjustmentQuantity > 0 ? 'increase' : 'decrease',
-            'physical_count_id' => $physicalCount->id,
-        ];
+        return DB::transaction(function () use ($physicalCount) {
+            // Re-read under lock: two managers approving the same count must
+            // not both apply it.
+            $count = PhysicalCount::whereKey($physicalCount->id)->lockForUpdate()->firstOrFail();
+
+            if ($count->isApproved()) {
+                return [
+                    'quantity' => abs($count->variance),
+                    'type' => $count->variance > 0 ? 'increase' : ($count->variance < 0 ? 'decrease' : 'none'),
+                    'physical_count_id' => $count->id,
+                    'already_approved' => true,
+                    'approved_at' => $count->approved_at,
+                    'approved_by' => $count->approved_by,
+                    'transaction_id' => $count->adjustment_transaction_id,
+                ];
+            }
+
+            if ($count->isRejected()) {
+                throw new ConflictException('This variance adjustment was rejected and can no longer be approved. Record a new count instead.');
+            }
+
+            $product = Product::whereKey($count->product_id)->lockForUpdate()->firstOrFail();
+
+            // The variance was measured against the system quantity at count
+            // time. If stock has moved since, applying "current + variance"
+            // would corrupt the quantity, so refuse and ask for a recount.
+            if ((int) $product->quantity !== (int) $count->system_quantity) {
+                throw new ConflictException(
+                    "System quantity changed since the count was taken (counted against {$count->system_quantity}, "
+                    . "now {$product->quantity}). Record a new count before approving."
+                );
+            }
+
+            // Land exactly on the counted quantity.
+            $adjustmentQuantity = (int) $count->counted_quantity - (int) $product->quantity;
+
+            if ($adjustmentQuantity === 0) {
+                // Mark as approved even though no adjustment needed
+                $count->update([
+                    'variance_approved' => true,
+                    'approved_by' => auth()->id(),
+                    'approved_at' => now(),
+                    'approval_notes' => 'No adjustment needed - count matches system quantity',
+                ]);
+
+                return [
+                    'quantity' => 0,
+                    'type' => 'none',
+                    'physical_count_id' => $count->id,
+                    'already_approved' => false,
+                ];
+            }
+
+            $user = auth()->user();
+
+            // Apply the stock adjustment
+            $transaction = $this->adjustStock([
+                'product_id' => $product->id,
+                'adjustment_quantity' => $adjustmentQuantity,
+                'reference_type' => 'physical_count',
+                'reference_id' => $count->id,
+                'reference_number' => $count->count_reference,
+                'notes' => "Variance adjustment from physical count #{$count->id} - " .
+                          ($adjustmentQuantity > 0 ? 'Overage' : 'Shrinkage') .
+                          " of " . abs($adjustmentQuantity) . " units",
+            ], $user);
+
+            // Mark the physical count as approved with transaction reference
+            $count->update([
+                'variance_approved' => true,
+                'approved_by' => $user->id,
+                'approved_at' => now(),
+                'adjustment_transaction_id' => $transaction->id,
+                'approval_notes' => "Approved by {$user->name}",
+            ]);
+
+            return [
+                'quantity' => abs($adjustmentQuantity),
+                'type' => $adjustmentQuantity > 0 ? 'increase' : 'decrease',
+                'physical_count_id' => $count->id,
+                'transaction_id' => $transaction->id,
+                'already_approved' => false,
+            ];
+        });
+    }
+
+    /**
+     * Reject a physical count's variance adjustment.
+     *
+     * Stock is left untouched; the count is flagged as rejected so it drops
+     * out of the manager's pending queue and cannot be approved later.
+     * Idempotent for an already-rejected count.
+     */
+    public function rejectVarianceAdjustment(PhysicalCount $physicalCount, ?string $reason = null): array
+    {
+        return DB::transaction(function () use ($physicalCount, $reason) {
+            $count = PhysicalCount::whereKey($physicalCount->id)->lockForUpdate()->firstOrFail();
+
+            if ($count->isRejected()) {
+                return [
+                    'physical_count_id' => $count->id,
+                    'already_rejected' => true,
+                    'rejected_at' => $count->rejected_at,
+                    'rejected_by' => $count->rejected_by,
+                ];
+            }
+
+            if ($count->isApproved()) {
+                throw new ConflictException('This variance adjustment has already been approved and cannot be rejected.');
+            }
+
+            if ($count->variance === 0) {
+                throw new \InvalidArgumentException('Cannot reject variance: count matches system quantity exactly');
+            }
+
+            $user = auth()->user();
+
+            $count->update([
+                'rejected_by' => $user?->id,
+                'rejected_at' => now(),
+                'rejection_notes' => $reason !== null && trim($reason) !== '' ? trim($reason) : 'Rejected by manager',
+            ]);
+
+            return [
+                'physical_count_id' => $count->id,
+                'already_rejected' => false,
+                'rejected_at' => $count->rejected_at,
+                'rejected_by' => $count->rejected_by,
+            ];
+        });
     }
 
     /**
@@ -733,13 +1030,126 @@ class InventoryService
     }
 
     /**
-     * Mark a batch as expired regardless of its expiry date.
+     * Mark a batch as expired regardless of its expiry date, and write off
+     * whatever is still in it.
+     *
+     * The remaining quantity leaves the batch and the product through
+     * applyStockChange() as a signed ADJUSTMENT (reference_type
+     * 'batch_expiry'), so expiry shows up in the ledger and in shrinkage. Any
+     * reservation allocated against the batch is re-allocated or released.
      */
-    public function markBatchExpired(Batch $batch): Batch
+    public function markBatchExpired(Batch $batch, ?User $user = null): Batch
     {
-        $batch->status = \App\Support\Enums\BatchStatus::EXPIRED;
-        $batch->save();
+        $user ??= auth()->user();
 
-        return $batch->refresh();
+        if (!$user) {
+            throw new \InvalidArgumentException('A user is required to write off an expired batch.');
+        }
+
+        return DB::transaction(function () use ($batch, $user) {
+            // Same lock order as applyStockChange(): product, then batch.
+            Product::whereKey($batch->product_id)->lockForUpdate()->firstOrFail();
+            $locked = Batch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
+
+            $remaining = (int) $locked->quantity;
+
+            if ($remaining > 0) {
+                $this->applyStockChange(
+                    (int) $locked->product_id,
+                    (int) $locked->id,
+                    -$remaining,
+                    StockTransactionType::ADJUSTMENT,
+                    $user,
+                    [
+                        'reference_type' => 'batch_expiry',
+                        'reference_id' => $locked->id,
+                        'notes' => "Expired batch {$locked->batch_number} written off ({$remaining} units)",
+                    ]
+                );
+
+                $locked->refresh();
+            }
+
+            $locked->status = \App\Support\Enums\BatchStatus::EXPIRED;
+            $locked->save();
+
+            $this->reconcileReservationsForBatch($locked);
+
+            return $locked->refresh();
+        });
+    }
+
+    /**
+     * Make sure no allocated reservation promises stock a batch no longer
+     * has. Call it after anything that removes stock from a batch (damage
+     * write-off, expiry).
+     *
+     * Reservations are taken back newest first until what is left fits in the
+     * batch (an expired batch holds nothing). Each one is moved to the
+     * earliest-expiring other usable batch that can cover it; if none can, it
+     * goes back to `confirmed` with no batch, so it shows up for
+     * re-allocation, and managers are notified.
+     *
+     * @return array{reallocated: int[], unallocated: int[]} reservation ids
+     */
+    public function reconcileReservationsForBatch(Batch $batch): array
+    {
+        return DB::transaction(function () use ($batch) {
+            $result = ['reallocated' => [], 'unallocated' => []];
+
+            $batch = Batch::whereKey($batch->id)->lockForUpdate()->firstOrFail();
+            $capacity = $batch->status === \App\Support\Enums\BatchStatus::EXPIRED
+                ? 0
+                : (int) $batch->quantity;
+
+            $allocated = Reservation::where('batch_id', $batch->id)
+                ->where('status', 'allocated')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get();
+
+            $committed = (int) $allocated->sum('quantity');
+
+            foreach ($allocated as $reservation) {
+                if ($committed <= $capacity) {
+                    break;
+                }
+
+                $committed -= $reservation->quantity;
+
+                $alternative = Batch::where('product_id', $batch->product_id)
+                    ->where('id', '!=', $batch->id)
+                    ->usable()
+                    ->fefoOrder()
+                    ->lockForUpdate()
+                    ->get()
+                    ->first(fn (Batch $candidate) => $candidate->available_quantity >= $reservation->quantity);
+
+                if ($alternative) {
+                    $reservation->update(['batch_id' => $alternative->id]);
+                    $result['reallocated'][] = $reservation->id;
+                } else {
+                    $reservation->update([
+                        'batch_id' => null,
+                        'status' => 'confirmed',
+                        'notes' => trim(($reservation->notes ? $reservation->notes . "\n" : '')
+                            . "Batch {$batch->batch_number} stock written off; needs re-allocation."),
+                    ]);
+                    $result['unallocated'][] = $reservation->id;
+                }
+            }
+
+            if ($result['unallocated']) {
+                $this->notificationService->sendBulkNotification(
+                    'reservation_unallocated',
+                    'Reservations lost their batch after a write-off and need re-allocation ('
+                        . count($result['unallocated']) . ')',
+                    ['manager'],
+                    ['batch_id' => $batch->id, 'reservation_ids' => $result['unallocated']]
+                );
+            }
+
+            return $result;
+        });
     }
 }

@@ -105,7 +105,11 @@ class ProcurementRequest extends Model
      */
     public function scopePending($query)
     {
-        return $query->where('status', ProcurementRequestStatus::GENERATED);
+        return $query->whereIn('status', [
+            ProcurementRequestStatus::GENERATED,
+            ProcurementRequestStatus::REVIEWED,
+            ProcurementRequestStatus::APPROVED,
+        ]);
     }
 
     /**
@@ -274,6 +278,8 @@ class ProcurementRequest extends Model
      */
     public static function generateForLowStockProducts(?\App\Models\User $generator = null): \Illuminate\Database\Eloquent\Collection
     {
+        $calculator = app(\App\Modules\Procurement\Services\ReorderPointCalculator::class);
+        
         $lowStockProducts = \App\Modules\Inventory\Models\Product::lowStock()
             ->where('is_active', true)
             ->where('reorder_level', '>', 0)
@@ -287,17 +293,52 @@ class ProcurementRequest extends Model
                 continue;
             }
 
-            // Calculate suggested quantity (2x reorder level - current stock)
-            $suggestedQuantity = max(1, ($product->reorder_level * 2) - $product->quantity);
+            // Use available_quantity for low-stock check
+            $availableQuantity = $product->available_quantity ?? $product->quantity;
+            
+            // T21: Subtract quantity already on order (open POs) to avoid duplicate suggestions
+            $onOrderQuantity = \App\Modules\Procurement\Models\PurchaseOrderItem::whereHas(
+                'purchaseOrder',
+                fn($q) => $q->whereIn('status', ['approved', 'sent', 'received'])
+            )->where('product_id', $product->id)->sum('quantity');
 
-            // Determine priority based on current stock level
-            $priority = $product->quantity <= 0 ? 'urgent' :
-                       ($product->quantity < $product->reorder_level * 0.5 ? 'high' : 'medium');
+            $effectiveAvailable = $availableQuantity + $onOrderQuantity;
+
+            // If effective available (stock + on-order) already meets reorder level, skip
+            if ($effectiveAvailable >= $product->reorder_level) {
+                continue;
+            }
+
+            // Adjust available quantity used in downstream calculations
+            $availableQuantity = $effectiveAvailable;
+            
+            try {
+                // Get calculated reorder point and recommendations
+                $recommendations = $calculator->getReorderPointRecommendations($product);
+                $optimalReorderPoint = $recommendations['recommendations'][95]['reorder_point'] ?? $product->reorder_level;
+                
+                // Calculate suggested quantity using calculator logic
+                $demandAnalysis = $calculator->analyzeDemand($product, 60); // 60 days for request generation
+                $leadTimeAnalysis = $calculator->analyzeLeadTime($product);
+                
+                // Suggested quantity = enough to cover lead time + buffer
+                $leadTimeDemand = $demandAnalysis['average_daily_demand'] * $leadTimeAnalysis['average_lead_time'];
+                $suggestedQuantity = max(1, ceil($leadTimeDemand - $availableQuantity));
+                
+            } catch (\Exception $e) {
+                // Fallback to simple calculation if calculator fails
+                $optimalReorderPoint = $product->reorder_level;
+                $suggestedQuantity = max(1, ($product->reorder_level * 2) - $availableQuantity);
+            }
+
+            // Determine priority based on available stock level  
+            $priority = $availableQuantity <= 0 ? 'urgent' :
+                       ($availableQuantity < $optimalReorderPoint * 0.5 ? 'high' : 'medium');
 
             $request = static::create([
                 'product_id' => $product->id,
-                'current_stock' => $product->quantity,
-                'reorder_point' => $product->reorder_level,
+                'current_stock' => $availableQuantity,
+                'reorder_point' => $optimalReorderPoint,
                 'suggested_quantity' => $suggestedQuantity,
                 'priority' => $priority,
                 'status' => ProcurementRequestStatus::GENERATED,

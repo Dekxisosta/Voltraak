@@ -242,7 +242,11 @@ class PurchaseOrder extends Model
      */
     public function canBeDelivered(): bool
     {
-        return in_array($this->status, [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::SENT]);
+        return in_array($this->status, [
+            PurchaseOrderStatus::APPROVED,
+            PurchaseOrderStatus::SENT,
+            PurchaseOrderStatus::RECEIVED,
+        ]);
     }
 
     /**
@@ -281,6 +285,29 @@ class PurchaseOrder extends Model
         $this->status = PurchaseOrderStatus::APPROVED;
         $this->approved_by = $approver?->id;
         $this->approved_at = now();
+        return $this->save();
+    }
+
+    /**
+     * Check if the order can be rejected (only pending orders can be).
+     */
+    public function canBeRejected(): bool
+    {
+        return $this->status === PurchaseOrderStatus::PENDING;
+    }
+
+    /**
+     * Reject the purchase order.
+     */
+    public function reject(?\App\Models\User $reviewer = null, ?string $reason = null): bool
+    {
+        if (!$this->canBeRejected()) {
+            return false;
+        }
+
+        $this->status = PurchaseOrderStatus::REJECTED;
+        $this->rejection_reason = $reason;
+        $this->approval_notes = $reviewer ? "Rejected by {$reviewer->name}" : null;
         return $this->save();
     }
 

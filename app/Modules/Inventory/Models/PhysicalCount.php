@@ -23,6 +23,14 @@ class PhysicalCount extends Model
         'count_reference',
         'notes',
         'count_date',
+        'variance_approved',
+        'approved_by',
+        'approved_at',
+        'adjustment_transaction_id',
+        'approval_notes',
+        'rejected_by',
+        'rejected_at',
+        'rejection_notes',
     ];
 
     protected $casts = [
@@ -33,6 +41,9 @@ class PhysicalCount extends Model
         'exceeds_threshold' => 'boolean',
         'threshold_used' => 'decimal:2',
         'count_date' => 'datetime',
+        'variance_approved' => 'boolean',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     /**
@@ -49,6 +60,30 @@ class PhysicalCount extends Model
     public function counter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'counted_by');
+    }
+
+    /**
+     * Get the user who approved the variance
+     */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * Get the user who rejected the variance
+     */
+    public function rejecter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    /**
+     * Get the stock transaction created when approving variance
+     */
+    public function adjustmentTransaction(): BelongsTo
+    {
+        return $this->belongsTo(StockTransaction::class, 'adjustment_transaction_id');
     }
 
     /**
@@ -126,6 +161,62 @@ class PhysicalCount extends Model
     }
 
     /**
+     * Check if variance can be approved
+     */
+    public function canApproveVariance(): bool
+    {
+        return !$this->variance_approved && !$this->isRejected() && $this->variance !== 0;
+    }
+
+    /**
+     * Check if the variance adjustment was rejected by a manager
+     */
+    public function isRejected(): bool
+    {
+        return $this->rejected_at !== null;
+    }
+
+    /**
+     * Approval workflow state: none (no variance), pending, approved, rejected
+     */
+    public function getApprovalStatusAttribute(): string
+    {
+        if ($this->variance_approved) {
+            return 'approved';
+        }
+
+        if ($this->isRejected()) {
+            return 'rejected';
+        }
+
+        return $this->variance !== 0 ? 'pending' : 'none';
+    }
+
+    /**
+     * Whether this count belongs in the manager's adjustment-approval queue:
+     * it has a variance and either exceeds the variance threshold or has
+     * already been decided (so history stays visible after approve/reject).
+     */
+    public function requiresManagerApproval(): bool
+    {
+        if ($this->variance === 0) {
+            return false;
+        }
+
+        return (bool) $this->exceeds_threshold
+            || (bool) $this->variance_approved
+            || $this->isRejected();
+    }
+
+    /**
+     * Check if variance has already been approved
+     */
+    public function isApproved(): bool
+    {
+        return $this->variance_approved;
+    }
+
+    /**
      * Get count accuracy level
      */
     public function getAccuracyLevelAttribute(): string
@@ -144,6 +235,24 @@ class PhysicalCount extends Model
     public function scopeExceedsThreshold($query)
     {
         return $query->where('exceeds_threshold', true);
+    }
+
+    /**
+     * Scope: Approved variances
+     */
+    public function scopeApproved($query)
+    {
+        return $query->where('variance_approved', true);
+    }
+
+    /**
+     * Scope: Pending approval (has variance but not approved)
+     */
+    public function scopePendingApproval($query)
+    {
+        return $query->where('variance_approved', false)
+                    ->whereNull('rejected_at')
+                    ->whereRaw('counted_quantity != system_quantity');
     }
 
     /**

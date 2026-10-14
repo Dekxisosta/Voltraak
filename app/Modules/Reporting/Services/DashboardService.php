@@ -117,15 +117,15 @@ class DashboardService
                 'severity' => 'critical',
                 'title' => 'Products Out of Stock',
                 'message' => "{$outOfStockCount} products are currently out of stock",
-                'action_url' => '/inventory/products?status=out_of_stock',
+                'action_url' => '/inventory?tab=products&filter=out_of_stock',
                 'count' => $outOfStockCount
             ];
         }
 
-        // Low stock alerts
-        $lowStockCount = Product::whereRaw('quantity <= reorder_level')
+        // Low stock alerts - unified definition across all dashboards
+        $lowStockCount = Product::where('is_active', true)
+            ->whereColumn('quantity', '<=', 'reorder_level')
             ->where('reorder_level', '>', 0)
-            ->where('quantity', '>', 0)
             ->count();
 
         if ($lowStockCount > 0) {
@@ -134,13 +134,14 @@ class DashboardService
                 'severity' => 'warning',
                 'title' => 'Low Stock Alert',
                 'message' => "{$lowStockCount} products are below reorder point",
-                'action_url' => '/inventory/products?status=low_stock',
+                'action_url' => '/inventory?tab=products&filter=low_stock',
                 'count' => $lowStockCount
             ];
         }
 
-        // Expiring batches
-        $expiringBatchesCount = Batch::where('expiry_date', '<=', Carbon::now()->addDays(30))
+        // Expiring batches (not expired yet) - use config for warning days
+        $warningDays = (int) config('ims.expiry.warning_days', 60);
+        $expiringBatchesCount = Batch::whereBetween('expiry_date', [Carbon::now(), Carbon::now()->addDays($warningDays)])
             ->where('quantity', '>', 0)
             ->count();
 
@@ -149,13 +150,13 @@ class DashboardService
                 'type' => 'expiring_batches',
                 'severity' => 'warning',
                 'title' => 'Batches Expiring Soon',
-                'message' => "{$expiringBatchesCount} batches expire within 30 days",
-                'action_url' => '/inventory/batches?status=expiring_soon',
+                'message' => "{$expiringBatchesCount} batches expire within {$warningDays} days",
+                'action_url' => '/inventory?tab=batches&filter=expiring_soon',
                 'count' => $expiringBatchesCount
             ];
         }
 
-        // Expired batches with stock
+        // Expired batches with stock (clearly separated from expiring)
         $expiredBatchesCount = Batch::where('expiry_date', '<', Carbon::now())
             ->where('quantity', '>', 0)
             ->count();
@@ -166,7 +167,7 @@ class DashboardService
                 'severity' => 'critical',
                 'title' => 'Expired Batches with Stock',
                 'message' => "{$expiredBatchesCount} expired batches still have inventory",
-                'action_url' => '/inventory/batches?status=expired',
+                'action_url' => '/inventory?tab=batches&filter=expired',
                 'count' => $expiredBatchesCount
             ];
         }
@@ -182,7 +183,7 @@ class DashboardService
                 'severity' => 'warning',
                 'title' => 'Overdue Purchase Orders',
                 'message' => "{$overduePOsCount} purchase orders are past due",
-                'action_url' => '/procurement/purchase-orders?status=overdue',
+                'action_url' => '/procurement?tab=purchase-orders&filter=overdue',
                 'count' => $overduePOsCount
             ];
         }
@@ -198,7 +199,7 @@ class DashboardService
                 'severity' => 'warning',
                 'title' => 'Urgent Reorder Suggestions',
                 'message' => "{$pendingRequestsCount} urgent reorder suggestions awaiting review",
-                'action_url' => '/procurement/requests?status=generated&priority=urgent',
+                'action_url' => '/procurement?tab=requests&filter=urgent',
                 'count' => $pendingRequestsCount
             ];
         }
@@ -285,7 +286,7 @@ class DashboardService
         // Calculate completion rate for current and previous periods
         $currentPeriodTotal = PurchaseOrder::whereBetween('order_date', [$startDate, $endDate])->count();
         $currentPeriodCompleted = PurchaseOrder::whereBetween('order_date', [$startDate, $endDate])
-            ->where('status', PurchaseOrderStatus::RECEIVED)
+            ->whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->count();
             
         $currentRate = $currentPeriodTotal > 0 ? ($currentPeriodCompleted / $currentPeriodTotal) * 100 : 0;
@@ -293,7 +294,7 @@ class DashboardService
         $previousPeriodStart = $startDate->copy()->subDays($startDate->diffInDays($endDate));
         $previousPeriodTotal = PurchaseOrder::whereBetween('order_date', [$previousPeriodStart, $startDate])->count();
         $previousPeriodCompleted = PurchaseOrder::whereBetween('order_date', [$previousPeriodStart, $startDate])
-            ->where('status', PurchaseOrderStatus::RECEIVED)
+            ->whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->count();
             
         $previousRate = $previousPeriodTotal > 0 ? ($previousPeriodCompleted / $previousPeriodTotal) * 100 : 0;
@@ -344,7 +345,7 @@ class DashboardService
     private function getFinancialOverview(Carbon $startDate, Carbon $endDate): array
     {
         $purchaseOrderValue = PurchaseOrder::whereBetween('order_date', [$startDate, $endDate])
-            ->whereIn('status', [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::SENT, PurchaseOrderStatus::RECEIVED])
+            ->whereIn('status', [PurchaseOrderStatus::APPROVED, PurchaseOrderStatus::SENT, PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED])
             ->sum('total_amount');
             
         $carryingCost = $this->analyticsService->calculateCarryingCost();
@@ -391,7 +392,7 @@ class DashboardService
             'daily_transactions' => StockTransaction::whereDate('created_at', $today)->count(),
             'weekly_physical_counts' => \App\Modules\Inventory\Models\PhysicalCount::where('count_date', '>=', $thisWeek)->count(),
             'pending_pos' => PurchaseOrder::where('status', PurchaseOrderStatus::PENDING)->count(),
-            'low_stock_products' => Product::whereRaw('quantity <= reorder_level')->where('reorder_level', '>', 0)->count(),
+            'low_stock_products' => Product::whereColumn('quantity', '<=', 'reorder_level')->where('reorder_level', '>', 0)->count(),
             'accuracy_this_week' => $this->getWeeklyAccuracy($thisWeek),
             'fefo_violations' => $this->getRecentFEFOViolations()
         ];
@@ -400,9 +401,10 @@ class DashboardService
     /**
      * Get weekly accuracy.
      */
-    private function getWeeklyAccuracy(Carbon $startOfWeek): float
+    private function getWeeklyAccuracy(Carbon $startOfWeek, Carbon $weekEnd = null): float
     {
-        $counts = \App\Modules\Inventory\Models\PhysicalCount::where('count_date', '>=', $startOfWeek)->get();
+        $weekEnd = $weekEnd ?? $startOfWeek->copy()->addWeek();
+        $counts = \App\Modules\Inventory\Models\PhysicalCount::whereBetween('count_date', [$startOfWeek, $weekEnd])->get();
         
         if ($counts->isEmpty()) return 0;
         
@@ -441,6 +443,7 @@ class DashboardService
     {
         return \App\Modules\Inventory\Models\PhysicalCount::where('created_at', '>=', Carbon::now()->subDays(7))
             ->whereRaw('ABS(variance_percentage) > 5')
+            ->where('variance_approved', false) // Add this filter
             ->count();
     }
 
@@ -460,14 +463,14 @@ class DashboardService
 
                 return [
                     'type' => 'stock_transaction',
-                    'description' => "{$transaction->type} - {$transaction->quantity} units of {$productName}",
+                    'description' => "{$transaction->type->value} - {$transaction->quantity} units of {$productName}",
                     'user' => $transaction->user->name ?? 'System',
                     'timestamp' => $transaction->created_at,
                     'details' => [
                         'transaction_id' => $transaction->id,
                         'product_name' => $transaction->product->name ?? 'Unknown',
                         'quantity' => $transaction->quantity,
-                        'type' => $transaction->type
+                        'type' => $transaction->type->value
                     ]
                 ];
             });
@@ -533,7 +536,7 @@ class DashboardService
             $weekStart = $startDate->copy()->addWeeks($i);
             $weekEnd = $weekStart->copy()->addWeek();
             
-            $accuracy = $this->getWeeklyAccuracy($weekStart);
+            $accuracy = $this->getWeeklyAccuracy($weekStart, $weekEnd);
             
             $weeks[] = [
                 'week' => $weekStart->format('M d'),
@@ -584,7 +587,7 @@ class DashboardService
 
         return $suppliers->map(function ($supplier) {
             $orders = $supplier->purchaseOrders;
-            $deliveredOrders = $orders->where('status', PurchaseOrderStatus::RECEIVED);
+            $deliveredOrders = $orders->whereIn('status', [PurchaseOrderStatus::RECEIVED, PurchaseOrderStatus::COMPLETED]);
             
             $onTimeDeliveries = $deliveredOrders->filter(function ($order) {
                 return $order->actual_delivery_date && 
@@ -638,7 +641,7 @@ class DashboardService
             'expiring_batches_today' => Batch::whereDate('expiry_date', $today)
                 ->where('quantity', '>', 0)
                 ->count(),
-            'low_stock_check' => Product::whereRaw('quantity <= reorder_level')
+            'low_stock_check' => Product::whereColumn('quantity', '<=', 'reorder_level')
                 ->where('reorder_level', '>', 0)
                 ->count(),
             'pending_stock_ins' => $this->getPendingStockIns()

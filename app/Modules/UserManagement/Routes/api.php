@@ -22,13 +22,15 @@ use App\Modules\UserManagement\Controllers\UserController;
 
 Route::prefix('auth')->name('auth.')->group(function () {
     // Public authentication routes
-    Route::post('login', [AuthController::class, 'login'])->name('login');
-    Route::post('register', [AuthController::class, 'register'])->name('register');
-    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->name('forgot-password');
-    Route::post('reset-password', [AuthController::class, 'resetPassword'])->name('reset-password');
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login')->name('login');
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:6,1')->name('forgot-password');
+    Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:6,1')->name('reset-password');
     
     // Protected authentication routes
     Route::middleware('auth:sanctum')->group(function () {
+        // Account creation is manager-only (RegisterRequest enforces the role);
+        // it must never be reachable without authentication.
+        Route::post('register', [AuthController::class, 'register'])->name('register');
         Route::post('logout', [AuthController::class, 'logout'])->name('logout');
         Route::get('me', [AuthController::class, 'me'])->name('me');
         Route::get('check', [AuthController::class, 'check'])->name('check');
@@ -45,29 +47,38 @@ Route::prefix('auth')->name('auth.')->group(function () {
 */
 
 Route::middleware('auth:sanctum')->prefix('users')->name('users.')->group(function () {
-    
-    // User profile routes (self-service)
+
+    // User profile routes (self-service, any authenticated role)
     Route::get('profile', [UserController::class, 'profile'])->name('profile');
     Route::put('profile', [UserController::class, 'updateProfile'])->name('update-profile');
-    
-    // User CRUD routes (admin/manager access)
-    Route::get('/', [UserController::class, 'index'])->name('index');
-    Route::post('/', [UserController::class, 'store'])->name('store');
-    Route::get('{id}', [UserController::class, 'show'])->name('show');
-    Route::put('{id}', [UserController::class, 'update'])->name('update');
-    Route::delete('{id}', [UserController::class, 'destroy'])->name('destroy');
-    
-    // User status management
-    Route::patch('{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('toggle-status');
-    Route::post('{id}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
-    
-    // Bulk operations
-    Route::post('bulk-update', [UserController::class, 'bulkUpdate'])->name('bulk-update');
-    
-    // Analytics and reports
-    Route::get('statistics', [UserController::class, 'statistics'])->name('statistics');
-    Route::get('requires-attention', [UserController::class, 'requiresAttention'])->name('requires-attention');
-    Route::get('{id}/activity-report', [UserController::class, 'activityReport'])->name('activity-report');
+
+    // Everything below is user administration: manager and admin only.
+    // Fine-grained rules (who may touch which role) live in UserService and
+    // the FormRequests. Static segments (statistics, requires-attention,
+    // bulk-update) are registered BEFORE the `{id}` routes and every `{id}`
+    // is constrained to digits, otherwise GET /users/statistics is captured
+    // by GET /users/{id} and fails with a type error instead of returning stats.
+    Route::middleware('role:manager')->group(function () {
+        // Analytics and reports
+        Route::get('statistics', [UserController::class, 'statistics'])->name('statistics');
+        Route::get('requires-attention', [UserController::class, 'requiresAttention'])->name('requires-attention');
+
+        // Bulk operations
+        Route::post('bulk-update', [UserController::class, 'bulkUpdate'])->name('bulk-update');
+
+        // User CRUD routes
+        Route::get('/', [UserController::class, 'index'])->name('index');
+        Route::post('/', [UserController::class, 'store'])->name('store');
+        Route::get('{id}', [UserController::class, 'show'])->whereNumber('id')->name('show');
+        Route::put('{id}', [UserController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('{id}', [UserController::class, 'destroy'])->whereNumber('id')->name('destroy');
+
+        // User status management
+        Route::patch('{id}/toggle-status', [UserController::class, 'toggleStatus'])->whereNumber('id')->name('toggle-status');
+        Route::post('{id}/reset-password', [UserController::class, 'resetPassword'])->whereNumber('id')->name('reset-password');
+
+        Route::get('{id}/activity-report', [UserController::class, 'activityReport'])->whereNumber('id')->name('activity-report');
+    });
 });
 
 /*

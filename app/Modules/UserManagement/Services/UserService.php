@@ -26,12 +26,17 @@ class UserService
         $query = User::query();
 
         // Apply filters
-        if (!empty($filters['role'])) {
+        if (!empty($filters['role']) && UserRole::tryFrom($filters['role'])) {
             $query->where('role', UserRole::from($filters['role']));
         }
 
-        if (!empty($filters['is_active'])) {
-            $query->where('is_active', $filters['is_active']);
+        // is_active=0 / "false" is a legitimate filter value, so test for
+        // presence rather than truthiness (empty('0') is true in PHP).
+        if (isset($filters['is_active']) && $filters['is_active'] !== '') {
+            $isActive = filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isActive !== null) {
+                $query->where('is_active', $isActive);
+            }
         }
 
         if (!empty($filters['department'])) {
@@ -46,8 +51,10 @@ class UserService
         }
 
         // Apply sorting
-        $sortField = $filters['sort_by'] ?? 'name';
-        $sortDirection = $filters['sort_direction'] ?? 'asc';
+        // Whitelist sortable columns / directions - these come straight from the query string.
+        $sortable = ['name', 'email', 'role', 'department', 'is_active', 'last_login_at', 'created_at'];
+        $sortField = in_array($filters['sort_by'] ?? null, $sortable, true) ? $filters['sort_by'] : 'name';
+        $sortDirection = strtolower($filters['sort_direction'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
         $query->orderBy($sortField, $sortDirection);
 
         return $query->paginate($perPage);
@@ -118,6 +125,9 @@ class UserService
 
         $originalData = $user->toArray();
 
+        // current_password is only a validation input (checked in UpdateUserRequest)
+        unset($data['current_password']);
+
         // Handle password update separately
         if (!empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);
@@ -152,6 +162,10 @@ class UserService
             throw new ValidationException([], 'You do not have permission to modify this user');
         }
 
+        if ($user->id === $currentUser->id) {
+            throw new ValidationException([], 'You cannot deactivate your own account');
+        }
+
         $newStatus = !$user->is_active;
         $user->update(['is_active' => $newStatus]);
 
@@ -182,12 +196,12 @@ class UserService
         $user = $this->getUserById($id);
         $currentUser = Auth::user();
 
-        if (!$this->canManageUser($currentUser, $user->role->value)) {
-            throw new ValidationException([], 'You do not have permission to delete this user');
-        }
-
         if ($user->id === $currentUser->id) {
             throw new ValidationException([], 'You cannot delete your own account');
+        }
+
+        if (!$this->canManageUser($currentUser, $user->role->value)) {
+            throw new ValidationException([], 'You do not have permission to delete this user');
         }
 
         // Check for existing relationships that prevent deletion
@@ -325,10 +339,8 @@ class UserService
             return false;
         }
 
-        $targetRoleEnum = UserRole::from($targetRole);
-        
-        // Managers can manage warehouse and inventory staff, but not other managers
-        return $targetRoleEnum !== UserRole::MANAGER;
+        // Admins manage every role; managers manage warehouse + inventory staff only.
+        return $currentUser->canManageRole($targetRole);
     }
 
     /**
@@ -342,7 +354,7 @@ class UserService
 
         // Users can update their own profile (limited fields)
         if ($currentUser->id === $targetUser->id) {
-            $allowedSelfUpdates = ['name', 'email', 'phone', 'password'];
+            $allowedSelfUpdates = ['name', 'email', 'phone', 'password', 'current_password'];
             $updateKeys = array_keys($updates);
             
             return empty(array_diff($updateKeys, $allowedSelfUpdates));

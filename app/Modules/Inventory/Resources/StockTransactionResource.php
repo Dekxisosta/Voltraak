@@ -14,26 +14,33 @@ class StockTransactionResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $type = $this->typeValue();
+
         return [
             'id' => $this->id,
             'product_id' => $this->product_id,
             'batch_id' => $this->batch_id,
             'user_id' => $this->user_id,
-            'type' => $this->type,
+            'type' => $type,
             'quantity' => $this->quantity,
+            'quantity_before' => $this->quantity_before,
+            'quantity_after' => $this->quantity_after,
             'unit_cost' => $this->unit_cost,
             'total_cost' => $this->total_cost,
+            'reference_number' => $this->reference_number,
+            'reason' => $this->reason,
             'reference_type' => $this->reference_type,
             'reference_id' => $this->reference_id,
             'notes' => $this->notes,
+            'transaction_date' => $this->transaction_date,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             
             // Transaction details
             'transaction_info' => [
                 'type_label' => $this->getTypeLabel(),
-                'is_inbound' => in_array($this->type, ['in', 'adjustment']) && $this->quantity > 0,
-                'is_outbound' => in_array($this->type, ['out', 'adjustment']) && $this->quantity < 0,
+                'is_inbound' => in_array($type, ['in', 'return', 'adjustment'], true) && $this->quantity > 0,
+                'is_outbound' => ($type === 'out') || ($type === 'adjustment' && $this->quantity < 0),
                 'absolute_quantity' => abs($this->quantity),
                 'transaction_value' => $this->quantity * $this->unit_cost,
                 'formatted_date' => $this->created_at->format('M d, Y H:i'),
@@ -57,31 +64,36 @@ class StockTransactionResource extends JsonResource
             
             // Relationships
             'product' => $this->when($this->relationLoaded('product'), function() {
-                return [
+                return $this->product ? [
                     'id' => $this->product->id,
                     'name' => $this->product->name,
                     'sku' => $this->product->sku,
                     'category' => $this->product->category,
-                ];
+                ] : null;
             }),
             
+            // Null for movements that are not tied to a batch.
             'batch' => $this->when($this->relationLoaded('batch'), function() {
-                return [
+                return $this->batch ? [
                     'id' => $this->batch->id,
                     'batch_number' => $this->batch->batch_number,
                     'expiry_date' => $this->batch->expiry_date,
-                    'status' => $this->batch->status,
+                    'status' => $this->batch->status instanceof \BackedEnum
+                        ? $this->batch->status->value
+                        : $this->batch->status,
                     'quantity' => $this->batch->quantity
-                ];
+                ] : null;
             }),
             
             'user' => $this->when($this->relationLoaded('user'), function() {
-                return [
+                return $this->user ? [
                     'id' => $this->user->id,
                     'name' => $this->user->name,
                     'email' => $this->user->email,
-                    'role' => $this->user->role
-                ];
+                    'role' => $this->user->role instanceof \BackedEnum
+                        ? $this->user->role->value
+                        : $this->user->role
+                ] : null;
             }),
             
             // Context information for different transaction types
@@ -92,26 +104,36 @@ class StockTransactionResource extends JsonResource
                 'has_reference' => !is_null($this->reference_type) && !is_null($this->reference_id),
                 'has_batch' => !is_null($this->batch_id),
                 'has_notes' => !is_null($this->notes) && strlen($this->notes) > 0,
-                'is_adjustment' => $this->type === 'adjustment',
+                'is_adjustment' => $type === 'adjustment',
                 'is_recent' => $this->created_at->diffInHours() <= 24
             ]
         ];
     }
     
     /**
+     * `type` is cast to the StockTransactionType enum, so it has to be turned
+     * back into its string value before it is compared with strings (match(),
+     * ===, in_array) or passed to string functions like ucfirst().
+     */
+    private function typeValue(): string
+    {
+        return $this->type instanceof \BackedEnum ? $this->type->value : (string) $this->type;
+    }
+
+    /**
      * Get human-readable type label.
      */
     private function getTypeLabel(): string
     {
-        return match($this->type) {
+        return match($this->typeValue()) {
             'in' => 'Stock In',
             'out' => 'Stock Out', 
             'adjustment' => $this->quantity > 0 ? 'Adjustment (Increase)' : 'Adjustment (Decrease)',
             'transfer' => 'Transfer',
             'damaged' => 'Damaged Stock',
             'expired' => 'Expired Stock',
-            'returned' => 'Customer Return',
-            default => ucfirst($this->type)
+            'return', 'returned' => 'Customer Return',
+            default => ucfirst($this->typeValue())
         };
     }
     
@@ -148,7 +170,7 @@ class StockTransactionResource extends JsonResource
         ];
         
         // Add type-specific context
-        switch($this->type) {
+        switch($this->typeValue()) {
             case 'adjustment':
                 $context['adjustment_reason'] = $this->getAdjustmentReason();
                 break;
@@ -170,13 +192,13 @@ class StockTransactionResource extends JsonResource
      */
     private function getTransactionCategory(): string
     {
-        return match($this->type) {
+        return match($this->typeValue()) {
             'in' => 'replenishment',
             'out' => 'consumption',
             'adjustment' => 'correction',
             'transfer' => 'movement',
             'damaged', 'expired' => 'loss',
-            'returned' => 'recovery',
+            'return', 'returned' => 'recovery',
             default => 'other'
         };
     }
@@ -186,15 +208,15 @@ class StockTransactionResource extends JsonResource
      */
     private function getTransactionPriority(): string
     {
-        if ($this->type === 'adjustment' && abs($this->quantity) > 100) {
+        if ($this->typeValue() === 'adjustment' && abs($this->quantity) > 100) {
             return 'high';
         }
         
-        if (in_array($this->type, ['damaged', 'expired']) && $this->quantity > 50) {
+        if (in_array($this->typeValue(), ['damaged', 'expired']) && $this->quantity > 50) {
             return 'high';
         }
         
-        if ($this->type === 'out' && $this->relationLoaded('batch')) {
+        if ($this->typeValue() === 'out' && $this->relationLoaded('batch')) {
             $batch = $this->batch;
             if ($batch && $batch->expiry_date && $batch->expiry_date->diffInDays() <= 7) {
                 return 'high'; // Using expiring batch
@@ -210,12 +232,12 @@ class StockTransactionResource extends JsonResource
     private function requiresApproval(): bool
     {
         // Large adjustments require approval
-        if ($this->type === 'adjustment' && abs($this->quantity) > 100) {
+        if ($this->typeValue() === 'adjustment' && abs($this->quantity) > 100) {
             return true;
         }
         
         // High-value transactions require approval
-        if (abs($this->total_cost) > 10000) {
+        if (abs((float) $this->total_cost) > 10000) {
             return true;
         }
         
@@ -233,7 +255,7 @@ class StockTransactionResource extends JsonResource
         }
         
         // Some transaction types are not easily reversible
-        if (in_array($this->type, ['expired', 'damaged'])) {
+        if (in_array($this->typeValue(), ['expired', 'damaged'])) {
             return false;
         }
         
@@ -253,7 +275,7 @@ class StockTransactionResource extends JsonResource
             return 'Damage report adjustment';
         }
         
-        if (stripos($this->notes, 'correction') !== false) {
+        if (stripos((string) $this->notes, 'correction') !== false) {
             return 'Manual correction';
         }
         

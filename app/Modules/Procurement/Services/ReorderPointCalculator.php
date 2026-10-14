@@ -24,8 +24,20 @@ class ReorderPointCalculator
      */
     public function calculateReorderPoint(Product $product, int $analysisPeriodDays = 90): int
     {
+        $minHistoryDays = config('ims.reorder.min_history_days', 30);
+        
+        // Enforce minimum history requirement
+        if ($analysisPeriodDays < $minHistoryDays) {
+            throw new \InvalidArgumentException("Analysis period must be at least {$minHistoryDays} days");
+        }
+
         // Get demand data
         $demandData = $this->analyzeDemand($product, $analysisPeriodDays);
+        
+        // Skip if insufficient data
+        if ($demandData['transaction_count'] < ($minHistoryDays / 7)) {
+            return $product->reorder_point ?? $product->reorder_level ?? 1;
+        }
         
         // Get lead time data
         $leadTimeData = $this->analyzeLeadTime($product);
@@ -126,6 +138,12 @@ class ReorderPointCalculator
         }
         
         $mean = $values->avg();
+        
+        // Guard against zero mean for percentage calculations
+        if ($mean == 0) {
+            return 0;
+        }
+        
         $squaredDifferences = $values->map(function ($value) use ($mean) {
             return pow($value - $mean, 2);
         });
@@ -171,6 +189,12 @@ class ReorderPointCalculator
             return 1.0;
         }
         
+        // Ensure minimum period for stable calculation
+        $periodDays = $currentPeriodStart->diffInDays($currentPeriodEnd);
+        if ($periodDays < 7) {
+            return 1.0; // No seasonal adjustment for very short periods
+        }
+        
         $lastYearStart = $currentPeriodStart->copy()->subYear();
         $lastYearEnd = $currentPeriodEnd->copy()->subYear();
         
@@ -182,7 +206,9 @@ class ReorderPointCalculator
         $currentPeriodDemand = $recentTransactions->sum('quantity');
         
         if ($lastYearTransactions > 0) {
-            return $currentPeriodDemand / $lastYearTransactions;
+            $factor = $currentPeriodDemand / $lastYearTransactions;
+            // Clamp seasonal factor to avoid extreme values (between 0.5x and 3.0x)
+            return max(0.5, min(3.0, $factor));
         }
         
         return 1.0; // No seasonal adjustment if no historical data
@@ -226,9 +252,11 @@ class ReorderPointCalculator
         
         $averageLeadTime = $leadTimes->avg();
         $leadTimeVariance = $this->calculateVariance($leadTimes);
-        
-        // Calculate reliability factor based on variance
-        $reliabilityFactor = 1 + (sqrt($leadTimeVariance) / $averageLeadTime);
+
+        // Calculate reliability factor based on variance with division guard
+        $reliabilityFactor = $averageLeadTime > 0 
+            ? 1 + (sqrt($leadTimeVariance) / $averageLeadTime)
+            : 1.2; // Default 20% buffer
         
         return [
             'average_lead_time' => $averageLeadTime,

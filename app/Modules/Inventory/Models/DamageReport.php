@@ -12,11 +12,18 @@ class DamageReport extends Model
 {
     use HasFactory;
 
+    /**
+     * 'rejected' is not a status in the damage_reports enum, so a manager's
+     * rejection is recorded in investigation_notes behind this marker.
+     */
+    public const REJECTION_MARKER = 'Rejection reason:';
+
     protected $fillable = [
         'product_id',
         'batch_id',
         'quantity_damaged',
         'damage_type',
+        'severity',
         'description',
         'estimated_value',
         'photo_path',
@@ -70,6 +77,15 @@ class DamageReport extends Model
     }
 
     /**
+     * Whether a manager rejected this report (see REJECTION_MARKER)
+     */
+    public function isRejected(): bool
+    {
+        return $this->status === 'investigated'
+            && str_contains((string) $this->investigation_notes, self::REJECTION_MARKER);
+    }
+
+    /**
      * Check if report can be investigated
      */
     public function canBeInvestigated(): bool
@@ -92,7 +108,7 @@ class DamageReport extends Model
     {
         if ($this->canBeInvestigated()) {
             $this->investigated_by = $investigator->id;
-            $this->status = 'investigating';
+            // Skip 'investigating' status as it's not in migration, stay 'reported'
             return $this->save();
         }
         
@@ -104,7 +120,7 @@ class DamageReport extends Model
      */
     public function completeInvestigation(string $notes, string $actionTaken = null): bool
     {
-        if ($this->status === 'investigating' || $this->status === 'reported') {
+        if ($this->status === 'reported') { // Only check 'reported' since we skip 'investigating'
             $this->investigation_notes = $notes;
             $this->action_taken = $actionTaken;
             $this->investigated_at = now();
@@ -115,62 +131,9 @@ class DamageReport extends Model
         return false;
     }
 
-    /**
-     * Approve the damage report and write off
-     */
-    public function approve(): bool
-    {
-        if ($this->canBeApproved()) {
-            $this->status = 'approved';
-            
-            // Create stock adjustment transaction for write-off
-            $this->createWriteOffTransaction();
-            
-            return $this->save();
-        }
-        
-        return false;
-    }
-
-    /**
-     * Write off the damaged inventory
-     */
-    public function writeOff(): bool
-    {
-        if ($this->status === 'approved') {
-            $this->status = 'written_off';
-            $this->createWriteOffTransaction();
-            return $this->save();
-        }
-        
-        return false;
-    }
-
-    /**
-     * Create stock transaction for write-off
-     */
-    protected function createWriteOffTransaction(): void
-    {
-        StockTransaction::create([
-            'product_id' => $this->product_id,
-            'batch_id' => $this->batch_id,
-            'user_id' => $this->investigated_by ?? $this->reported_by,
-            'type' => 'adjustment',
-            'quantity' => $this->quantity_damaged,
-            'quantity_before' => $this->batch?->quantity ?? $this->product->quantity,
-            'quantity_after' => ($this->batch?->quantity ?? $this->product->quantity) - $this->quantity_damaged,
-            'reference_type' => 'damage_report',
-            'reference_id' => $this->id,
-            'notes' => "Write-off due to damage: {$this->damage_type->getDisplayName()}",
-        ]);
-
-        // Update batch/product quantities
-        if ($this->batch) {
-            $this->batch->reduceQuantity($this->quantity_damaged);
-        }
-        
-        $this->product->updateStock($this->quantity_damaged, 'subtract');
-    }
+    // Approval and write-off live in DamageReportService::approveDamageReport(),
+    // which moves stock through InventoryService. The model must not change
+    // quantities itself.
 
     /**
      * Calculate estimated value if not provided
@@ -216,11 +179,13 @@ class DamageReport extends Model
     }
 
     /**
-     * Scope: Under investigation
+     * Scope: Under investigation (reports with investigator assigned but not completed)
      */
     public function scopeInvestigating($query)
     {
-        return $query->where('status', 'investigating');
+        return $query->where('status', 'reported')
+                    ->whereNotNull('investigated_by')
+                    ->whereNull('investigated_at');
     }
 
     /**
