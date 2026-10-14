@@ -8,7 +8,8 @@ class StoreSupplierRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('supplier.create');
+        // Authorization is handled by the controller
+        return true;
     }
 
     public function rules(): array

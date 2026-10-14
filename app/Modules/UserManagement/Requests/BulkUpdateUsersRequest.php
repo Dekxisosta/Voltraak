@@ -38,12 +38,12 @@ class BulkUpdateUsersRequest extends FormRequest
                 'array',
                 'min:1'
             ],
-            'updates.role' => [
-                'sometimes',
-                'string',
-                Rule::enum(UserRole::class),
-                'not_in:' . UserRole::MANAGER->value
-            ],
+            'updates.role' => array_merge(
+                ['sometimes', 'string', Rule::enum(UserRole::class)],
+                $this->user()?->role === UserRole::ADMIN
+                    ? []
+                    : ['not_in:' . UserRole::MANAGER->value . ',' . UserRole::ADMIN->value]
+            ),
             'updates.is_active' => [
                 'sometimes',
                 'boolean'
@@ -73,7 +73,7 @@ class BulkUpdateUsersRequest extends FormRequest
             'updates.array' => 'Updates must be provided as an object',
             'updates.min' => 'At least one field must be updated',
             'updates.role.enum' => 'Please select a valid user role',
-            'updates.role.not_in' => 'Cannot assign manager role in bulk operations',
+            'updates.role.not_in' => 'You cannot assign that role in bulk operations',
             'updates.department.max' => 'Department name cannot exceed 100 characters'
         ];
     }
@@ -92,14 +92,16 @@ class BulkUpdateUsersRequest extends FormRequest
                 $validator->errors()->add('user_ids', 'Cannot include your own account in bulk operations');
             }
             
-            // Check if trying to update any manager accounts
-            $managerIds = \App\Models\User::whereIn('id', $userIds)
-                ->where('role', UserRole::MANAGER)
-                ->pluck('id')
-                ->toArray();
-                
-            if (!empty($managerIds)) {
-                $validator->errors()->add('user_ids', 'Cannot bulk update manager accounts');
+            // Managers cannot bulk update manager / admin accounts (admins can).
+            if ($this->user()->role !== UserRole::ADMIN) {
+                $protectedIds = \App\Models\User::whereIn('id', $userIds)
+                    ->whereIn('role', [UserRole::MANAGER, UserRole::ADMIN])
+                    ->pluck('id')
+                    ->toArray();
+
+                if (!empty($protectedIds)) {
+                    $validator->errors()->add('user_ids', 'Cannot bulk update manager or admin accounts');
+                }
             }
         });
     }

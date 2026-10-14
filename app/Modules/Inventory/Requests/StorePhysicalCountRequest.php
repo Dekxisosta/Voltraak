@@ -11,7 +11,8 @@ class StorePhysicalCountRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('physical_count.create');
+        // Authorization is handled by the controller
+        return true;
     }
 
     /**

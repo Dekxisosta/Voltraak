@@ -8,7 +8,8 @@ class StorePurchaseOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('purchase_order.create');
+        // Authorization is handled by the controller
+        return true;
     }
 
     public function rules(): array

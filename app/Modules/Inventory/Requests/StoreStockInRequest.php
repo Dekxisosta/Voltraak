@@ -12,7 +12,8 @@ class StoreStockInRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('stock_transaction.create');
+        // Authorization is handled by the controller
+        return true;
     }
 
     /**
@@ -27,9 +28,12 @@ class StoreStockInRequest extends FormRequest
             'batch_id' => 'nullable|exists:batches,id',
             'quantity' => 'required|integer|min:1|max:999999',
             'unit_cost' => 'required|numeric|min:0|max:999999.99',
+            'reference_number' => 'nullable|string|max:255',
+            'reason' => 'nullable|string|max:100',
             'reference_type' => 'nullable|string|max:50',
             'reference_id' => 'nullable|string|max:50',
             'notes' => 'nullable|string|max:1000',
+            'purchase_order_id' => 'nullable|integer|exists:purchase_orders,id',
             
             // Batch creation fields (if creating new batch)
             'create_batch' => 'boolean',
@@ -110,11 +114,32 @@ class StoreStockInRequest extends FormRequest
     }
 
     /**
+     * Non-blocking advisory. Laravel's validator has no warnings bag (a call
+     * to one throws), so advisories are only logged; blocking
+     * problems are still reported through $validator->errors().
+     */
+    private function warn(string $field, string $message): void
+    {
+        \Illuminate\Support\Facades\Log::info("Stock movement advisory [{$field}]: {$message}", [
+            'user_id' => $this->user()?->id,
+            'product_id' => $this->product_id,
+        ]);
+    }
+
+    /**
      * Configure the validator instance.
      */
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
+            // T19: Reject stock-in with purchase_order_id
+            if ($this->filled('purchase_order_id')) {
+                $validator->errors()->add(
+                    'purchase_order_id',
+                    'Stock-in with a purchase order reference must be processed through the PO receive endpoint (POST /api/v1/procurement/purchase-orders/{po}/receive).'
+                );
+            }
+
             // Validate product is active
             if ($this->product_id) {
                 $product = \App\Modules\Inventory\Models\Product::find($this->product_id);
@@ -156,7 +181,7 @@ class StoreStockInRequest extends FormRequest
                     $percentDiff = ($costDiff / $product->unit_price) * 100;
                     
                     if ($percentDiff > 20) {
-                        $validator->warnings()->add(
+                        $this->warn(
                             'unit_cost',
                             "Unit cost differs significantly from product standard price (₱{$product->unit_price}). Verify accuracy."
                         );
@@ -166,7 +191,7 @@ class StoreStockInRequest extends FormRequest
 
             // Validate large quantity
             if ($this->quantity > 1000) {
-                $validator->warnings()->add(
+                $this->warn(
                     'quantity',
                     'Large quantity detected. Verify accuracy to prevent data entry errors.'
                 );
@@ -202,7 +227,7 @@ class StoreStockInRequest extends FormRequest
                     $daysToExpiry = now()->diffInDays($expiryDate, false);
                     
                     if ($daysToExpiry <= 30) {
-                        $validator->warnings()->add(
+                        $this->warn(
                             'expiry_date',
                             "New batch expires in {$daysToExpiry} days. Consider if this stock should be received."
                         );

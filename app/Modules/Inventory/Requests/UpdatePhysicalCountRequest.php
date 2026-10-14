@@ -11,7 +11,8 @@ class UpdatePhysicalCountRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('physical_count.update');
+        // Authorization is handled by the controller
+        return true;
     }
 
     /**

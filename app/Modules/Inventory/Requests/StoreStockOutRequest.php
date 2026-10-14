@@ -12,7 +12,8 @@ class StoreStockOutRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('stock_transaction.create');
+        // Authorization is handled by the controller
+        return true;
     }
 
     /**
@@ -25,6 +26,8 @@ class StoreStockOutRequest extends FormRequest
         return [
             'product_id' => 'required|exists:products,id',
             'quantity' => 'required|integer|min:1|max:999999',
+            'reference_number' => 'nullable|string|max:255',
+            'reason' => 'nullable|string|max:100',
             'reference_type' => 'nullable|string|max:50',
             'reference_id' => 'nullable|string|max:50',
             'notes' => 'nullable|string|max:1000',
@@ -80,6 +83,19 @@ class StoreStockOutRequest extends FormRequest
         if (!$this->has('specific_batches')) {
             $this->merge(['specific_batches' => []]);
         }
+    }
+
+    /**
+     * Non-blocking advisory. Laravel's validator has no warnings bag (a call
+     * to one throws), so advisories are only logged; blocking
+     * problems are still reported through $validator->errors().
+     */
+    private function warn(string $field, string $message): void
+    {
+        \Illuminate\Support\Facades\Log::info("Stock movement advisory [{$field}]: {$message}", [
+            'user_id' => $this->user()?->id,
+            'product_id' => $this->product_id,
+        ]);
     }
 
     /**
@@ -150,7 +166,7 @@ class StoreStockOutRequest extends FormRequest
                             
                             // Warn about expired batches
                             if ($batch->status === \App\Support\Enums\BatchStatus::EXPIRED) {
-                                $validator->warnings()->add(
+                                $this->warn(
                                     "specific_batches.{$index}.batch_id",
                                     "Batch {$batch->batch_number} is expired. Verify this is intentional."
                                 );
@@ -169,7 +185,7 @@ class StoreStockOutRequest extends FormRequest
 
                 // If specific batches provided, force_fefo should be false
                 if ($this->force_fefo) {
-                    $validator->warnings()->add(
+                    $this->warn(
                         'force_fefo',
                         'FEFO will be disabled when specific batches are provided.'
                     );
@@ -193,7 +209,7 @@ class StoreStockOutRequest extends FormRequest
 
             // Validate large quantity
             if ($this->quantity > 1000) {
-                $validator->warnings()->add(
+                $this->warn(
                     'quantity',
                     'Large quantity detected. Verify accuracy to prevent data entry errors.'
                 );
@@ -210,7 +226,7 @@ class StoreStockOutRequest extends FormRequest
                         ->count();
                     
                     if ($expiredBatches > 0) {
-                        $validator->warnings()->add(
+                        $this->warn(
                             'product_id',
                             'Product has expired batches with stock. FEFO enforcement will prioritize these for removal.'
                         );

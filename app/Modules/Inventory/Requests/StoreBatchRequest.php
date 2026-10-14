@@ -13,7 +13,8 @@ class StoreBatchRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('batch.create');
+        // Authorization is handled by the controller
+        return true;
     }
 
     /**

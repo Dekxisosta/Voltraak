@@ -12,7 +12,8 @@ class StoreProductRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('product.create');
+        // Authorization is handled by the controller
+        return true;
     }
 
     /**
@@ -109,14 +110,23 @@ class StoreProductRequest extends FormRequest
     public function withValidator($validator): void
     {
         $validator->after(function ($validator) {
-            // Validate reasonable reorder level
-            if ($this->reorder_level !== null && $this->reorder_level === 0) {
-                $validator->warnings()->add(
-                    'reorder_level',
-                    'Reorder level of 0 may cause stockouts. Consider setting a minimum level.'
-                );
+            // Advisory only: Laravel's validator has no warnings() API, so
+            // non-blocking notes are collected instead of failing the request.
+            if ($this->reorder_level !== null && (int) $this->reorder_level === 0) {
+                $this->warnings['reorder_level'][] =
+                    'Reorder level of 0 may cause stockouts. Consider setting a minimum level.';
             }
         });
+    }
+
+    /**
+     * Non-blocking advisories collected during validation.
+     */
+    protected array $warnings = [];
+
+    public function getWarnings(): array
+    {
+        return $this->warnings;
     }
 
     /**

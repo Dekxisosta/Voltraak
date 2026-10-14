@@ -8,7 +8,8 @@ class UpdateProcurementRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('procurement_request.update');
+        // Authorization is handled by the controller
+        return true;
     }
 
     public function rules(): array

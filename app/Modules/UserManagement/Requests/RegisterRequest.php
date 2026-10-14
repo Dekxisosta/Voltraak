@@ -13,9 +13,11 @@ class RegisterRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        // Only managers can register new users, or allow self-registration if no user is authenticated
+        // Account creation is manager-only. There is no public self-signup:
+        // an unauthenticated caller must never be able to mint an account,
+        // least of all one with an elevated role.
         $user = $this->user();
-        return !$user || $user->isManager();
+        return $user !== null && $user->isManager();
     }
 
     /**

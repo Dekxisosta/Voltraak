@@ -8,7 +8,8 @@ class UpdateSupplierRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('supplier.update');
+        // Authorization is handled by the controller
+        return true;
     }
 
     public function rules(): array

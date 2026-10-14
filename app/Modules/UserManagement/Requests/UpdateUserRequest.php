@@ -17,6 +17,7 @@ class UpdateUserRequest extends FormRequest
         $targetUserId = $this->route('id') ?? $this->route('user');
         
         // Users can update their own profile or managers can update subordinates
+        // (a missing target falls through so the service can answer with a 404).
         return $user && ($user->id == $targetUserId || $user->isManager());
     }
 
@@ -41,7 +42,7 @@ class UpdateUserRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                Rule::unique('users', 'email')->ignore($userId)
+                Rule::unique('users', 'email')->ignore($userId)->withoutTrashed()
             ],
             'phone' => [
                 'sometimes',
@@ -73,12 +74,13 @@ class UpdateUserRequest extends FormRequest
 
         // Only managers can update role and is_active
         if ($currentUser && $currentUser->isManager() && !$isSelfUpdate) {
-            $rules['role'] = [
-                'sometimes',
-                'string',
-                Rule::enum(UserRole::class),
-                'not_in:' . UserRole::MANAGER->value // Cannot assign manager role
-            ];
+            $rules['role'] = array_merge(
+                ['sometimes', 'string', Rule::enum(UserRole::class)],
+                // Admins may assign any role; managers cannot grant manager/admin.
+                $currentUser->role === UserRole::ADMIN
+                    ? []
+                    : ['not_in:' . UserRole::MANAGER->value . ',' . UserRole::ADMIN->value]
+            );
             
             $rules['is_active'] = [
                 'sometimes',
@@ -102,7 +104,7 @@ class UpdateUserRequest extends FormRequest
             'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character',
             'current_password.required' => 'Current password is required to change password',
             'role.enum' => 'Please select a valid user role',
-            'role.not_in' => 'You cannot assign manager role to other users',
+            'role.not_in' => 'You cannot assign that role',
             'phone.regex' => 'Please provide a valid phone number',
             'department.max' => 'Department name cannot exceed 100 characters'
         ];

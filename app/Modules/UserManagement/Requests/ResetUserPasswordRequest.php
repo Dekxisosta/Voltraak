@@ -56,10 +56,10 @@ class ResetUserPasswordRequest extends FormRequest
                 $validator->errors()->add('new_password', 'Cannot reset your own password using this endpoint. Use the change password endpoint instead.');
             }
             
-            // Check if target user is a manager
+            // Managers cannot reset manager / admin passwords (admins can).
             $targetUser = \App\Models\User::find($targetUserId);
-            if ($targetUser && $targetUser->role === \App\Support\Enums\UserRole::MANAGER) {
-                $validator->errors()->add('new_password', 'Cannot reset password for manager accounts.');
+            if ($targetUser && $currentUser && !$currentUser->canManageRole($targetUser->role)) {
+                $validator->errors()->add('new_password', 'You do not have permission to reset this user\'s password.');
             }
         });
     }

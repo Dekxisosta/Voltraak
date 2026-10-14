@@ -34,7 +34,7 @@ class StoreUserRequest extends FormRequest
                 'string',
                 'email',
                 'max:255',
-                'unique:users,email'
+                Rule::unique('users', 'email')->withoutTrashed()
             ],
             'password' => [
                 'required',
@@ -42,12 +42,14 @@ class StoreUserRequest extends FormRequest
                 'min:8',
                 'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/'
             ],
-            'role' => [
-                'required',
-                'string',
-                Rule::enum(UserRole::class),
-                'not_in:' . UserRole::MANAGER->value // Managers cannot create other managers
-            ],
+            'role' => array_merge(
+                ['required', 'string', Rule::enum(UserRole::class)],
+                // Admins may assign any role; managers may only create warehouse /
+                // inventory staff (no managers, no admins).
+                $this->user()?->role === UserRole::ADMIN
+                    ? []
+                    : ['not_in:' . UserRole::MANAGER->value . ',' . UserRole::ADMIN->value]
+            ),
             'phone' => [
                 'nullable',
                 'string',
@@ -82,7 +84,7 @@ class StoreUserRequest extends FormRequest
             'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character',
             'role.required' => 'User role is required',
             'role.enum' => 'Please select a valid user role',
-            'role.not_in' => 'You cannot assign manager role to other users',
+            'role.not_in' => 'You cannot assign that role',
             'phone.regex' => 'Please provide a valid phone number',
             'department.max' => 'Department name cannot exceed 100 characters'
         ];
